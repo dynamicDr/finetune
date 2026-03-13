@@ -1,0 +1,36 @@
+项目总结：
+这个项目可以看成是在 HuggingFace 的 TRL 示例项目上，额外加了一套“在 VSI-Bench 视频数据集上评测多模态模型”的小工具。
+- TRL：HuggingFace 出的一个库，用来做大模型微调和对齐（比如 SFT、RLHF、DPO、GRPO），这里的 `scripts/`、`datasets/`、`notebooks/` 大部分都是它的官方示例，平时要做各种训练可以直接参考这些脚本。
+- VSI-Bench：一个视频理解评测数据集，里面有很多短视频和对应的问题（既有选择题也有数值题），我们用它来测试像 Qwen2.5-VL-3B 这种“看图看视频的大模型”到底表现怎样。
+
+关键文件与作用：
+- README.md：TRL 官方示例的简要说明和文档入口。
+- note：当前这个笔记文件，用来记录项目结构、脚本用途和使用方法。
+- download_visbench.py：下载并准备 VSI-Bench 数据集（包括元数据和大体积视频 zip），并做简单完整性检查。
+- video_test.py：扫描 `~/dataset/vsi_bench` 文件夹下所有 `.mp4`，统计每个视频的帧数以及整体的统计信息。
+- test_vsibench.py：核心评测脚本，加载 Qwen2.5-VL-3B 等模型，对 VSI-Bench 的视频做推理，分别统计多选题的准确率、数值题的数值误差指标，还可以把结果写到 CSV 里。
+- vsibench_evaluation_log.csv：`test_vsibench.py` 运行后追加的评测日志，记录帧数、题型、平均准确率、平均推理时间等，用于后续画图和对比不同配置。
+- test_frame.sh：批量实验脚本，循环不同的 `num_frames` 和题型配置，多次调用 `python test_vsibench.py ...`，一键跑完一系列对比实验。
+- srun.sh：提交到集群的 SLURM 脚本，负责申请 GPU、激活 `conda` 环境 `finetune`，并运行 `test_frame.sh`，自动产出 `test_frame_batch_*.out/.err` 日志。
+
+
+环境启动：
+srun --gres=gpu:1 --mail-type=ALL --pty bash
+conda activate finetune
+
+test_vsibench.py 
+这是测试一个模型一种配置在某个数据集上
+
+test_frame.sh 
+本机上一键“多次调用 test_vsibench.py”的壳
+
+srun.sh 把这个批量任务丢到集群上跑。可以自动将某个sh（如test_frame.sh）送入srun作为一个作业提交，自动启动GPU并且任务完成时释放gpu资源
+使用方法：
+运行：
+sbatch srun.sh
+查看任务（可查看job名称和id）：
+squeue -u $USER
+查看标准输出（数字改为上一条输出的id）：
+tail -f test_frame_batch_25623.out
+结束任务：
+scancel 25623
