@@ -1,0 +1,12 @@
+# @package hydra.launcher
+_target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
+submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+timeout_min: 2880         # 2天，q-h800 上也够用
+gpus_per_node: 1
+nodes: 1
+mem_gb: 240               # H800 每卡配 240GB 内存
+cpus_per_task: 4
+partition: q-h800
+setup:
+  - source $HOME/miniconda3/etc/profile.d/conda.sh
+  - conda activate finetune

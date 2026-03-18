@@ -1,0 +1,8 @@
+model:
+  name: Qwen3-VL-8B-Instruct
+  path: ${oc.env:HOME}/.cache/huggingface/hub/models--Qwen--Qwen3-VL-8B-Instruct
+video_dir: ${oc.env:HOME}/dataset/vsi_bench
+seed: 42
+num_samples: all
+task_filter: numeric
+num_frames: 4

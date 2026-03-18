@@ -1,36 +1,87 @@
-项目总结：
-这个项目可以看成是在 HuggingFace 的 TRL 示例项目上，额外加了一套“在 VSI-Bench 视频数据集上评测多模态模型”的小工具。
-- TRL：HuggingFace 出的一个库，用来做大模型微调和对齐（比如 SFT、RLHF、DPO、GRPO），这里的 `scripts/`、`datasets/`、`notebooks/` 大部分都是它的官方示例，平时要做各种训练可以直接参考这些脚本。
-- VSI-Bench：一个视频理解评测数据集，里面有很多短视频和对应的问题（既有选择题也有数值题），我们用它来测试像 Qwen2.5-VL-3B 这种“看图看视频的大模型”到底表现怎样。
+项目简述  
+这个项目是在 HuggingFace TRL 示例项目基础上，加了一套“用 VSI-Bench 评测多模态视频模型”的脚本和配置。现在评测流程已经切到 Hydra + Submitit 的统一配置和并行架构。
 
-关键文件与作用：
-- README.md：TRL 官方示例的简要说明和文档入口。
-- note：当前这个笔记文件，用来记录项目结构、脚本用途和使用方法。
-- download_visbench.py：下载并准备 VSI-Bench 数据集（包括元数据和大体积视频 zip），并做简单完整性检查。
-- video_test.py：扫描 `~/dataset/vsi_bench` 文件夹下所有 `.mp4`，统计每个视频的帧数以及整体的统计信息。
-- test_vsibench.py：核心评测脚本，加载 Qwen2.5-VL-3B 等模型，对 VSI-Bench 的视频做推理，分别统计多选题的准确率、数值题的数值误差指标，还可以把结果写到 CSV 里。
-- vsibench_evaluation_log.csv：`test_vsibench.py` 运行后追加的评测日志，记录帧数、题型、平均准确率、平均推理时间等，用于后续画图和对比不同配置。
-- test_frame.sh：批量实验脚本，循环不同的 `num_frames` 和题型配置，多次调用 `python test_vsibench.py ...`，一键跑完一系列对比实验。
-- srun.sh：提交到集群的 SLURM 脚本，负责申请 GPU、激活 `conda` 环境 `finetune`，并运行 `test_frame.sh`，自动产出 `test_frame_batch_*.out/.err` 日志。
+术语表  
+- TRL：HuggingFace 出的大模型对齐/微调库（SFT、RLHF、DPO、GRPO 等），`scripts/`、`datasets/`、`notebooks/` 主要是官方示例脚本，可以直接改着用。  
+- VSI-Bench：视频理解评测集，里面是短视频配问题（有选择题，也有数值题），我们用它来测试多模态模型对视频的理解能力。  
+  - 例子：一个 5 秒的视频，内容是一个计时器从 0 秒走到 5 秒，对应的问题可能是  
+    - 选择题：“计时器最终指向多少秒？A. 3 B. 4 C. 5 D. 6”  
+    - 数值题：“计时器最终指向多少秒？（直接回答数字）”  
+- SLURM：集群上的作业调度系统，可以理解成“排队和分配 GPU 的管家”，我们把任务交给它，它负责在哪台机器上跑、什么时候跑。  
+- Hydra：一个配置管理工具，用命令行参数 + YAML 文件来控制实验超参，方便做扫参和复现实验结果。  
+- Submitit：一个基于 SLURM 的小工具，帮我们把 Hydra 的多组配置自动变成 SLURM 作业，在集群上并行跑。  
+
+关键文件与作用  
+- README.md：TRL 示例项目的简要说明。  
+- note：当前文件，记录项目结构和用法。  
+- download_visbench.py：下载并准备 VSI-Bench（含视频与元数据）。  
+- video_test.py：扫描 `~/dataset/vsi_bench` 下所有 `.mp4`，做帧数统计。  
+- test_vsibench.py：评测核心脚本，给定模型和配置，在 VSI-Bench 上跑推理并写入 CSV。  
+- run.py：新的统一入口。用 Hydra 管理实验配置，用 Submitit 提交 SLURM 任务。  
+- config/：Hydra 配置目录  
+  - `config.yaml`：公共配置（数据路径、任务类型、帧数等）和 Hydra 输出目录设置。  
+  - `model/*.yaml`：不同 Qwen3-VL 模型的配置（名称 + 本地缓存路径）。  
+  - `slurm/default_4090.yaml`：默认使用的 RTX4090（debug 队列）配置，适合小模型和调试。  
+  - `slurm/h800.yaml`：单卡 H800 配置，适合大模型。  
+  - `slurm/hgpu_batch.yaml`：多卡 hgpu-batch 配置，适合需要多卡/长时间的大任务（配合 `sbatch` 更合适）。  
+- backup/：旧的非 Hydra 脚本和旧配置归档目录（如 `test_frame.sh`、`srun.sh`，以及早期的 `slurm/default.yaml` 等），保留仅供参考。
+
+新的运行方式  
+1. 单次评测（先申请一块交互式 GPU）  
+   - 先在集群上申请一块 GPU 打开交互式终端：  
+     - srun --gres=gpu:1 --mail-type=ALL --pty bash  
+   - 在新开的终端里激活环境：  
+     - conda activate finetune  
+   - 然后直接运行：  
+     - python run.py model=qwen3_8b num_frames=16  
+
+2. SLURM 单任务评测（Submitit 模式）  
+   - 小模型用 RTX4090（默认走 slurm=default_4090）：  
+     - python run.py --hydra/launcher=submitit_slurm model=qwen3_4b  
+   - 大模型用单卡 H800：  
+     - python run.py --hydra/launcher=submitit_slurm model=qwen3_30b slurm=h800  
+
+3. SLURM 并行多任务（多模型、多任务、多帧数一起扫）  
+   - 并行扫参，小模型用默认 RTX4090：  
+     - python run.py --multirun --hydra/launcher=submitit_slurm \
+       model=qwen3_4b,qwen3_8b \
+       task_filter=mcq,numeric \
+       num_frames=4,8  
+   - 并行扫参或长时间大任务，用 hgpu-batch：  
+     - python run.py --multirun \
+        hydra/launcher=submitit_slurm \
+        model=qwen3_4b,qwen3_8b,qwen3_30b \
+        task_filter=mcq,numeric \
+        num_frames=4 \
+        slurm=hgpu_batch \
+        hydra.launcher.timeout_min=700 #这个值定义了任务最大分钟数
+
+说明  
+- 现在不再直接用 `test_frame.sh` + `srun.sh` 做批量扫参，所有实验配置统一由 Hydra 管理。  
+- 如需新增模型或修改资源配置，只要在 `config/model/` 或 `config/slurm/` 下面改 YAML 即可，无需改 shell。  
+
+SLURM 常用指令  
+- 查看自己所有作业：  
+  - squeue -u $USER  
+- 取消一个作业（比如作业号是 12345）：  
+  - scancel 12345  
+- 取消自己当前所有作业：  
+  - scancel -u $USER  
+- 查看某个作业的详细信息：  
+  - scontrol show job 12345  
 
 
-环境启动：
-srun --gres=gpu:1 --mail-type=ALL --pty bash
-conda activate finetune
-
-test_vsibench.py 
-这是测试一个模型一种配置在某个数据集上
-
-test_frame.sh 
-本机上一键“多次调用 test_vsibench.py”的壳
-
-srun.sh 把这个批量任务丢到集群上跑。可以自动将某个sh（如test_frame.sh）送入srun作为一个作业提交，自动启动GPU并且任务完成时释放gpu资源
-使用方法：
-运行：
-sbatch srun.sh
-查看任务（可查看job名称和id）：
-squeue -u $USER
-查看标准输出（数字改为上一条输出的id）：
-tail -f test_frame_batch_25623.out
-结束任务：
-scancel 25623
+  最新任务：
+  ; python run.py --multirun \
+  ;       hydra/launcher=submitit_slurm \
+  ;       model=qwen3_8b,qwen3_30b_a3b \
+  ;       task_filter=mcq,numeric \
+  ;       num_frames=4 \
+  ;       slurm=hgpu_batch
+  ; 以上命令发现这两个模型acc和推理时间差别不大。
+  python run.py --multirun \
+        hydra/launcher=submitit_slurm \
+        model=qwen3_4b,qwen3_8b_thinking,qwen3_235b_a22b,qwen3_32b \
+        task_filter=mcq,numeric \
+        num_frames=4 \
+        slurm=hgpu_batch

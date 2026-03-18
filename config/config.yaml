@@ -1,0 +1,17 @@
+defaults:
+  - model: qwen3_4b
+  - slurm: default_4090
+  - _self_
+
+video_dir: ${oc.env:HOME}/dataset/vsi_bench
+seed: 42
+num_samples: all
+task_filter: mcq
+num_frames: 4
+
+hydra:
+  run:
+    dir: outputs/${model.name}/${task_filter}_frames${num_frames}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${model.name}/${task_filter}_frames${num_frames}

@@ -1,0 +1,11 @@
+[2026-03-18 03:34:17,139][__main__][INFO] - 当前配置:
+model:
+  name: Qwen/Qwen3-VL-4B-Instruct
+  path: ${oc.env:HOME}/.cache/huggingface/hub/models--Qwen--Qwen3-VL-4B-Instruct
+video_dir: ${oc.env:HOME}/dataset/vsi_bench
+seed: 42
+num_samples: all
+task_filter: mcq
+num_frames: 4
+
+[2026-03-18 03:34:17,141][__main__][INFO] - 执行命令: python test_vsibench.py --model_path /userhome/cs3/duanty/.cache/huggingface/hub/models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281ec70b05090aa6165b016eac8ec08e71b17 --video_dir /userhome/cs3/duanty/dataset/vsi_bench --num_samples all --num_frames 4 --seed 42 --task_filter mcq --log_file results.csv

@@ -1,0 +1,20 @@
+submitit INFO (2026-03-16 23:03:25,365) - Starting with JobEnvironment(job_id=35513_0, hostname=gpucluster-g18, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2026-03-16 23:03:25,365) - Loading pickle: /userhome/cs3/duanty/finetune/outputs/multirun/2026-03-16_23-03-22/.submitit/35513_0/35513_0_submitted.pkl
+[2026-03-16 23:03:25,634][__main__][INFO] - 当前配置:
+model:
+  name: Qwen3-VL-8B-Instruct
+  path: ${oc.env:HOME}/.cache/huggingface/hub/models--Qwen--Qwen3-VL-8B-Instruct
+video_dir: ${oc.env:HOME}/dataset/vsi_bench
+seed: 42
+num_samples: all
+task_filter: mcq
+num_frames: 4
+
+[2026-03-16 23:03:25,637][__main__][INFO] - 执行命令: python test_vsibench.py --model_path /userhome/cs3/duanty/.cache/huggingface/hub/models--Qwen--Qwen3-VL-8B-Instruct/snapshots/0c351dd01ed87e9c1b53cbc748cba10e6187ff3b --video_dir /userhome/cs3/duanty/dataset/vsi_bench --num_samples all --num_frames 4 --seed 42 --task_filter mcq --log_file results.csv
+
+记录已添加到 results.csv:
+2026-03-17 19:15:23,42,mcq,2490,4,44.50,29.001,Qwen3-VL-8B-Instruct,
+submitit INFO (2026-03-17 19:15:26,295) - Job completed successfully
+[2026-03-17 19:15:26,295][submitit][INFO] - Job completed successfully
+submitit INFO (2026-03-17 19:15:26,303) - Exiting after successful completion
+[2026-03-17 19:15:26,303][submitit][INFO] - Exiting after successful completion

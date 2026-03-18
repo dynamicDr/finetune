@@ -1,0 +1,5 @@
+timestamp,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,model_name,lora_path
+2026-03-17 19:15:23,42,mcq,2490,4,44.50,29.001,Qwen3-VL-8B-Instruct,
+2026-03-17 19:42:37,42,mcq,2490,4,45.86,29.601,Qwen3-VL-30B-A3B-Instruct,
+2026-03-17 19:58:53,42,numeric,2640,4,64.53,28.337,Qwen3-VL-8B-Instruct,
+2026-03-17 20:48:55,42,numeric,2640,4,68.22,29.419,Qwen3-VL-30B-A3B-Instruct,

@@ -137,6 +137,47 @@ def should_include_sample(sample, task_filter: str) -> bool:
     return task_filter == "all" or (sample.get("options") is not None) == (task_filter == "mcq")
 
 
+def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
+    """根据当前 results 字典计算已评估部分的准确率和平均推理时间。"""
+    avg_accuracy = 0.0
+    if task_filter == "mcq" and results["total"] > 0:
+        avg_accuracy = results["correct"] / results["total"] * 100
+    elif task_filter == "numeric" and results["mra_count"] > 0:
+        avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
+    elif task_filter == "all":
+        total_score = 0.0
+        total_count = 0
+        if results["total"] > 0:
+            total_score += results["correct"]
+            total_count += results["total"]
+        if results["mra_count"] > 0:
+            total_score += results["mra_sum"]
+            total_count += results["mra_count"]
+        if total_count > 0:
+            avg_accuracy = total_score / total_count * 100
+    avg_inference_time = (
+        sum(results["inference_times"]) / len(results["inference_times"])
+        if results["inference_times"]
+        else 0.0
+    )
+    return avg_accuracy, avg_inference_time
+
+
+def _write_progress_file(
+    progress_file: str,
+    n_done: int,
+    n_total: int,
+    partial_accuracy: float,
+    elapsed_sec: float,
+):
+    """覆盖写入进度文件，便于超时或断点后查看已跑多少、当前准确率。"""
+    with open(progress_file, "w", encoding="utf-8") as f:
+        f.write(f"n_done={n_done}\n")
+        f.write(f"n_total={n_total}\n")
+        f.write(f"partial_accuracy={partial_accuracy:.2f}\n")
+        f.write(f"elapsed_sec={elapsed_sec:.1f}\n")
+
+
 def log_to_csv(
     log_file: str,
     seed: int,
@@ -200,6 +241,7 @@ def evaluate_vsibench(
     log_file: str = "vsibench_evaluation_log.csv",
     model_name: str = "",
     lora_path: str = "",
+    progress_interval: int = 10,
 ):
     """在 VSI-Bench 数据集上评估模型
 
@@ -207,7 +249,9 @@ def evaluate_vsibench(
         num_samples: 评估的样本数量,可以是整数或 "all" (测试全部样本)
         task_filter: 'all' (所有题目), 'mcq' (只做多选题), 'numeric' (只做数值题)
         log_file: CSV 日志文件路径
+        progress_interval: 每评估多少个样本写一次进度文件（0 表示不写）
     """
+    progress_file = os.path.splitext(log_file)[0] + "_progress.txt"
     dataset = load_dataset("nyu-visionx/VSI-Bench", split="test")
 
     # 先筛选符合条件的样本
@@ -241,7 +285,13 @@ def evaluate_vsibench(
         "numeric_count": 0,
     }
 
-    for i, sample in enumerate(tqdm(samples, desc="评估进度")):
+    start_time = time.time()
+    n_total = len(samples)
+
+    # 初始化进度条
+    pbar = tqdm(samples, desc="评估进度")
+
+    for i, sample in enumerate(pbar):
         try:
             question = sample.get("question", "")
             answer = sample.get("ground_truth", "")
@@ -304,6 +354,24 @@ def evaluate_vsibench(
                     "inference_time": inference_time,
                 }
             )
+
+            # 更新进度条显示的准确率和平均推理时间
+            if len(results["details"]) > 0:
+                partial_acc, partial_time = _compute_accuracy_from_results(results, task_filter)
+                pbar.set_postfix({
+                    'Acc': f'{partial_acc:.2f}%',
+                    'AvgTime': f'{partial_time:.2f}s'
+                })
+
+            # 定期写进度文件，超时或中断后仍可看到已跑多少、当前准确率
+            n_done = len(results["details"])
+            if progress_interval > 0 and (
+                n_done % progress_interval == 0 or i == n_total - 1
+            ):
+                partial_acc, _ = _compute_accuracy_from_results(results, task_filter)
+                _write_progress_file(
+                    progress_file, n_done, n_total, partial_acc, time.time() - start_time
+                )
 
         except Exception as e:
             continue
@@ -370,7 +438,7 @@ def main():
         model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
         lora_path = resolved_model_path
     else:
-        # 通用规则: 从路径中截取“最后一个 -- 之后、下一个 / 之前”的内容作为模型名
+        # 通用规则: 从路径中截取"最后一个 -- 之后、下一个 / 之前"的内容作为模型名
         # 例如:
         #   .../models--Qwen--Qwen3-VL-8B-Instruct/snapshots/xxx  -> Qwen3-VL-8B-Instruct
         #   .../models--Foo--Bar-1B/snapshots/xxx                 -> Bar-1B
