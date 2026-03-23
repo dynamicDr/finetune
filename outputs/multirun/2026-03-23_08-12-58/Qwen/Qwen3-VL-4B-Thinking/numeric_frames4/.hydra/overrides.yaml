@@ -1,4 +1,0 @@
-- model=qwen3_4b_thinking
-- task_filter=numeric
-- num_frames=4
-- slurm=hgpu_batch

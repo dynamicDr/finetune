@@ -1,4 +1,0 @@
-- model=qwen3_30b
-- task_filter=mcq
-- num_frames=4
-- slurm=hgpu_batch

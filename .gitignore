@@ -1,0 +1,34 @@
+# ---- run.py / Hydra / Submitit ----
+outputs/
+
+# run.py 里写死的评测汇总（及常见备份/进度）
+results.csv
+results_backup.csv
+results_progress.txt
+
+# test_vsibench 默认或其它 log_file 对应的进度文件
+vsibench_evaluation_log.csv
+vsibench_evaluation_log_progress.txt
+vsibench_evaluation_log_backup.csv
+
+# 通用：评测 CSV 的进度旁路文件（与 log_file 同 stem）
+*_evaluation_log_progress.txt
+
+# ---- Python / 环境 ----
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- IDE ----
+.idea/

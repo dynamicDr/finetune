@@ -1,8 +1,0 @@
-Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:10<00:10, 10.91s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:19<00:00,  9.25s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:19<00:00,  9.50s/it]
-评估进度:   0%|          | 0/2490 [00:00<?, ?it/s]The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
-评估进度:   0%|          | 1/2490 [00:25<17:48:51, 25.77s/it]srun: Job step aborted: Waiting up to 122 seconds for job step to finish.
-submitit WARNING (2026-03-14 01:01:36,642) - Bypassing signal SIGCONT
-slurmstepd: error: *** STEP 35063.0 ON gpucluster-g2 CANCELLED AT 2026-03-14T01:01:36 ***
-submitit WARNING (2026-03-14 01:01:36,643) - Bypassing signal SIGTERM
-slurmstepd: error: *** JOB 35063 ON gpucluster-g2 CANCELLED AT 2026-03-14T01:01:36 ***
-评估进度:   0%|          | 2/2490 [00:49<16:53:02, 24.43s/it]评估进度:   0%|          | 3/2490 [01:12<16:33:30, 23.97s/it]评估进度:   0%|          | 4/2490 [01:35<16:21:49, 23.70s/it]评估进度:   0%|          | 5/2490 [01:59<16:18:09, 23.62s/it]评估进度:   0%|          | 6/2490 [02:22<16:16:14, 23.58s/it]

@@ -11,6 +11,8 @@ seed: 42
 num_samples: all
 task_filter: mcq
 num_frames: 4
+# 与 test_vsibench / train_vsibench 划分一致时可覆盖
+train_ratio: 0.8
 
 hydra:
   run:

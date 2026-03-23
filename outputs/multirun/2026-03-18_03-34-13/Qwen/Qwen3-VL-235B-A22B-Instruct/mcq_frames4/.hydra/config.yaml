@@ -1,8 +1,0 @@
-model:
-  name: Qwen/Qwen3-VL-235B-A22B-Instruct
-  path: ${oc.env:HOME}/.cache/huggingface/hub/models--Qwen--Qwen3-VL-235B-A22B-Instruct
-video_dir: ${oc.env:HOME}/dataset/vsi_bench
-seed: 42
-num_samples: all
-task_filter: mcq
-num_frames: 4

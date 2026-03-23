@@ -86,10 +86,23 @@ python run.py --multirun \
 
 
 最新任务:
-  python run.py --multirun \
-        hydra/launcher=submitit_slurm \
-        script=test_vsibench.py \
-        model=qwen3_4b_thinking,qwen3_8b_thinking \
-        task_filter=mcq,numeric \
-        num_frames=4 \
-        slurm=hgpu_batch
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=test_vsibench.py \
+    model=qwen3_4b_thinking,qwen3_8b_thinking,qwen3_30b_a3b_thinking,qwen3_32b_thinking \
+    task_filter=mcq,numeric \
+    num_frames=4 \
+    train_ratio=0.8 \
+    seed=42 \
+    slurm=hgpu_batch
+
+最新任务（zzy）:
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=test_vsibench.py \
+    model=qwen3_4b,qwen3_8b,qwen3_30b_a3b,qwen3_32b,\
+    task_filter=mcq,numeric \
+    num_frames=4 \
+    train_ratio=0.8 \
+    seed=42 \
+    slurm=hgpu_batch

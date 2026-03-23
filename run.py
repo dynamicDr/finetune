@@ -40,6 +40,8 @@ def main(cfg: DictConfig) -> None:
         str(cfg.num_frames),
         "--seed",
         str(cfg.seed),
+        "--train_ratio",
+        str(cfg.train_ratio),
         "--task_filter",
         cfg.task_filter,
         "--log_file",
