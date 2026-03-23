@@ -107,15 +107,26 @@ def generate_response(model, processor, frames: list, question: str) -> tuple[st
 
 
 def extract_answer(response: str, has_options: bool = False):
-    """从模型回复中提取答案"""
+    """从模型回复中提取答案。
+    对于 Thinking 模型（<think>...</think>），答案在 </think> 之后，需从该部分提取，否则会误取推理过程中的中间值。
+    """
     response = response.strip()
 
+    # Thinking 模型：答案在 </think> 之后（或 <answer>...</answer> 内）
+    answer_portion = response
+    if "</think>" in response:
+        answer_portion = response.split("</think>", 1)[-1].strip()
+    # 若有 <answer>...</answer>，优先从中提取
+    answer_match = re.search(r"<answer>\s*(.*?)\s*</answer>", answer_portion, re.DOTALL | re.IGNORECASE)
+    if answer_match:
+        answer_portion = answer_match.group(1).strip()
+
     if has_options:
-        match = re.search(r"\b([A-D])\b", response.upper())
+        match = re.search(r"\b([A-D])\b", answer_portion.upper())
         if match:
             return match.group(1)
 
-    numbers = re.findall(r"[\d.]+", response)
+    numbers = re.findall(r"[\d.]+", answer_portion)
     if numbers:
         try:
             return float(numbers[0])

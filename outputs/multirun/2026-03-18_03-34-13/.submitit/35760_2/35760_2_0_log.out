@@ -11,3 +11,10 @@ task_filter: mcq
 num_frames: 4
 
 [2026-03-18 03:34:17,141][__main__][INFO] - 执行命令: python test_vsibench.py --model_path /userhome/cs3/duanty/.cache/huggingface/hub/models--Qwen--Qwen3-VL-8B-Thinking/snapshots/92f3c4b4feadd3a016ef468d103bb5f58b2a2c6b --video_dir /userhome/cs3/duanty/dataset/vsi_bench --num_samples all --num_frames 4 --seed 42 --task_filter mcq --log_file results.csv
+
+记录已添加到 results.csv:
+2026-03-19 01:44:28,42,mcq,2490,4,29.03,31.884,Qwen3-VL-8B-Thinking,
+submitit INFO (2026-03-19 01:44:28,839) - Job completed successfully
+[2026-03-19 01:44:28,839][submitit][INFO] - Job completed successfully
+submitit INFO (2026-03-19 01:44:28,846) - Exiting after successful completion
+[2026-03-19 01:44:28,846][submitit][INFO] - Exiting after successful completion

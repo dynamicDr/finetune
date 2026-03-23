@@ -1,0 +1,17 @@
+submitit INFO (2026-03-18 20:01:51,366) - Starting with JobEnvironment(job_id=35760_4, hostname=gpucluster-g2, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2026-03-18 20:01:51,366) - Loading pickle: /userhome/cs3/duanty/finetune/outputs/multirun/2026-03-18_03-34-13/.submitit/35760_4/35760_4_submitted.pkl
+[2026-03-18 20:01:51,587][__main__][INFO] - 当前配置:
+model:
+  name: Qwen/Qwen3-VL-235B-A22B-Instruct
+  path: ${oc.env:HOME}/.cache/huggingface/hub/models--Qwen--Qwen3-VL-235B-A22B-Instruct
+video_dir: ${oc.env:HOME}/dataset/vsi_bench
+seed: 42
+num_samples: all
+task_filter: mcq
+num_frames: 4
+
+[2026-03-18 20:01:51,589][__main__][INFO] - 执行命令: python test_vsibench.py --model_path /userhome/cs3/duanty/.cache/huggingface/hub/models--Qwen--Qwen3-VL-235B-A22B-Instruct/snapshots/710c13861be6c466e66de3f484069440b8f31389 --video_dir /userhome/cs3/duanty/dataset/vsi_bench --num_samples all --num_frames 4 --seed 42 --task_filter mcq --log_file results.csv
+submitit WARNING (2026-03-20 01:12:53,535) - Bypassing signal SIGCONT
+[2026-03-20 01:12:53,535][submitit][WARNING] - Bypassing signal SIGCONT
+submitit WARNING (2026-03-20 01:12:53,536) - Bypassing signal SIGTERM
+[2026-03-20 01:12:53,536][submitit][WARNING] - Bypassing signal SIGTERM

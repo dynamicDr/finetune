@@ -1,5 +1,11 @@
-timestamp,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,model_name,lora_path
-2026-03-17 19:15:23,42,mcq,2490,4,44.50,29.001,Qwen3-VL-8B-Instruct,
-2026-03-17 19:42:37,42,mcq,2490,4,45.86,29.601,Qwen3-VL-30B-A3B-Instruct,
-2026-03-17 19:58:53,42,numeric,2640,4,64.53,28.337,Qwen3-VL-8B-Instruct,
-2026-03-17 20:48:55,42,numeric,2640,4,68.22,29.419,Qwen3-VL-30B-A3B-Instruct,
+timestamp          , seed, task_filter, num_samples, num_frames, avg_accuracy, avg_inference_time, model_name               , lora_path
+2026-03-17 19:15:23,   42, mcq        ,        2490,          4,        44.50,             29.001, Qwen3-VL-8B-Instruct     , 
+2026-03-17 19:42:37,   42, mcq        ,        2490,          4,        45.86,             29.601, Qwen3-VL-30B-A3B-Instruct, 
+2026-03-17 19:58:53,   42, numeric    ,        2640,          4,        64.53,             28.337, Qwen3-VL-8B-Instruct     , 
+2026-03-17 20:48:55,   42, numeric    ,        2640,          4,        68.22,             29.419, Qwen3-VL-30B-A3B-Instruct, 
+2026-03-18 20:01:47,   42, mcq        ,        2490,          4,        39.60,             23.643, Qwen3-VL-4B-Instruct     , 
+2026-03-18 20:41:29,   42, numeric    ,        2640,          4,        65.32,             23.197, Qwen3-VL-4B-Instruct     , 
+2026-03-19 01:44:28,   42, mcq        ,        2490,          4,        29.03,             31.884, Qwen3-VL-8B-Thinking     , 
+2026-03-19 02:38:13,   42, numeric    ,        2640,          4,         0.00,             31.289, Qwen3-VL-8B-Thinking     , 
+2026-03-19 21:50:55,   42, mcq        ,        2490,          4,        46.35,             28.826, Qwen3-VL-32B-Instruct    , 
+2026-03-20 00:06:00,   42, numeric    ,        2640,          4,        66.49,             29.032, Qwen3-VL-32B-Instruct    , 

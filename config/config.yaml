@@ -3,6 +3,9 @@ defaults:
   - slurm: default_4090
   - _self_
 
+# 要执行的评测脚本，可通过 script=xxx 覆盖
+script: test_vsibench.py
+
 video_dir: ${oc.env:HOME}/dataset/vsi_bench
 seed: 42
 num_samples: all

@@ -1,0 +1,4 @@
+- model=qwen3_235b_a22b
+- task_filter=numeric
+- num_frames=4
+- slurm=hgpu_batch

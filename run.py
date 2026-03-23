@@ -29,7 +29,7 @@ def main(cfg: DictConfig) -> None:
 
     cmd = [
         "python",
-        "test_vsibench.py",
+        cfg.script,
         "--model_path",
         model_path,
         "--video_dir",

@@ -9,3 +9,5 @@ task_filter: mcq
 num_frames: 4
 
 [2026-03-18 03:34:17,141][__main__][INFO] - 执行命令: python test_vsibench.py --model_path /userhome/cs3/duanty/.cache/huggingface/hub/models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281ec70b05090aa6165b016eac8ec08e71b17 --video_dir /userhome/cs3/duanty/dataset/vsi_bench --num_samples all --num_frames 4 --seed 42 --task_filter mcq --log_file results.csv
+[2026-03-18 20:01:49,860][submitit][INFO] - Job completed successfully
+[2026-03-18 20:01:49,867][submitit][INFO] - Exiting after successful completion

@@ -1,5 +1,8 @@
 """
 test_vsibench.py - 使用 VSI-Bench 数据集评估 Qwen2.5-VL-3B 模型
+
+支持 --train_ratio 和 --seed 参数，与 train_vsibench.py 配合使用，
+确保训练和测试使用相同的数据划分。
 """
 import argparse
 import os
@@ -19,7 +22,6 @@ from transformers import AutoProcessor, AutoModelForImageTextToText, Qwen2_5_VLF
 
 def load_model_and_processor(model_path: str, use_lora: bool = False):
     """加载模型和处理器"""
-    # 如果是 Qwen3-VL 系列，使用通用的 AutoModelForImageTextToText 来加载
     if "Qwen3-VL" in model_path:
         model = AutoModelForImageTextToText.from_pretrained(
             model_path,
@@ -31,7 +33,6 @@ def load_model_and_processor(model_path: str, use_lora: bool = False):
         model.eval()
         return model, processor
 
-    # 下面是原来的 Qwen2.5-VL 加载逻辑，兼容 LoRA
     if use_lora:
         from peft import PeftModel
 
@@ -55,7 +56,6 @@ def load_model_and_processor(model_path: str, use_lora: bool = False):
 
     model.eval()
     return model, processor
-
 
 
 def extract_video_frames(video_path: str, num_frames: int = 8) -> list:
@@ -113,15 +113,22 @@ def generate_response(model, processor, frames: list, question: str) -> tuple[st
 
 
 def extract_answer(response: str, has_options: bool = False):
-    """从模型回复中提取答案"""
+    """从模型回复中提取答案。"""
     response = response.strip()
 
+    answer_portion = response
+    if "</think>" in response:
+        answer_portion = response.split("</think>", 1)[-1].strip()
+    answer_match = re.search(r"<answer>\s*(.*?)\s*</answer>", answer_portion, re.DOTALL | re.IGNORECASE)
+    if answer_match:
+        answer_portion = answer_match.group(1).strip()
+
     if has_options:
-        match = re.search(r"\b([A-D])\b", response.upper())
+        match = re.search(r"\b([A-D])\b", answer_portion.upper())
         if match:
             return match.group(1)
 
-    numbers = re.findall(r"[\d.]+", response)
+    numbers = re.findall(r"[\d.]+", answer_portion)
     return float(numbers[0]) if numbers else response
 
 
@@ -135,6 +142,27 @@ def calculate_mra(pred: float, gt: float) -> float:
 def should_include_sample(sample, task_filter: str) -> bool:
     """判断样本是否应该被包含在评估中"""
     return task_filter == "all" or (sample.get("options") is not None) == (task_filter == "mcq")
+
+
+def split_indices(
+    indices: list[int],
+    seed: int,
+    train_ratio: float,
+    use_train_split: bool,
+) -> list[int]:
+    """
+    根据 seed 和 train_ratio 划分索引，返回训练集或测试集部分。
+    必须保证 train 和 test 脚本使用相同的 seed 和 train_ratio。
+    """
+    indices_copy = indices.copy()
+    random.seed(seed)
+    random.shuffle(indices_copy)
+    
+    split_point = int(len(indices_copy) * train_ratio)
+    if use_train_split:
+        return indices_copy[:split_point]
+    else:
+        return indices_copy[split_point:]
 
 
 def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
@@ -188,11 +216,14 @@ def log_to_csv(
     avg_inference_time: float,
     model_name: str,
     lora_path: str,
+    train_ratio: float,
+    use_train_split: bool,
 ):
     """将评估结果记录到 CSV 文件并打印追加的行"""
     file_exists = os.path.exists(log_file)
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    split_name = "train" if use_train_split else "test"
     row_data = [
         timestamp,
         seed,
@@ -203,12 +234,13 @@ def log_to_csv(
         f"{avg_inference_time:.3f}",
         model_name,
         lora_path,
+        train_ratio,
+        split_name,
     ]
 
     with open(log_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
 
-        # 如果文件不存在,写入表头
         if not file_exists:
             writer.writerow([
                 'timestamp',
@@ -220,12 +252,12 @@ def log_to_csv(
                 'avg_inference_time',
                 'model_name',
                 'lora_path',
+                'train_ratio',
+                'eval_split',
             ])
 
-        # 写入数据
         writer.writerow(row_data)
 
-    # 打印追加的行
     print(f"\n记录已添加到 {log_file}:")
     print(f"{','.join(map(str, row_data))}")
 
@@ -234,7 +266,7 @@ def evaluate_vsibench(
     model,
     processor,
     video_dir: str,
-    num_samples = 10,  # 可以是整数或 "all"
+    num_samples = 10,
     num_frames: int = 8,
     seed: int = 42,
     task_filter: str = "all",
@@ -242,6 +274,8 @@ def evaluate_vsibench(
     model_name: str = "",
     lora_path: str = "",
     progress_interval: int = 10,
+    train_ratio: float = 0.8,
+    use_train_split: bool = False,
 ):
     """在 VSI-Bench 数据集上评估模型
 
@@ -250,6 +284,8 @@ def evaluate_vsibench(
         task_filter: 'all' (所有题目), 'mcq' (只做多选题), 'numeric' (只做数值题)
         log_file: CSV 日志文件路径
         progress_interval: 每评估多少个样本写一次进度文件（0 表示不写）
+        train_ratio: 训练集比例（与 train_vsibench.py 保持一致）
+        use_train_split: True 评估训练集，False 评估测试集（默认）
     """
     progress_file = os.path.splitext(log_file)[0] + "_progress.txt"
     dataset = load_dataset("nyu-visionx/VSI-Bench", split="test")
@@ -260,12 +296,19 @@ def evaluate_vsibench(
         if should_include_sample(dataset[i], task_filter)
     ]
 
-    # 从筛选后的样本中随机抽取或使用全部
+    # 使用与训练相同的逻辑划分数据
+    filtered_indices = split_indices(filtered_indices, seed, train_ratio, use_train_split)
+    
+    split_name = "训练集" if use_train_split else "测试集"
+    print(f"评估 {split_name}，共 {len(filtered_indices)} 个样本 (train_ratio={train_ratio}, seed={seed})")
+
+    # 从划分后的样本中随机抽取或使用全部
     if num_samples == "all":
         sample_indices = filtered_indices
         actual_num_samples = len(filtered_indices)
     else:
-        random.seed(seed)
+        # 使用不同的 seed 进行抽样，避免与划分冲突
+        random.seed(seed + 1000)
         sample_indices = random.sample(
             filtered_indices,
             min(num_samples, len(filtered_indices))
@@ -288,7 +331,6 @@ def evaluate_vsibench(
     start_time = time.time()
     n_total = len(samples)
 
-    # 初始化进度条
     pbar = tqdm(samples, desc="评估进度")
 
     for i, sample in enumerate(pbar):
@@ -307,7 +349,6 @@ def evaluate_vsibench(
             if not frames:
                 continue
 
-            # 构建提示
             if options:
                 prompt = f"{question}\n\nOptions:\n" + "\n".join(options)
                 prompt += "\n\nPlease answer with the option letter directly (A, B, C, or D)."
@@ -321,7 +362,6 @@ def evaluate_vsibench(
 
             pred_answer = extract_answer(response, has_options=bool(options))
 
-            # 评估结果
             is_correct = False
             mra_score = None
 
@@ -355,7 +395,6 @@ def evaluate_vsibench(
                 }
             )
 
-            # 更新进度条显示的准确率和平均推理时间
             if len(results["details"]) > 0:
                 partial_acc, partial_time = _compute_accuracy_from_results(results, task_filter)
                 pbar.set_postfix({
@@ -363,7 +402,6 @@ def evaluate_vsibench(
                     'AvgTime': f'{partial_time:.2f}s'
                 })
 
-            # 定期写进度文件，超时或中断后仍可看到已跑多少、当前准确率
             n_done = len(results["details"])
             if progress_interval > 0 and (
                 n_done % progress_interval == 0 or i == n_total - 1
@@ -376,14 +414,12 @@ def evaluate_vsibench(
         except Exception as e:
             continue
 
-    # 计算平均准确率和平均推理时间
     avg_accuracy = 0.0
     if task_filter == "mcq" and results["total"] > 0:
         avg_accuracy = results["correct"] / results["total"] * 100
     elif task_filter == "numeric" and results["mra_count"] > 0:
         avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
     elif task_filter == "all":
-        # 对于 all,计算综合准确率
         total_score = 0.0
         total_count = 0
         if results["total"] > 0:
@@ -397,7 +433,6 @@ def evaluate_vsibench(
 
     avg_inference_time = sum(results["inference_times"]) / len(results["inference_times"]) if results["inference_times"] else 0.0
 
-    # 记录到 CSV 并打印 (使用实际的样本数量)
     log_to_csv(
         log_file,
         seed,
@@ -408,6 +443,8 @@ def evaluate_vsibench(
         avg_inference_time,
         model_name,
         lora_path,
+        train_ratio,
+        use_train_split,
     )
 
     return results
@@ -420,28 +457,27 @@ def main():
     parser.add_argument("--num_samples", type=str, default="10", help="评估的样本数量,可以是数字或 'all' (测试全部样本)")
     parser.add_argument("--num_frames", type=int, default=8, help="每个视频提取的帧数")
     parser.add_argument("--video_dir", type=str, default="~/dataset/vsi_bench", help="视频文件目录路径")
-    parser.add_argument("--seed", type=int, default=42, help="随机抽样的种子")
+    parser.add_argument("--seed", type=int, default=42, help="随机抽样的种子（需与训练时一致）")
     parser.add_argument("--task_filter", type=str, default="all", choices=["all", "mcq", "numeric"], help="题目类型筛选: all (所有题目), mcq (只做多选题), numeric (只做数值题)")
     parser.add_argument("--log_file", type=str, default="vsibench_evaluation_log.csv", help="CSV 日志文件路径")
+    
+    # 数据划分参数
+    parser.add_argument("--train_ratio", type=float, default=0.8, help="训练集比例（需与训练时一致，默认0.8）")
+    parser.add_argument("--use_train_split", action="store_true", help="评估训练集（默认评估测试集）")
+    
     args = parser.parse_args()
     video_dir = os.path.expanduser(args.video_dir)
 
-    # 处理 num_samples 参数
     if args.num_samples.lower() == "all":
         num_samples = "all"
     else:
         num_samples = int(args.num_samples)
 
-    # 展开本地路径中的 ~，并确定 model_name / lora_path 用于日志记录
     resolved_model_path = os.path.expanduser(args.model_path)
     if args.use_lora:
         model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
         lora_path = resolved_model_path
     else:
-        # 通用规则: 从路径中截取"最后一个 -- 之后、下一个 / 之前"的内容作为模型名
-        # 例如:
-        #   .../models--Qwen--Qwen3-VL-8B-Instruct/snapshots/xxx  -> Qwen3-VL-8B-Instruct
-        #   .../models--Foo--Bar-1B/snapshots/xxx                 -> Bar-1B
         path_str = resolved_model_path.rstrip("/")
         last_dashdash = path_str.rfind("--")
         if last_dashdash != -1:
@@ -452,7 +488,6 @@ def main():
             else:
                 model_name = path_str[start:slash_pos]
         else:
-            # 如果路径中没有 "--"，就退化为取最后一段
             model_name = os.path.basename(path_str)
         lora_path = ""
 
@@ -468,6 +503,8 @@ def main():
         log_file=args.log_file,
         model_name=model_name,
         lora_path=lora_path,
+        train_ratio=args.train_ratio,
+        use_train_split=args.use_train_split,
     )
 
 
