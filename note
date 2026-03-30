@@ -130,71 +130,16 @@ python run.py --multirun \
 
 
 
-试着在0.8的训练集上微调模型：
-    python run.py --multirun \
-    hydra/launcher=submitit_slurm \
-    script=train_vsibench.py \
-    model=qwen3_4b_thinking,qwen3_8b_thinking\
-    task_filter=mcq,numeric \
-    num_frames=4 \
-    train_ratio=0.8 \
-    seed=42 \
-    slurm=hgpu_batch
+在0.8的训练集上微调模型：
+bash scripts/train_finetune.sh
+
+评测微调后的模型在0.2的测试集上的效果：
+bash scripts/eval_finetuned.sh
 
 最新任务：
-评测微调后的模型在0.2的测试集上的效果：
-# 第1组：4B + mcq
-python run.py --multirun \
-  hydra/launcher=submitit_slurm \
-  script=test_vsibench.py \
-  slurm=hgpu_batch \
-  num_frames=4 \
-  train_ratio=0.8 \
-  seed=42 \
-  num_samples=all \
-  task_filter=mcq \
-  model=qwen3_4b_thinking \
-  lora.enabled=true \
-  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-4B-Thinking/mcq_frames4
 
-# 第2组：4B + numeric
-python run.py --multirun \
-  hydra/launcher=submitit_slurm \
-  script=test_vsibench.py \
-  slurm=hgpu_batch \
-  num_frames=4 \
-  train_ratio=0.8 \
-  seed=42 \
-  num_samples=all \
-  task_filter=numeric \
-  model=qwen3_4b_thinking \
-  lora.enabled=true \
-  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-4B-Thinking/numeric_frames4
+批量训练 4 个模型的 Confidence Head：
+bash scripts/train_confidence.sh
 
-# 第3组：8B + mcq
-python run.py --multirun \
-  hydra/launcher=submitit_slurm \
-  script=test_vsibench.py \
-  slurm=hgpu_batch \
-  num_frames=4 \
-  train_ratio=0.8 \
-  seed=42 \
-  num_samples=all \
-  task_filter=mcq \
-  model=qwen3_8b_thinking \
-  lora.enabled=true \
-  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-8B-Thinking/mcq_frames4
-
-# 第4组：8B + numeric
-python run.py --multirun \
-  hydra/launcher=submitit_slurm \
-  script=test_vsibench.py \
-  slurm=hgpu_batch \
-  num_frames=4 \
-  train_ratio=0.8 \
-  seed=42 \
-  num_samples=all \
-  task_filter=numeric \
-  model=qwen3_8b_thinking \
-  lora.enabled=true \
-  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-8B-Thinking/numeric_frames4
+批量评测 4 个模型的 Confidence（高/低信心准确率）：
+bash scripts/eval_confidence.sh

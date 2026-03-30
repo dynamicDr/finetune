@@ -35,6 +35,20 @@ def build_batch_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def append_model_args(cfg: DictConfig, cmd: list[str], model_snapshot: str) -> None:
+    if OmegaConf.select(cfg, "lora.enabled", default=False):
+        ap = str(OmegaConf.select(cfg, "lora.adapter_path", default="") or "").strip()
+        if not ap:
+            raise ValueError("lora.enabled=true 需要 lora.adapter_path")
+        bm = OmegaConf.select(cfg, "lora.base_model", default=None)
+        bm = str(bm).strip() if bm and str(bm) not in ("null", "") else str(cfg.model.name)
+        cmd += ["--use_lora", "--model_path", str(Path(ap).expanduser()), "--base_model", bm]
+        if OmegaConf.select(cfg, "lora.merge_lora", default=False):
+            cmd.append("--merge_lora")
+    else:
+        cmd += ["--model_path", model_snapshot]
+
+
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig) -> None:
     logging.basicConfig(level=logging.INFO)
@@ -60,7 +74,7 @@ def main(cfg: DictConfig) -> None:
     ]
     model_snapshot = resolve_model_path(cfg.model.path)
 
-    if "train_vsibench" in name:
+    if name == "train_vsibench.py":
         if OmegaConf.select(cfg, "lora.enabled", default=False):
             raise ValueError("训练时不要设置 lora.enabled=true")
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
@@ -70,6 +84,21 @@ def main(cfg: DictConfig) -> None:
         ms = OmegaConf.select(cfg, "train.max_samples", default=None)
         if ms is not None and str(ms).strip() not in ("", "null", "None"):
             cmd += ["--max_samples", str(int(ms))]
+    elif name == "train_vsibench_confidence.py":
+        out = OmegaConf.select(cfg, "train.output_dir", default=None)
+        if not out or str(out).strip() in ("null", "~", ""):
+            out = f"outputs/vsibench_confidence/{cfg.model.name}/{cfg.task_filter}_frames{cfg.num_frames}"
+        cmd = ["python", str(sp), "--output_dir", str(out), *shared]
+        append_model_args(cfg, cmd, model_snapshot)
+        ms = OmegaConf.select(cfg, "train.max_samples", default=None)
+        if ms is not None and str(ms).strip() not in ("", "null", "None"):
+            cmd += ["--max_samples", str(int(ms))]
+        ep = OmegaConf.select(cfg, "confidence.num_train_epochs", default=None)
+        if ep is not None and str(ep).strip() not in ("", "null", "None"):
+            cmd += ["--num_train_epochs", str(int(ep))]
+        lr = OmegaConf.select(cfg, "confidence.learning_rate", default=None)
+        if lr is not None and str(lr).strip() not in ("", "null", "None"):
+            cmd += ["--learning_rate", str(float(lr))]
     else:
         cmd = [
             "python",
@@ -80,17 +109,20 @@ def main(cfg: DictConfig) -> None:
             "--log_file",
             f"result_{build_batch_timestamp()}.csv",
         ]
-        if OmegaConf.select(cfg, "lora.enabled", default=False):
-            ap = str(OmegaConf.select(cfg, "lora.adapter_path", default="") or "").strip()
-            if not ap:
-                raise ValueError("lora.enabled=true 需要 lora.adapter_path")
-            bm = OmegaConf.select(cfg, "lora.base_model", default=None)
-            bm = str(bm).strip() if bm and str(bm) not in ("null", "") else str(cfg.model.name)
-            cmd += ["--use_lora", "--model_path", str(Path(ap).expanduser()), "--base_model", bm]
-            if OmegaConf.select(cfg, "lora.merge_lora", default=False):
-                cmd.append("--merge_lora")
-        else:
-            cmd += ["--model_path", model_snapshot]
+        if name == "test_vsibench_confidence.py":
+            head_path = str(OmegaConf.select(cfg, "confidence.head_path", default="") or "").strip()
+            if not head_path:
+                raise ValueError("test_vsibench_confidence.py 需要 confidence.head_path")
+            cmd += [
+                "--confidence_head_path",
+                str(Path(head_path).expanduser()),
+                "--detail_file",
+                f"detail_{build_batch_timestamp()}.csv",
+            ]
+            th = OmegaConf.select(cfg, "confidence.threshold", default=None)
+            if th is not None and str(th).strip() not in ("", "null", "None"):
+                cmd += ["--threshold", str(float(th))]
+        append_model_args(cfg, cmd, model_snapshot)
 
     log.info(f"执行命令: {' '.join(cmd)}")
     r = subprocess.run(cmd, capture_output=False)
