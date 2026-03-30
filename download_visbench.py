@@ -9,6 +9,7 @@ download_vsibench.py - 下载并准备 VSI-Bench 数据集
 import os
 import argparse
 import zipfile
+import shutil
 from tqdm import tqdm
 
 
@@ -39,7 +40,7 @@ def download_dataset_metadata(cache_dir: str):
     return dataset
 
 
-def download_videos(cache_dir: str):
+def download_videos(cache_dir: str, tmp_dir: str):
     """下载视频 zip 文件"""
     from huggingface_hub import hf_hub_download
 
@@ -47,8 +48,7 @@ def download_videos(cache_dir: str):
     print("步骤 2/3: 下载视频文件...")
     print("=" * 60)
 
-    video_dir = os.path.join(cache_dir, "videos")
-    os.makedirs(video_dir, exist_ok=True)
+    os.makedirs(tmp_dir, exist_ok=True)
 
     zip_files = [
         "arkitscenes.zip",
@@ -68,7 +68,11 @@ def download_videos(cache_dir: str):
                 cache_dir=cache_dir,
                 resume_download=True,  # 支持断点续传
             )
-            downloaded_zips.append((zip_file, zip_path))
+            # 复制到临时目录，后续统一从 tmp 解压并在最后删除 tmp
+            local_zip_path = os.path.join(tmp_dir, zip_file)
+            if not os.path.exists(local_zip_path):
+                shutil.copy2(zip_path, local_zip_path)
+            downloaded_zips.append((zip_file, local_zip_path))
             print(f"✓ 下载完成: {zip_file}")
 
             # 显示文件大小
@@ -79,36 +83,39 @@ def download_videos(cache_dir: str):
             print(f"✗ 下载失败 {zip_file}: {e}")
             continue
 
-    return downloaded_zips, video_dir
+    return downloaded_zips
 
 
 def extract_videos(downloaded_zips: list, video_dir: str):
-    """解压视频文件"""
+    """从 zip 中提取所有 mp4 到目标目录（扁平化存放）"""
     print("\n" + "=" * 60)
     print("步骤 3/3: 解压视频文件...")
     print("=" * 60)
+    os.makedirs(video_dir, exist_ok=True)
 
     for zip_file, zip_path in downloaded_zips:
-        # 检查是否已解压
-        folder_name = zip_file.replace(".zip", "")
-        extract_path = os.path.join(video_dir, folder_name)
-
-        if os.path.exists(extract_path) and len(os.listdir(extract_path)) > 0:
-            print(f"✓ {folder_name} 已解压，跳过 ({len(os.listdir(extract_path))} 个文件)")
-            continue
-
         print(f"\n正在解压 {zip_file}...")
         try:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # 获取文件列表
-                file_list = zip_ref.namelist()
-                print(f"  共 {len(file_list)} 个文件")
+                file_list = [f for f in zip_ref.namelist() if f.lower().endswith(".mp4")]
+                print(f"  共 {len(file_list)} 个 mp4 文件")
 
-                # 带进度条解压
-                for file in tqdm(file_list, desc=f"  解压 {folder_name}"):
-                    zip_ref.extract(file, video_dir)
+                extracted = 0
+                skipped = 0
+                for file in tqdm(file_list, desc=f"  提取 {zip_file}"):
+                    target_name = os.path.basename(file)
+                    if not target_name:
+                        continue
+                    target_path = os.path.join(video_dir, target_name)
+                    if os.path.exists(target_path):
+                        skipped += 1
+                        continue
+                    with zip_ref.open(file) as src, open(target_path, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
+                    extracted += 1
 
             print(f"✓ 解压完成: {zip_file}")
+            print(f"  新增: {extracted}，跳过(已存在): {skipped}")
 
         except Exception as e:
             print(f"✗ 解压失败 {zip_file}: {e}")
@@ -121,24 +128,16 @@ def verify_dataset(dataset, video_dir: str, num_samples: int = None):
     print("验证数据集完整性...")
     print("=" * 60)
 
-    # 统计视频文件
-    total_videos = 0
-    video_stats = {}
-
-    for subdir in ["arkitscenes", "scannet", "scannetpp"]:
-        subdir_path = os.path.join(video_dir, subdir)
-        if os.path.exists(subdir_path):
-            files = [f for f in os.listdir(subdir_path) if f.endswith(('.mp4', '.avi', '.mov'))]
-            video_stats[subdir] = len(files)
-            total_videos += len(files)
-        else:
-            video_stats[subdir] = 0
+    # 统计视频文件（扁平目录）
+    if os.path.exists(video_dir):
+        files = [f for f in os.listdir(video_dir) if f.lower().endswith(".mp4")]
+        total_videos = len(files)
+    else:
+        total_videos = 0
 
     print(f"\n视频文件统计:")
-    for subdir, count in video_stats.items():
-        status = "✓" if count > 0 else "✗"
-        print(f"  {status} {subdir}: {count} 个视频")
-    print(f"  总计: {total_videos} 个视频")
+    print(f"  目录: {video_dir}")
+    print(f"  总计: {total_videos} 个 mp4 视频")
 
     # 验证样本的视频路径
     if "test" in dataset:
@@ -178,11 +177,9 @@ def verify_dataset(dataset, video_dir: str, num_samples: int = None):
                 if not video_name.endswith(('.mp4', '.avi', '.mov')):
                     video_name += ".mp4"
 
-                for subdir in ["arkitscenes", "scannet", "scannetpp"]:
-                    candidate = os.path.join(video_dir, subdir, video_name)
-                    if os.path.exists(candidate):
-                        video_found = True
-                        break
+                candidate = os.path.join(video_dir, video_name)
+                if os.path.exists(candidate):
+                    video_found = True
 
             if video_found:
                 found += 1
@@ -250,13 +247,15 @@ def main():
     args = parser.parse_args()
 
     cache_dir = os.path.abspath(args.cache_dir)
-    video_dir = os.path.join(cache_dir, "videos")
+    video_dir = os.path.expanduser("~/dataset/vsi_bench")
+    tmp_dir = os.path.join(cache_dir, "tmp_download")
 
     print("\n" + "=" * 60)
     print("VSI-Bench 数据集下载工具")
     print("=" * 60)
     print(f"缓存目录: {cache_dir}")
     print(f"视频目录: {video_dir}")
+    print(f"临时目录: {tmp_dir}")
 
     # 创建目录
     os.makedirs(cache_dir, exist_ok=True)
@@ -265,12 +264,16 @@ def main():
         # 步骤 1: 下载元数据
         dataset = download_dataset_metadata(cache_dir)
 
-        # 步骤 2: 下载视频
-        downloaded_zips, video_dir = download_videos(cache_dir)
+        # 步骤 2: 下载视频到 tmp
+        downloaded_zips = download_videos(cache_dir, tmp_dir)
 
         # 步骤 3: 解压视频
         if downloaded_zips:
             extract_videos(downloaded_zips, video_dir)
+            # 清理临时下载目录
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                print(f"\n已清理临时目录: {tmp_dir}")
     else:
         print("\n跳过下载，加载现有数据集...")
         from datasets import load_dataset
