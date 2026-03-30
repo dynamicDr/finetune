@@ -10,6 +10,9 @@
 - SLURM：集群上的作业调度系统，可以理解成“排队和分配 GPU 的管家”，我们把任务交给它，它负责在哪台机器上跑、什么时候跑。  
 - Hydra：一个配置管理工具，用命令行参数 + YAML 文件来控制实验超参，方便做扫参和复现实验结果。  
 - Submitit：一个基于 SLURM 的小工具，帮我们把 Hydra 的多组配置自动变成 SLURM 作业，在集群上并行跑。  
+- PEFT：Parameter-Efficient Fine-Tuning（参数高效微调）。核心思想是在不更新/少更新基座大模型参数的情况下，只训练一小部分“可插拔”的参数（如 LoRA），显著降低显存与训练成本。常见实现是 HuggingFace 的 `peft` 库。  
+- Adapter：可插拔的微调增量权重/模块的统称（在 PEFT 语境下尤其常见）。训练时把 adapter“挂”到基座模型上，只训练 adapter；推理/评测时加载基座模型 + adapter 组合得到微调后的能力。 
+- LoRA：Low-Rank Adaptation，一种最常用的 PEFT 方法。它通过在部分线性层旁路注入低秩矩阵（增量权重）来拟合任务差异；训练时只更新这些低秩参数，基座权重保持不变。  
 
 关键文件与作用  
 - README.md：TRL 示例项目的简要说明。  
@@ -26,6 +29,23 @@
   - `slurm/h800.yaml`：单卡 H800 配置，适合大模型。  
   - `slurm/hgpu_batch.yaml`：多卡 hgpu-batch 配置，适合需要多卡/长时间的大任务（配合 `sbatch` 更合适）。  
 - backup/：旧的非 Hydra 脚本和旧配置归档目录（如 `test_frame.sh`、`srun.sh`，以及早期的 `slurm/default.yaml` 等），保留仅供参考。
+
+LoRA 微调输出目录（`outputs/vsibench_train/.../<task>_frames<num>/`）文件说明  
+
+- `adapter_config.json`：LoRA 配置参数（rank、alpha、目标模块等）。相当于一份“改造说明书”，记录你改了模型的哪些层、改动幅度多大。
+- `adapter_model.safetensors`：LoRA 训练得到的权重，是微调的核心产物。相当于一个“知识补丁”，原模型参数远大于这个文件（通常只有几十到几百 MB），贴上去就能让模型学会新技能。
+- `vocab.json`： 词表文件。就是一本“字典”，记录 token 到 id 的映射。
+- `merges.txt`：合并规则。告诉模型怎么拼字，比如把子词拼成更大的词片段。
+- `tokenizer.json`：完整的分词器文件。包含词表和合并规则的整合版，加载它就够了。
+- `added_tokens.json`：额外添加的特殊 token。比如你训练时新加了 `<video>` 这样的标记。
+- `special_tokens_map.json`：特殊 token 的映射。记录对话开始/结束、padding 等特殊 token 的含义。
+- `chat_template.jinja`：对话格式模板。规定输入要怎么拼接，比如把 `<|im_start|>user\n你好<|im_end|>` 这种格式拼出来。
+- `tokenizer_config.json`：tokenizer 的加载配置（special tokens、清理规则等）。
+- `preprocessor_config.json`：图像预处理配置。告诉模型图片要怎么处理（缩放/归一化等）。
+- `video_preprocessor_config.json`：视频预处理配置。告诉模型视频抽几帧、每帧怎么处理。
+- `training_args.bin`：保存的训练参数。记录学习率、batch_size 等设置，方便复现或继续训练。（该文件不一定存在于你当前目录中）
+- `checkpoint-200` / `checkpoint-264`：训练过程中的检查点。（评测一般只需要目录根部的最终 adapter）
+- `README.md`：说明文件，模型卡片信息。
 
 新的运行方式  
 1. 单次评测（先申请一块交互式 GPU）  
@@ -72,7 +92,8 @@ SLURM 常用指令
   - scancel -u $USER  
 - 查看某个作业的详细信息：  
   - scontrol show job 12345  
-
+- 查看排队情况
+squeue -p q-hgpu-batch -t PD -o "%.10i %.15P %.20j %.10u %.8Q %.6D %.10M %R"
 
 推理任务：
 python run.py --multirun \
@@ -85,7 +106,7 @@ python run.py --multirun \
 ; 以上命令发现这两个模型acc和推理时间差别不大。
 
 
-最新任务:
+在0.2的测试集上测试效果:
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=test_vsibench.py \
@@ -96,13 +117,84 @@ python run.py --multirun \
     seed=42 \
     slurm=hgpu_batch
 
-最新任务（zzy）:
+在0.2的测试集上测试效果:（zzy）
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=test_vsibench.py \
-    model=qwen3_4b,qwen3_8b,qwen3_30b_a3b,qwen3_32b,\
+    model=qwen3_4b,qwen3_8b,qwen3_30b_a3b,qwen3_32b \
     task_filter=mcq,numeric \
     num_frames=4 \
     train_ratio=0.8 \
     seed=42 \
     slurm=hgpu_batch
+
+
+
+试着在0.8的训练集上微调模型：
+    python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=train_vsibench.py \
+    model=qwen3_4b_thinking,qwen3_8b_thinking\
+    task_filter=mcq,numeric \
+    num_frames=4 \
+    train_ratio=0.8 \
+    seed=42 \
+    slurm=hgpu_batch
+
+最新任务：
+评测微调后的模型在0.2的测试集上的效果：
+# 第1组：4B + mcq
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=test_vsibench.py \
+  slurm=hgpu_batch \
+  num_frames=4 \
+  train_ratio=0.8 \
+  seed=42 \
+  num_samples=all \
+  task_filter=mcq \
+  model=qwen3_4b_thinking \
+  lora.enabled=true \
+  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-4B-Thinking/mcq_frames4
+
+# 第2组：4B + numeric
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=test_vsibench.py \
+  slurm=hgpu_batch \
+  num_frames=4 \
+  train_ratio=0.8 \
+  seed=42 \
+  num_samples=all \
+  task_filter=numeric \
+  model=qwen3_4b_thinking \
+  lora.enabled=true \
+  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-4B-Thinking/numeric_frames4
+
+# 第3组：8B + mcq
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=test_vsibench.py \
+  slurm=hgpu_batch \
+  num_frames=4 \
+  train_ratio=0.8 \
+  seed=42 \
+  num_samples=all \
+  task_filter=mcq \
+  model=qwen3_8b_thinking \
+  lora.enabled=true \
+  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-8B-Thinking/mcq_frames4
+
+# 第4组：8B + numeric
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=test_vsibench.py \
+  slurm=hgpu_batch \
+  num_frames=4 \
+  train_ratio=0.8 \
+  seed=42 \
+  num_samples=all \
+  task_filter=numeric \
+  model=qwen3_8b_thinking \
+  lora.enabled=true \
+  lora.adapter_path=outputs/vsibench_train/Qwen/Qwen3-VL-8B-Thinking/numeric_frames4

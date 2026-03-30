@@ -33,6 +33,7 @@ def download_dataset_metadata(cache_dir: str):
     for split in dataset:
         print(f"  - {split}: {len(dataset[split])} 个样本")
         if len(dataset[split]) > 0:
+            
             print(f"    字段: {list(dataset[split].features.keys())}")
 
     return dataset

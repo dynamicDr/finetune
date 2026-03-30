@@ -1,0 +1,4 @@
+n_done=498
+n_total=498
+partial_accuracy=48.39
+elapsed_sec=13336.3

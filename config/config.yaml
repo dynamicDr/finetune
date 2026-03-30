@@ -14,6 +14,19 @@ num_frames: 4
 # 与 test_vsibench / train_vsibench 划分一致时可覆盖
 train_ratio: 0.8
 
+# LoRA 评测（与 train_vsibench.py --output_dir 对齐）
+# 用法：lora.enabled=true lora.adapter_path=/path/to/output_dir
+# base_model 为空时，评测基座默认用当前 model.name（与训练时 --model_path 一致）
+lora:
+  enabled: false
+  adapter_path: ""
+  base_model: null
+  merge_lora: false
+
+train:
+  output_dir: outputs/vsibench_train/${model.name}/${task_filter}_frames${num_frames}
+  max_samples: null
+
 hydra:
   run:
     dir: outputs/${model.name}/${task_filter}_frames${num_frames}

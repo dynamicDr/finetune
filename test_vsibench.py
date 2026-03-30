@@ -11,6 +11,7 @@ import time
 import random
 import csv
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import torch
@@ -20,8 +21,49 @@ from tqdm import tqdm
 from transformers import AutoProcessor, AutoModelForImageTextToText, Qwen2_5_VLForConditionalGeneration
 
 
-def load_model_and_processor(model_path: str, use_lora: bool = False):
+def load_model_and_processor(
+    model_path: str,
+    use_lora: bool = False,
+    base_model: str | None = None,
+    merge_lora: bool = False,
+):
     """加载模型和处理器"""
+    model_path = os.path.expanduser(model_path)
+    if use_lora and base_model:
+        from peft import PeftModel
+
+        base_id = os.path.expanduser(base_model)
+        if "Qwen3-VL" in base_id:
+            base = AutoModelForImageTextToText.from_pretrained(
+                base_id,
+                dtype=torch.bfloat16,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            model = PeftModel.from_pretrained(base, model_path)
+            if merge_lora:
+                model = model.merge_and_unload()
+            proc_src = (
+                model_path
+                if os.path.isfile(os.path.join(model_path, "preprocessor_config.json"))
+                or os.path.isfile(os.path.join(model_path, "tokenizer_config.json"))
+                else base_id
+            )
+            processor = AutoProcessor.from_pretrained(proc_src, trust_remote_code=True)
+        else:
+            base = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                base_id,
+                dtype=torch.bfloat16,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            model = PeftModel.from_pretrained(base, model_path)
+            if merge_lora:
+                model = model.merge_and_unload()
+            processor = AutoProcessor.from_pretrained(base_id)
+        model.eval()
+        return model, processor
+
     if "Qwen3-VL" in model_path:
         model = AutoModelForImageTextToText.from_pretrained(
             model_path,
@@ -29,7 +71,7 @@ def load_model_and_processor(model_path: str, use_lora: bool = False):
             device_map="auto",
             trust_remote_code=True,
         )
-        processor = AutoProcessor.from_pretrained(model_path)
+        processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
         model.eval()
         return model, processor
 
@@ -220,6 +262,7 @@ def log_to_csv(
     use_train_split: bool,
 ):
     """将评估结果记录到 CSV 文件并打印追加的行"""
+    Path(log_file).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
     file_exists = os.path.exists(log_file)
 
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -287,7 +330,6 @@ def evaluate_vsibench(
         train_ratio: 训练集比例（与 train_vsibench.py 保持一致）
         use_train_split: True 评估训练集，False 评估测试集（默认）
     """
-    progress_file = os.path.splitext(log_file)[0] + "_progress.txt"
     dataset = load_dataset("nyu-visionx/VSI-Bench", split="test")
 
     # 先筛选符合条件的样本
@@ -403,13 +445,7 @@ def evaluate_vsibench(
                 })
 
             n_done = len(results["details"])
-            if progress_interval > 0 and (
-                n_done % progress_interval == 0 or i == n_total - 1
-            ):
-                partial_acc, _ = _compute_accuracy_from_results(results, task_filter)
-                _write_progress_file(
-                    progress_file, n_done, n_total, partial_acc, time.time() - start_time
-                )
+            # 不输出 progress.txt：评测仅写 CSV
 
         except Exception as e:
             continue
@@ -452,8 +488,19 @@ def evaluate_vsibench(
 
 def main():
     parser = argparse.ArgumentParser(description="使用 VSI-Bench 评估 Qwen2.5-VL-3B 模型")
-    parser.add_argument("--model_path", type=str, default="Qwen/Qwen2.5-VL-3B-Instruct", help="模型路径或 HuggingFace 模型 ID")
+    parser.add_argument("--model_path", type=str, default="Qwen/Qwen2.5-VL-3B-Instruct", help="模型路径或 HuggingFace 模型 ID；与 --use_lora 连用时为 adapter 目录（train_vsibench 的 --output_dir）")
     parser.add_argument("--use_lora", action="store_true", help="是否加载 LoRA 权重")
+    parser.add_argument(
+        "--base_model",
+        type=str,
+        default=None,
+        help="LoRA 基座（HF id 或路径）。Qwen3-VL 微调评测需指定；可由 run.py 从 model.name 传入",
+    )
+    parser.add_argument(
+        "--merge_lora",
+        action="store_true",
+        help="加载 LoRA 后 merge_and_unload（更占显存峰值、启动更慢；默认保持 adapter 形态）",
+    )
     parser.add_argument("--num_samples", type=str, default="10", help="评估的样本数量,可以是数字或 'all' (测试全部样本)")
     parser.add_argument("--num_frames", type=int, default=8, help="每个视频提取的帧数")
     parser.add_argument("--video_dir", type=str, default="~/dataset/vsi_bench", help="视频文件目录路径")
@@ -468,6 +515,11 @@ def main():
     args = parser.parse_args()
     video_dir = os.path.expanduser(args.video_dir)
 
+    # 所有 CSV 统一输出到仓库根目录的 eval_csv/ 下
+    eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
+    eval_csv_dir.mkdir(parents=True, exist_ok=True)
+    args.log_file = str(eval_csv_dir / Path(args.log_file).name)
+
     if args.num_samples.lower() == "all":
         num_samples = "all"
     else:
@@ -475,7 +527,10 @@ def main():
 
     resolved_model_path = os.path.expanduser(args.model_path)
     if args.use_lora:
-        model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
+        if args.base_model:
+            model_name = os.path.expanduser(args.base_model)
+        else:
+            model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
         lora_path = resolved_model_path
     else:
         path_str = resolved_model_path.rstrip("/")
@@ -491,7 +546,12 @@ def main():
             model_name = os.path.basename(path_str)
         lora_path = ""
 
-    model, processor = load_model_and_processor(resolved_model_path, args.use_lora)
+    model, processor = load_model_and_processor(
+        resolved_model_path,
+        use_lora=args.use_lora,
+        base_model=args.base_model,
+        merge_lora=args.merge_lora,
+    )
     evaluate_vsibench(
         model,
         processor,

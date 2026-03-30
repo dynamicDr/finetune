@@ -346,6 +346,8 @@ def main():
         remove_unused_columns=False,
         report_to="none",
         push_to_hub=args.push_to_hub,
+        # 多模态在 collate 里做 processor；勿让 TRL 按纯文本字段 "text" 预 tokenize
+        dataset_kwargs={"skip_prepare_dataset": True},
     )
     if args.hub_model_id:
         sft_kw["hub_model_id"] = args.hub_model_id
