@@ -1,5 +1,8 @@
 # ---- run.py / Hydra / Submitit ----
 outputs/
+config/slurm/default_4090.yaml
+config/slurm/h800.yaml
+config/slurm/hgpu_batch.yaml
 
 # run.py 里写死的评测汇总（及常见备份/进度）
 results.csv
