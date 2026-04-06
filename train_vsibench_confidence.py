@@ -16,11 +16,11 @@ import random
 from pathlib import Path
 
 import torch
-from datasets import load_dataset
 from torch import nn
 from tqdm import tqdm
 
 from train_vsibench import build_user_text
+from hf_dataset_loader import load_dataset
 from test_vsibench import (
     calculate_mra,
     extract_answer,
@@ -131,7 +131,7 @@ def parse_args():
     p.add_argument("--num_frames", type=int, default=4)
     p.add_argument("--task_filter", type=str, default="all", choices=["all", "mcq", "numeric"])
     p.add_argument("--num_train_epochs", type=int, default=1)
-    p.add_argument("--max_samples", type=int, default=200)
+    p.add_argument("--max_samples", type=int, default=9999999999)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--learning_rate", type=float, default=1e-3)

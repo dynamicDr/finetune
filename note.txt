@@ -19,8 +19,8 @@
 - note：当前文件，记录项目结构和用法。  
 - download_visbench.py：下载并准备 VSI-Bench（含视频与元数据）。  
 - video_test.py：扫描 `~/dataset/vsi_bench` 下所有 `.mp4`，做帧数统计。  
-- test_vsibench.py：评测核心脚本，给定模型和配置，在 VSI-Bench 上跑推理并写入 CSV。  
-- train_vsibench.py：在 VSI-Bench 标注 + 本地视频上做 Qwen3-VL 的 SFT（TRL SFTTrainer + QLoRA/LoRA），用法见脚本内 `argparse` 与文件头说明。  
+- visbench/eval_vsibench.py：评测核心脚本，给定模型和配置，在 VSI-Bench 上跑推理并写入 CSV。  
+- visbench/train_vsibench.py：在 VSI-Bench 标注 + 本地视频上做 Qwen3-VL 的 SFT（TRL SFTTrainer + QLoRA/LoRA），用法见脚本内 `argparse` 与文件头说明。  
 - run.py：新的统一入口。用 Hydra 管理实验配置，用 Submitit 提交 SLURM 任务。  
 - config/：Hydra 配置目录  
   - `config.yaml`：公共配置（数据路径、任务类型、帧数等）和 Hydra 输出目录设置。  
@@ -54,22 +54,23 @@ LoRA 微调输出目录（`outputs/vsibench_train/.../<task>_frames<num>/`）文
    - 在新开的终端里激活环境：  
      - conda activate finetune  
    - 然后直接运行：  
-     - python run.py script=test_vsibench.py model=qwen3_8b num_frames=16  
+     - python run.py script=visbench/eval_vsibench.py model=qwen3_8b num_frames=16  
 
 2. SLURM 单任务评测（Submitit 模式）  
    - 小模型用 RTX4090（默认走 slurm=default_4090）：  
-     - python run.py script=test_vsibench.py --hydra/launcher=submitit_slurm model=qwen3_4b  
+     - python run.py script=visbench/eval_vsibench.py --hydra/launcher=submitit_slurm model=qwen3_4b  
    - 大模型用单卡 H800：  
-     - python run.py script=test_vsibench.py --hydra/launcher=submitit_slurm model=qwen3_30b slurm=h800  
-
+     - python run.py script=visbench/eval_vsibench.py --hydra/launcher=submitit_slurm model=qwen3_30b slurm=h800  
+   - 单纯跑一个脚本在服务器：
+      sbatch single_run.sh benchmark_vl_vision_vs_lm_time.py
 3. SLURM 并行多任务（多模型、多任务、多帧数一起扫）  
    - 并行扫参，小模型用默认 RTX4090：  
-     - python run.py script=test_vsibench.py --multirun --hydra/launcher=submitit_slurm \
+     - python run.py script=visbench/eval_vsibench.py --multirun --hydra/launcher=submitit_slurm \
        model=qwen3_4b,qwen3_8b \
        task_filter=mcq,numeric \
        num_frames=4,8  
    - 并行扫参或长时间大任务，用 hgpu-batch：  
-     - python run.py script=test_vsibench.py --multirun \
+     - python run.py script=visbench/eval_vsibench.py --multirun \
         hydra/launcher=submitit_slurm \
         model=qwen3_4b,qwen3_8b,qwen3_30b \
         task_filter=mcq,numeric \
@@ -80,8 +81,8 @@ LoRA 微调输出目录（`outputs/vsibench_train/.../<task>_frames<num>/`）文
 说明  
 - 现在不再直接用 `test_frame.sh` + `srun.sh` 做批量扫参，所有实验配置统一由 Hydra 管理。  
 - 如需新增模型或修改资源配置，只要在 `config/model/` 或 `config/slurm/` 下面改 YAML 即可，无需改 shell。
-- 通过 `script=xxx.py` 指定要执行的评测脚本（默认 `test_vsibench.py`），不再写死在 run.py 中。 
-- 运行方法，在(base)环境下直接运行 3中的指令"python run.py script=test_vsibench.py --multirun --hydra/launcher=submitit_slurm..."
+- 通过 `script=xxx.py` 指定要执行的评测脚本（默认 `visbench/eval_vsibench.py`），不再写死在 run.py 中。 
+- 运行方法，在(base)环境下直接运行 3中的指令"python run.py script=visbench/eval_vsibench.py --multirun --hydra/launcher=submitit_slurm..."
 
 SLURM 常用指令  
 - 查看自己所有作业：  
@@ -98,7 +99,7 @@ squeue -p q-hgpu-batch -t PD -o "%.10i %.15P %.20j %.10u %.8Q %.6D %.10M %R"
 推理任务：
 python run.py --multirun \
       hydra/launcher=submitit_slurm \
-      script=test_vsibench.py \
+      script=visbench/eval_vsibench.py \
       model=qwen3_8b,qwen3_30b_a3b \
       task_filter=mcq,numeric \
       num_frames=4 \
@@ -109,7 +110,7 @@ python run.py --multirun \
 在0.2的测试集上测试效果:
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
-    script=test_vsibench.py \
+    script=visbench/eval_vsibench.py \
     model=qwen3_4b_thinking,qwen3_8b_thinking,qwen3_30b_a3b_thinking,qwen3_32b_thinking \
     task_filter=mcq,numeric \
     num_frames=4 \
@@ -120,7 +121,7 @@ python run.py --multirun \
 在0.2的测试集上测试效果:（zzy）
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
-    script=test_vsibench.py \
+    script=visbench/eval_vsibench.py \
     model=qwen3_4b,qwen3_8b,qwen3_30b_a3b,qwen3_32b \
     task_filter=mcq,numeric \
     num_frames=4 \
@@ -143,3 +144,8 @@ bash scripts/train_confidence.sh
 
 批量评测 4 个模型的 Confidence（高/低信心准确率）：
 bash scripts/eval_confidence.sh
+
+测试vit解释图片：
+srun --gres=gpu:1 --mail-type=ALL --pty bash  
+conda activate finetune  
+python script.py --image_path ./plane2.png --use_cuda

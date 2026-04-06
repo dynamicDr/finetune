@@ -1,0 +1,2 @@
+"""VSI-Bench scripts namespace."""
+

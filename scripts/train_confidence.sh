@@ -7,12 +7,11 @@ pids=()
 # 第1组：4B + mcq
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=train_vsibench_confidence.py \
+  script=visbench/train_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
   seed=42 \
-  train.max_samples=200 \
   +confidence.num_train_epochs=1 \
   +confidence.learning_rate=1e-3 \
   model=qwen3_4b_thinking \
@@ -25,12 +24,11 @@ pids+=($!)
 # 第2组：4B + numeric
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=train_vsibench_confidence.py \
+  script=visbench/train_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
   seed=42 \
-  train.max_samples=200 \
   +confidence.num_train_epochs=1 \
   +confidence.learning_rate=1e-3 \
   model=qwen3_4b_thinking \
@@ -43,12 +41,11 @@ pids+=($!)
 # 第3组：8B + mcq
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=train_vsibench_confidence.py \
+  script=visbench/train_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
   seed=42 \
-  train.max_samples=200 \
   +confidence.num_train_epochs=1 \
   +confidence.learning_rate=1e-3 \
   model=qwen3_8b_thinking \
@@ -61,12 +58,11 @@ pids+=($!)
 # 第4组：8B + numeric
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=train_vsibench_confidence.py \
+  script=visbench/train_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
   seed=42 \
-  train.max_samples=200 \
   +confidence.num_train_epochs=1 \
   +confidence.learning_rate=1e-3 \
   model=qwen3_8b_thinking \

@@ -11,12 +11,11 @@ import argparse
 import zipfile
 import shutil
 from tqdm import tqdm
+from hf_dataset_loader import load_dataset
 
 
 def download_dataset_metadata(cache_dir: str):
     """下载数据集元数据 (parquet 文件)"""
-    from datasets import load_dataset
-
     print("=" * 60)
     print("步骤 1/3: 下载数据集元数据...")
     print("=" * 60)
@@ -276,7 +275,6 @@ def main():
                 print(f"\n已清理临时目录: {tmp_dir}")
     else:
         print("\n跳过下载，加载现有数据集...")
-        from datasets import load_dataset
         dataset = load_dataset(
             "nyu-visionx/VSI-Bench",
             cache_dir=cache_dir,
@@ -298,7 +296,7 @@ def main():
     print("✓ 数据集准备完成!")
     print("=" * 60)
     print(f"\n后续使用方法:")
-    print(f"  from datasets import load_dataset")
+    print(f"  from hf_dataset_loader import load_dataset")
     print(f"  dataset = load_dataset('nyu-visionx/VSI-Bench', cache_dir='{cache_dir}')")
     print(f"  视频文件路径: {video_dir}")
     print("\n")

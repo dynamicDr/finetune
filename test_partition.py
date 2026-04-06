@@ -12,7 +12,7 @@ test_partition.py - 验证 train/test 脚本的数据划分是否一致
 
 import argparse
 import random
-from datasets import load_dataset
+from hf_dataset_loader import load_dataset
 
 
 def should_include_sample(sample, task_filter: str) -> bool:

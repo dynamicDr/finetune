@@ -55,6 +55,7 @@ def main(cfg: DictConfig) -> None:
     log.info(f"当前配置:\n{OmegaConf.to_yaml(cfg)}")
 
     name = str(cfg.script)
+    script_key = Path(name).name
     root = Path(get_original_cwd())
     sp = root / name if (root / name).is_file() else Path(__file__).resolve().parent / name
     if not sp.is_file():
@@ -74,7 +75,7 @@ def main(cfg: DictConfig) -> None:
     ]
     model_snapshot = resolve_model_path(cfg.model.path)
 
-    if name == "train_vsibench.py":
+    if script_key == "train_vsibench.py":
         if OmegaConf.select(cfg, "lora.enabled", default=False):
             raise ValueError("训练时不要设置 lora.enabled=true")
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
@@ -84,7 +85,7 @@ def main(cfg: DictConfig) -> None:
         ms = OmegaConf.select(cfg, "train.max_samples", default=None)
         if ms is not None and str(ms).strip() not in ("", "null", "None"):
             cmd += ["--max_samples", str(int(ms))]
-    elif name == "train_vsibench_confidence.py":
+    elif script_key == "train_vsibench_confidence.py":
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
         if not out or str(out).strip() in ("null", "~", ""):
             out = f"outputs/vsibench_confidence/{cfg.model.name}/{cfg.task_filter}_frames{cfg.num_frames}"
@@ -109,10 +110,10 @@ def main(cfg: DictConfig) -> None:
             "--log_file",
             f"result_{build_batch_timestamp()}.csv",
         ]
-        if name == "test_vsibench_confidence.py":
+        if script_key in ("eval_vsibench_confidence.py", "test_vsibench_confidence.py"):
             head_path = str(OmegaConf.select(cfg, "confidence.head_path", default="") or "").strip()
             if not head_path:
-                raise ValueError("test_vsibench_confidence.py 需要 confidence.head_path")
+                raise ValueError("eval_vsibench_confidence.py 需要 confidence.head_path")
             cmd += [
                 "--confidence_head_path",
                 str(Path(head_path).expanduser()),

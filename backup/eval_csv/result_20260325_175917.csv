@@ -1,0 +1,2 @@
+timestamp,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,model_name,lora_path,train_ratio,eval_split
+2026-03-26 00:58:06,42,mcq,498,4,48.39,26.629,Qwen/Qwen3-VL-8B-Thinking,outputs/vsibench_train/Qwen/Qwen3-VL-8B-Thinking/mcq_frames4,0.8,test

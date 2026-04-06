@@ -7,7 +7,7 @@ pids=()
 # 第1组：4B + mcq
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=test_vsibench_confidence.py \
+  script=visbench/eval_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
@@ -24,7 +24,7 @@ pids+=($!)
 # 第2组：4B + numeric
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=test_vsibench_confidence.py \
+  script=visbench/eval_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
@@ -41,7 +41,7 @@ pids+=($!)
 # 第3组：8B + mcq
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=test_vsibench_confidence.py \
+  script=visbench/eval_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \
@@ -58,7 +58,7 @@ pids+=($!)
 # 第4组：8B + numeric
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
-  script=test_vsibench_confidence.py \
+  script=visbench/eval_vsibench_confidence.py \
   slurm=hgpu_batch \
   num_frames=4 \
   train_ratio=0.8 \

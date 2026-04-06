@@ -22,11 +22,12 @@ from typing import Any
 
 import cv2
 import torch
-from datasets import Dataset, load_dataset
+from datasets import Dataset
 from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 from peft import LoraConfig
+from hf_dataset_loader import load_dataset
 
 from trl import SFTConfig, SFTTrainer
 

@@ -1,0 +1,5 @@
+seed, task_filter, num_samples, num_frames, threshold, overall_acc, high_conf_acc, low_conf_acc, high_conf_count, low_conf_count, model_name
+  42, mcq        , all        ,          4,       0.7,       45.98,         45.98,         0.00,             498,              0, Qwen/Qwen3-VL-4B-Thinking
+  42, numeric    , all        ,          4,       0.7,       75.76,          0.00,        75.76,               0,            528, Qwen/Qwen3-VL-4B-Thinking
+  42, mcq        , all        ,          4,       0.7,       48.39,         48.39,         0.00,             498,              0, Qwen/Qwen3-VL-8B-Thinking
+  42, numeric    , all        ,          4,       0.7,       75.19,         75.19,         0.00,             528,              0, Qwen/Qwen3-VL-8B-Thinking
