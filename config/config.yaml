@@ -5,12 +5,21 @@ defaults:
 
 # 要执行的评测脚本，可通过 script=xxx 覆盖
 script: visbench/eval_vsibench.py
+dataset: vsibench
+dataset_split: test
+dataset_name: nyu-visionx/VSI-Bench
+dataset_config: full
+dataset_no_config: false
 
 video_dir: ${oc.env:HOME}/dataset/vsi_bench
 seed: 42
 num_samples: all
 task_filter: mcq
 num_frames: 4
+frame_sampling_method: uniform
+focus_blip_model_name: Salesforce/blip-itm-base-coco
+focus_blip_device: null
+focus_blip_batch_size: 16
 # 与 eval_vsibench / train_vsibench 划分一致时可覆盖
 train_ratio: 0.8
 

@@ -73,19 +73,46 @@ def main(cfg: DictConfig) -> None:
         "--task_filter",
         cfg.task_filter,
     ]
+    dataset_shared: list[str] = []
+    if script_key in ("vqa_train.py", "vqa_eval.py"):
+        dataset_shared += ["--model_name", str(cfg.model.name)]
+        dataset_shared += ["--dataset", str(OmegaConf.select(cfg, "dataset", default="vsibench"))]
+        frame_sampling_method = OmegaConf.select(cfg, "frame_sampling_method", default=None)
+        if frame_sampling_method:
+            dataset_shared += ["--frame_sampling_method", str(frame_sampling_method)]
+        focus_blip_model_name = OmegaConf.select(cfg, "focus_blip_model_name", default=None)
+        if focus_blip_model_name:
+            dataset_shared += ["--focus_blip_model_name", str(focus_blip_model_name)]
+        focus_blip_device = OmegaConf.select(cfg, "focus_blip_device", default=None)
+        if focus_blip_device is not None and str(focus_blip_device).strip() not in ("", "null", "None"):
+            dataset_shared += ["--focus_blip_device", str(focus_blip_device)]
+        focus_blip_batch_size = OmegaConf.select(cfg, "focus_blip_batch_size", default=None)
+        if focus_blip_batch_size is not None and str(focus_blip_batch_size).strip() not in ("", "null", "None"):
+            dataset_shared += ["--focus_blip_batch_size", str(int(focus_blip_batch_size))]
+        dataset_split = OmegaConf.select(cfg, "dataset_split", default=None)
+        if dataset_split:
+            dataset_shared += ["--dataset_split", str(dataset_split)]
+        dataset_name = OmegaConf.select(cfg, "dataset_name", default=None)
+        if dataset_name:
+            dataset_shared += ["--dataset_name", str(dataset_name)]
+        dataset_config = OmegaConf.select(cfg, "dataset_config", default=None)
+        if dataset_config is not None and str(dataset_config).strip() not in ("", "null", "None"):
+            dataset_shared += ["--dataset_config", str(dataset_config)]
+        if OmegaConf.select(cfg, "dataset_no_config", default=False):
+            dataset_shared.append("--no_dataset_config")
     model_snapshot = resolve_model_path(cfg.model.path)
 
-    if script_key == "train_vsibench.py":
+    if script_key in ("train_vsibench.py", "vqa_train.py"):
         if OmegaConf.select(cfg, "lora.enabled", default=False):
             raise ValueError("训练时不要设置 lora.enabled=true")
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
         if not out or str(out).strip() in ("null", "~", ""):
             out = f"outputs/vsibench_train/{cfg.model.name}/{cfg.task_filter}_frames{cfg.num_frames}"
-        cmd = ["python", str(sp), "--model_path", model_snapshot, "--output_dir", str(out), *shared]
+        cmd = ["python", str(sp), "--model_path", model_snapshot, "--output_dir", str(out), *shared, *dataset_shared]
         ms = OmegaConf.select(cfg, "train.max_samples", default=None)
         if ms is not None and str(ms).strip() not in ("", "null", "None"):
             cmd += ["--max_samples", str(int(ms))]
-    elif script_key == "train_vsibench_confidence.py":
+    elif script_key in ("train_vsibench_confidence.py",):
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
         if not out or str(out).strip() in ("null", "~", ""):
             out = f"outputs/vsibench_confidence/{cfg.model.name}/{cfg.task_filter}_frames{cfg.num_frames}"
@@ -105,6 +132,7 @@ def main(cfg: DictConfig) -> None:
             "python",
             str(sp),
             *shared,
+            *dataset_shared,
             "--num_samples",
             str(cfg.num_samples),
             "--log_file",

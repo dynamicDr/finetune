@@ -31,9 +31,11 @@ import torch
 from tqdm import tqdm
 from transformers import AutoModelForImageTextToText, AutoProcessor
 
-from hf_dataset_loader import load_dataset
-from train_vsibench import build_user_text
-from test_vsibench import extract_video_frames, should_include_sample, split_indices
+from data_loaders.base import load_dataset
+from frame_samplers import sample_video_frames
+from visbench.train_vsibench import build_user_text
+from visbench.eval_vsibench import should_include_sample
+from vl_common import split_indices
 
 
 HUB_ROOT = Path.home() / ".cache/huggingface/hub"
@@ -147,7 +149,7 @@ def collect_vsi_samples(
     for row in rows:
         scene = row.get("scene_name", "")
         video_path = os.path.join(video_dir, f"{scene}.mp4")
-        frames = extract_video_frames(video_path, num_frames=num_frames)
+        frames = sample_video_frames(video_path=video_path, num_frames=num_frames, method="uniform")
         if not frames:
             continue
         prompt = build_user_text(row.get("question", ""), row.get("options", None))
@@ -178,7 +180,7 @@ def benchmark_one_config(
     for row in rows:
         scene = row.get("scene_name", "")
         video_path = os.path.join(video_dir, f"{scene}.mp4")
-        frames = extract_video_frames(video_path, num_frames=num_frames)
+        frames = sample_video_frames(video_path=video_path, num_frames=num_frames, method="uniform")
         if not frames:
             continue
         samples_meta.append((row, frames))

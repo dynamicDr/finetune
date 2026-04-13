@@ -1,0 +1,5 @@
+timestamp,dataset,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,model_name,lora_path,train_ratio,eval_split
+2026-04-12 15:00:31,vsibench,42,mcq,498,4,31.73,26.735,uniform,0.115003,Qwen/Qwen3-VL-4B-Thinking,,0.8,test
+2026-04-12 15:26:26,vsibench,42,mcq,498,4,31.12,29.801,random,0.160634,Qwen/Qwen3-VL-4B-Thinking,,0.8,test
+2026-04-12 17:46:57,vsibench,42,mcq,498,4,29.72,27.863,focus,3.798982,Qwen/Qwen3-VL-4B-Thinking,,0.8,test
+2026-04-12 17:54:52,vsibench,42,mcq,498,4,28.11,27.550,sevila,5.070810,Qwen/Qwen3-VL-4B-Thinking,,0.8,test

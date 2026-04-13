@@ -1,146 +1,71 @@
-"""
-在 EgoSchema 上对 Qwen3-VL 做 SFT（LoRA/QLoRA）。
-
-默认使用 HuggingFace: lmms-lab/EgoSchema 的 validation split，
-并按 seed/train_ratio 划分训练/测试部分，确保可与 eval_egoschema.py 对齐。
-"""
-
 from __future__ import annotations
 
 import argparse
 import inspect
 import os
-import re
 from typing import Any
 
 import torch
 from datasets import Dataset
 from peft import LoraConfig
-from tqdm import tqdm
-from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
+from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 
-from hf_dataset_loader import load_dataset
-from vl_common import build_mcq_prompt, collect_visual_token_ids, extract_video_frames, split_indices
-
-
-def _normalize_options(sample: dict[str, Any]) -> list[str] | None:
-    options = sample.get("options")
-    if isinstance(options, list) and options:
-        return [str(x).strip() for x in options]
-
-    collected: list[str] = []
-    for key in ("option", "choices", "candidates"):
-        cand = sample.get(key)
-        if isinstance(cand, list) and cand:
-            return [str(x).strip() for x in cand]
-
-    for i in range(8):
-        for k in (f"option_{i}", f"option{i}", f"a{i}", f"choice_{i}"):
-            if k in sample and str(sample[k]).strip():
-                collected.append(str(sample[k]).strip())
-                break
-    return collected if collected else None
+from data_loaders import get_data_loader, list_supported_datasets
+from data_loaders.base import VQASample
+from frame_samplers import sample_video_frames
+from vl_common import collect_visual_token_ids
 
 
-def _answer_to_letter(answer: Any, num_options: int) -> str | None:
-    if answer is None:
-        return None
-    text = str(answer).strip().upper()
-    if not text:
-        return None
-
-    if len(text) == 1 and "A" <= text <= "Z":
-        return text
-
-    m = re.search(r"-?\d+", text)
-    if m:
-        idx = int(m.group(0))
-        if 0 <= idx < num_options:
-            return chr(ord("A") + idx)
-        if 1 <= idx <= num_options:
-            return chr(ord("A") + idx - 1)
-    return None
+def build_user_text(question: str, options: list[str] | None) -> str:
+    if options:
+        return (
+            f"{question}\n\nOptions:\n"
+            + "\n".join(options)
+            + "\n\nPlease answer with the option letter directly."
+        )
+    return f"{question}\n\nPlease provide the numerical answer directly."
 
 
-def _resolve_video_path(video_dir: str, sample: dict[str, Any]) -> str | None:
-    # 按常见字段名尝试拼接本地视频路径
-    candidates: list[str] = []
-    for key in ("video_path", "video", "video_id", "video_uid", "video_idx", "sample_id", "uid", "q_uid"):
-        val = sample.get(key)
-        if val is not None and str(val).strip():
-            candidates.append(str(val).strip())
-
-    for c in candidates:
-        if os.path.isfile(c):
-            return c
-        p = os.path.join(video_dir, c)
-        if os.path.isfile(p):
-            return p
-        for ext in (".mp4", ".MP4", ".webm", ".mkv", ".avi"):
-            p2 = os.path.join(video_dir, c + ext)
-            if os.path.isfile(p2):
-                return p2
-    return None
-
-
-def build_training_examples(
-    video_dir: str,
-    dataset_name: str,
-    split: str,
-    seed: int,
-    train_ratio: float,
-    use_train_split: bool,
-    max_samples: int | None,
-) -> list[dict[str, str]]:
-    ds = load_dataset(dataset_name, split=split)
-    indices = list(range(len(ds)))
-    indices = split_indices(indices, seed, train_ratio, use_train_split)
-    if max_samples is not None:
-        indices = indices[:max_samples]
-
-    records: list[dict[str, str]] = []
-    for i in tqdm(indices, desc="构建 EgoSchema 训练样本"):
-        sample = ds[i]
-        question = str(sample.get("question", "")).strip()
-        if not question:
-            continue
-
-        options = _normalize_options(sample)
-        if not options:
-            continue
-
-        raw_answer = sample.get("answer", sample.get("ground_truth", sample.get("label")))
-        answer_letter = _answer_to_letter(raw_answer, len(options))
-        if not answer_letter:
-            continue
-
-        video_path = _resolve_video_path(video_dir, sample)
-        if not video_path:
-            continue
-
-        records.append(
+def build_training_examples(samples: list[VQASample]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for sample in samples:
+        rows.append(
             {
-                "video_path": video_path,
-                "user_text": build_mcq_prompt(question, options),
-                "answer": answer_letter,
+                "video_path": sample.video_path,
+                "user_text": build_user_text(sample.question, sample.options),
+                "question_text": sample.question,
+                "answer": str(sample.answer).strip(),
             }
         )
-
-    if not records:
-        raise RuntimeError("没有可用训练样本，请检查 EgoSchema 字段和 video_dir 本地视频命名。")
-    return records
+    if not rows:
+        raise RuntimeError("没有可用训练样本。")
+    return rows
 
 
 def make_collate_fn(processor, num_frames: int, visual_token_ids: list[int]):
     def collate_fn(examples: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
         texts: list[str] = []
         batch_images: list[list] = []
-        for ex in examples:
-            frames = extract_video_frames(ex["video_path"], num_frames=num_frames)
+        for i, ex in enumerate(examples):
+            frame_sampling_method = ex.get("frame_sampling_method", "uniform")
+            random_seed = ex.get("sample_seed", None) if frame_sampling_method == "random" else None
+            if random_seed is not None:
+                random_seed = int(random_seed) + i
+            frames = sample_video_frames(
+                video_path=ex["video_path"],
+                num_frames=num_frames,
+                method=frame_sampling_method,
+                random_seed=random_seed,
+                question=ex.get("question_text", ""),
+                answer=ex.get("answer", ""),
+                focus_blip_model_name=ex.get("focus_blip_model_name", "Salesforce/blip-itm-base-coco"),
+                focus_blip_device=ex.get("focus_blip_device", None),
+                focus_blip_batch_size=int(ex.get("focus_blip_batch_size", 16)),
+            )
             if not frames:
                 raise ValueError(f"无法从视频取帧: {ex['video_path']}")
-            content = [{"type": "image", "image": f} for f in frames]
+            content: list[dict[str, Any]] = [{"type": "image", "image": f} for f in frames]
             content.append({"type": "text", "text": ex["user_text"]})
             messages = [
                 {"role": "user", "content": content},
@@ -163,14 +88,29 @@ def make_collate_fn(processor, num_frames: int, visual_token_ids: list[int]):
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="EgoSchema SFT 训练")
+    p = argparse.ArgumentParser(description="通用 VQA 训练脚本（TRL + LoRA/QLoRA）")
+    p.add_argument("--dataset", type=str, default="vsibench", choices=list_supported_datasets())
+    p.add_argument("--dataset_split", type=str, default="test")
+    p.add_argument("--dataset_name", type=str, default="nyu-visionx/VSI-Bench")
+    p.add_argument("--dataset_config", type=str, default="full")
+    p.add_argument("--no_dataset_config", action="store_true")
+
     p.add_argument("--model_path", type=str, required=True)
-    p.add_argument("--video_dir", type=str, default="~/dataset/egoschema/videos")
-    p.add_argument("--output_dir", type=str, default="./outputs/egoschema_sft_lora")
-    p.add_argument("--dataset_name", type=str, default="lmms-lab/EgoSchema")
-    p.add_argument("--split", type=str, default="validation")
+    p.add_argument("--model_name", type=str, default=None, help="模型名称（可选，便于日志标识）")
+    p.add_argument("--video_dir", type=str, default="~/dataset/vsi_bench")
+    p.add_argument("--output_dir", type=str, default="./outputs/vqa_sft_lora")
     p.add_argument("--num_frames", type=int, default=4)
+    p.add_argument(
+        "--frame_sampling_method",
+        type=str,
+        default="uniform",
+        choices=["uniform", "random", "focus", "sevila"],
+    )
+    p.add_argument("--focus_blip_model_name", type=str, default="Salesforce/blip-itm-base-coco")
+    p.add_argument("--focus_blip_device", type=str, default=None)
+    p.add_argument("--focus_blip_batch_size", type=int, default=16)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--task_filter", type=str, default="all", choices=["all", "mcq", "numeric"])
     p.add_argument("--max_samples", type=int, default=None)
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_test_split", action="store_true")
@@ -185,6 +125,8 @@ def parse_args():
     p.add_argument("--save_steps", type=int, default=200)
     p.add_argument("--bf16", action="store_true")
     p.add_argument("--no_qlora", action="store_true")
+    p.add_argument("--push_to_hub", action="store_true")
+    p.add_argument("--hub_model_id", type=str, default=None)
 
     p.add_argument("--lora_r", type=int, default=32)
     p.add_argument("--lora_alpha", type=int, default=32)
@@ -196,22 +138,36 @@ def main():
     args = parse_args()
     video_dir = os.path.expanduser(args.video_dir)
     model_path = os.path.expanduser(args.model_path)
+    if args.model_name:
+        print(f"训练模型: {args.model_name}")
     use_train_split = not args.use_test_split
 
-    rows = build_training_examples(
+    loader = get_data_loader(
+        args.dataset,
         video_dir=video_dir,
-        dataset_name=args.dataset_name,
-        split=args.split,
         seed=args.seed,
         train_ratio=args.train_ratio,
+        task_filter=args.task_filter,
+        dataset_name=args.dataset_name,
+        dataset_config=args.dataset_config,
+        no_dataset_config=args.no_dataset_config,
+    )
+    samples = loader.get_split_samples(
+        split=args.dataset_split,
         use_train_split=use_train_split,
         max_samples=args.max_samples,
     )
-    print(f"有效 EgoSchema 训练样本数: {len(rows)}")
+    train_rows = build_training_examples(samples)
+    for row_idx, row in enumerate(train_rows):
+        row["frame_sampling_method"] = args.frame_sampling_method
+        row["sample_seed"] = args.seed + row_idx
+        row["focus_blip_model_name"] = args.focus_blip_model_name
+        row["focus_blip_device"] = args.focus_blip_device
+        row["focus_blip_batch_size"] = args.focus_blip_batch_size
+    print(f"有效训练样本数: {len(train_rows)}")
 
     processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
     visual_ids = collect_visual_token_ids(processor)
-
     peft_config = LoraConfig(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
@@ -248,7 +204,7 @@ def main():
     if hasattr(model, "enable_input_require_grads"):
         model.enable_input_require_grads()
 
-    training_args = SFTConfig(
+    sft_kw: dict[str, Any] = dict(
         output_dir=args.output_dir,
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
@@ -264,13 +220,17 @@ def main():
         max_length=None,
         remove_unused_columns=False,
         report_to="none",
+        push_to_hub=args.push_to_hub,
         dataset_kwargs={"skip_prepare_dataset": True},
     )
+    if args.hub_model_id:
+        sft_kw["hub_model_id"] = args.hub_model_id
+    training_args = SFTConfig(**sft_kw)
 
     trainer_kw: dict[str, Any] = dict(
         model=model,
         args=training_args,
-        train_dataset=Dataset.from_list(rows),
+        train_dataset=Dataset.from_list(train_rows),
         data_collator=make_collate_fn(processor, args.num_frames, visual_ids),
         peft_config=peft_config,
     )
@@ -283,8 +243,9 @@ def main():
     trainer.train()
     trainer.save_model(args.output_dir)
     processor.save_pretrained(args.output_dir)
-    print(f"训练完成，已保存到: {args.output_dir}")
+    print(f"训练结束，adapter 与 processor 已保存到: {args.output_dir}")
 
 
 if __name__ == "__main__":
     main()
+
