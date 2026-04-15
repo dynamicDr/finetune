@@ -6,56 +6,6 @@ from typing import Any
 from .base import BaseDataLoader, VQASample, load_dataset
 
 
-def _pick_first_non_empty(raw: dict[str, Any], keys: list[str]) -> str:
-    for k in keys:
-        if k in raw and raw[k] is not None:
-            v = str(raw[k]).strip()
-            if v:
-                return v
-    return ""
-
-
-def _extract_options(raw: dict[str, Any]) -> list[str] | None:
-    # style-1: options: [...]
-    opts = raw.get("options")
-    if isinstance(opts, list) and opts:
-        out = [str(x).strip() for x in opts if str(x).strip()]
-        return out or None
-
-    # style-2: option_0..option_4 / option0..option4
-    bucket: list[str] = []
-    for i in range(8):
-        for key in (f"option_{i}", f"option{i}", f"candidate_{i}", f"candidate{i}"):
-            if key in raw and raw[key] is not None:
-                text = str(raw[key]).strip()
-                if text:
-                    bucket.append(text)
-                    break
-    return bucket or None
-
-
-def _normalize_mcq_answer(answer_raw: Any, options: list[str] | None) -> str:
-    if answer_raw is None:
-        return ""
-    text = str(answer_raw).strip()
-    if not text:
-        return ""
-
-    # If answer is index-like and options exist, convert to option letter.
-    if options is not None:
-        try:
-            idx = int(float(text))
-            if 0 <= idx < len(options):
-                return chr(ord("A") + idx)
-        except Exception:
-            pass
-
-    # Keep letter answer if provided.
-    if len(text) == 1 and text.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        return text.upper()
-    return text
-
-
 class EgoSchemaLoader(BaseDataLoader):
     def __init__(
         self,
@@ -64,12 +14,22 @@ class EgoSchemaLoader(BaseDataLoader):
         train_ratio: float = 0.8,
         task_filter: str = "all",
         dataset_name: str = "lmms-lab/EgoSchema",
-        dataset_config: str | None = None,
+        dataset_config: str | None = "Subset",
         no_dataset_config: bool = False,
     ):
         super().__init__(video_dir=video_dir, seed=seed, train_ratio=train_ratio, task_filter=task_filter)
         self.dataset_name = dataset_name
         self.dataset_config = None if no_dataset_config else dataset_config
+        base_video_dir = os.path.expanduser(video_dir)
+        # 按更深目录优先，兼容 /egoschema 和 /egoschema/videos 作为输入。
+        candidates = [
+            os.path.join(base_video_dir, "videos", "videos", "videos"),
+            os.path.join(base_video_dir, "videos", "videos"),
+            os.path.join(base_video_dir, "videos"),
+            base_video_dir,
+        ]
+        # 去重并保序
+        self.video_roots = list(dict.fromkeys(candidates))
 
     def load_raw_dataset(self, split: str):
         kwargs: dict[str, Any] = {}
@@ -77,35 +37,78 @@ class EgoSchemaLoader(BaseDataLoader):
             kwargs["name"] = self.dataset_config
         return load_dataset(self.dataset_name, split=split, **kwargs)
 
+    @staticmethod
+    def _pick_video_id(raw_sample: dict[str, Any]) -> str:
+        for k in ("video_id", "video_uid", "video_idx", "q_uid", "uid", "id"):
+            v = raw_sample.get(k, None)
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s:
+                return s
+        return ""
+
+    @staticmethod
+    def _extract_options(raw_sample: dict[str, Any]) -> list[str] | None:
+        if isinstance(raw_sample.get("options"), list) and len(raw_sample["options"]) > 0:
+            return [str(x).strip() for x in raw_sample["options"]]
+        if isinstance(raw_sample.get("option"), list) and len(raw_sample["option"]) > 0:
+            return [str(x).strip() for x in raw_sample["option"]]
+        option_keys = ("option0", "option1", "option2", "option3", "option4")
+        vals = [str(raw_sample.get(k, "")).strip() for k in option_keys]
+        vals = [v for v in vals if v]
+        return vals if vals else None
+
+    @staticmethod
+    def _normalize_mcq_answer(raw_answer: Any) -> str:
+        # 支持 A-E、0-4、1-5 三类标注格式
+        if isinstance(raw_answer, str):
+            s = raw_answer.strip()
+            upper = s.upper()
+            if upper in {"A", "B", "C", "D", "E"}:
+                return upper
+            if s.isdigit():
+                raw_answer = int(s)
+            else:
+                return s
+
+        if isinstance(raw_answer, int):
+            if 0 <= raw_answer <= 4:
+                return "ABCDE"[raw_answer]
+            if 1 <= raw_answer <= 5:
+                return "ABCDE"[raw_answer - 1]
+
+        return str(raw_answer).strip()
+
     def _resolve_video_path(self, video_id: str) -> str | None:
         if not video_id:
             return None
-        # Support both ids without extension and full filename.
-        candidates = [video_id]
+
+        candidate_names = [video_id]
+        # 若 video_id 不带扩展名，补全常见视频后缀
         if "." not in os.path.basename(video_id):
-            candidates.extend([f"{video_id}.mp4", f"{video_id}.webm", f"{video_id}.mkv", f"{video_id}.avi"])
-        for name in candidates:
-            path = os.path.join(self.video_dir, name)
-            if os.path.isfile(path):
-                return path
+            candidate_names.extend([f"{video_id}.mp4", f"{video_id}.webm", f"{video_id}.mkv", f"{video_id}.avi"])
+
+        for root in self.video_roots:
+            for name in candidate_names:
+                p = os.path.join(root, name)
+                if os.path.isfile(p):
+                    return p
         return None
 
     def to_vqa_sample(self, raw_sample: dict[str, Any], index: int) -> VQASample | None:
-        video_id = _pick_first_non_empty(
-            raw_sample,
-            ["video_id", "video_uid", "video_idx", "q_uid", "uid", "id"],
-        )
+        question = str(raw_sample.get("question", "")).strip()
+        if not question:
+            return None
+
+        video_id = self._pick_video_id(raw_sample)
         video_path = self._resolve_video_path(video_id)
         if not video_path:
             return None
 
-        question = _pick_first_non_empty(raw_sample, ["question", "query", "prompt"])
-        if not question:
-            return None
-
-        options = _extract_options(raw_sample)
-        answer_raw = raw_sample.get("answer", raw_sample.get("label", raw_sample.get("ground_truth")))
-        answer = _normalize_mcq_answer(answer_raw, options)
+        options = self._extract_options(raw_sample)
+        raw_answer = raw_sample.get("answer", raw_sample.get("ground_truth", ""))
+        answer = self._normalize_mcq_answer(raw_answer)
         if not answer:
             return None
 
@@ -120,5 +123,7 @@ class EgoSchemaLoader(BaseDataLoader):
             metadata={
                 "source_index": index,
                 "video_id": video_id,
+                "dataset_name": self.dataset_name,
+                "dataset_config": self.dataset_config,
             },
         )

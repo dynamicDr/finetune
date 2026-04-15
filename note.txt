@@ -91,13 +91,13 @@ LoRA 微调输出目录（`outputs/vsibench_train/.../<task>_frames<num>/`）文
 
 SLURM 常用指令  
 - 查看自己所有作业：  
-  - squeue -u $USER  
+squeue -u $USER  
 - 取消一个作业（比如作业号是 12345）：  
-  - scancel 12345  
+scancel 12345  
 - 取消自己当前所有作业：  
-  - scancel -u $USER  
+scancel -u $USER  
 - 查看某个作业的详细信息：  
-  - scontrol show job 12345  
+scontrol show job 12345  
 - 查看排队情况
 squeue -p q-hgpu-batch -t PD -o "%.10i %.15P %.20j %.10u %.8Q %.6D %.10M %R"
 
@@ -126,6 +126,7 @@ python run.py --multirun \
     train_ratio=0.8 \
     seed=42 \
     slurm=hgpu_batch
+
 
 在0.2的测试集上测试效果:（zzy）
 python run.py --multirun \
@@ -205,5 +206,90 @@ python run.py --multirun \
     num_frames=8 \
     frame_sampling_method=uniform,random,focus,sevila \
     train_ratio=0.8 \
+    seed=42 \
+    slurm=hgpu_batch
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    num_frames=8 \
+    frame_sampling_method=uniform,random,focus,sevila \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+下载数据集的方法整理：
+nextqa：
+gdown从google网盘上下载视频（NExTVideo.zip）在~/dataset/nextqa，命令如下：
+gdown "https://drive.google.com/uc?id=XXXX" -O NExTVideo.zip
+(base) duanty@gpu3gate1:~/dataset/nextqa$python -c "import zipfile; zipfile.ZipFile('NExTVideo.zip').extractall('.')"
+python -c "from datasets import load_dataset; load_dataset('lmms-lab/NExTQA','MC')"
+
+egoschema：
+详见egoschema的git仓库，需先配置 Kaggle 并接受比赛
+(base) duanty@gpu3gate1:~/dataset/egoschema$ kaggle competitions download -c egoschema-public
+python -c "import zipfile; zipfile.ZipFile('egoschema-public.zip').extractall('.')"
+
+测试nextqa能不能跑。
+已通过，问题：一个视频对应多个问题时，decode太慢，现在跑这个指令需要100个小时
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=nextqa \
+    dataset_name=lmms-lab/NExTQA \
+    dataset_config=MC \
+    dataset_split=test \
+    video_dir=~/dataset/nextqa \
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    num_frames=8 \
+    frame_sampling_method=uniform \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+测试egochema能不能跑，
+成功，约4.5小时
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    num_frames=8 \
+    frame_sampling_method=uniform \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+
+正式测试egochema上各个模型和帧数的效果，
+成功，约4.5小时
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_4b_thinking,qwen3_8b_thinking,qwen3_30b_a3b_thinking,qwen3_32b_thinking \
+    task_filter=mcq \
+    num_frames=4,8,16,32\
+    frame_sampling_method=uniform \
+    train_ratio=0.0 \
     seed=42 \
     slurm=hgpu_batch
