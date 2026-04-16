@@ -6,7 +6,7 @@ from .random import sample_random_frames
 from .uniform import sample_uniform_frames
 
 
-SUPPORTED_FRAME_SAMPLERS = ("uniform", "random", "focus", "sevila")
+SUPPORTED_FRAME_SAMPLERS = ("uniform", "random", "focus", "sevila", "videoagent")
 
 
 def sample_video_frames(
@@ -62,6 +62,16 @@ def sample_video_frames(
             blip_model_name=focus_blip_model_name,
             blip_device=focus_blip_device,
             blip_batch_size=focus_blip_batch_size,
+        )
+    if method == "videoagent":
+        from .videoagent import sample_videoagent_frames
+
+        return sample_videoagent_frames(
+            video_path,
+            num_frames,
+            question=question,
+            answer=answer,
+            random_seed=random_seed,
         )
     raise ValueError(f"不支持的选帧方法: {method}，可选: {', '.join(SUPPORTED_FRAME_SAMPLERS)}")
 
