@@ -302,7 +302,7 @@ python run.py --multirun \
     dataset_config=Subset \
     dataset_split=test \
     video_dir=~/dataset/egoschema/videos/videos \
-    num_frames=16,32\
+    num_frames=32,64\
     model=qwen3_4b_thinking,qwen3_8b_thinking,qwen3_30b_a3b_thinking,qwen3_32b_thinking \
     task_filter=mcq \
     frame_sampling_method=uniform \
