@@ -309,3 +309,20 @@ python run.py --multirun \
     train_ratio=0.0 \
     seed=42 \
     slurm=hgpu_batch
+
+测试videoagent能否跑通：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    num_frames=8 \
+    frame_sampling_method=videoagent \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
