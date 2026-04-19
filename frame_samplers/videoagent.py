@@ -4,7 +4,6 @@ import json
 import os
 import random
 import re
-import warnings
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -13,7 +12,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from .uniform import sample_uniform_frames
+_LOCAL_LLM_CACHE: dict[str, tuple[Any, Any]] = {}
 
 
 def _repo_root() -> Path:
@@ -76,39 +75,90 @@ def _load_captions(caption_file: str) -> dict[str, list[str]]:
 
 
 def parse_json(text: str):
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        json_pattern = r"\{.*?\}|\[.*?\]"
-        matches = re.findall(json_pattern, text, re.DOTALL)
-        for match in matches:
+    def _norm_parse(s: str):
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
             try:
-                match = match.replace("'", '"')
-                return json.loads(match)
+                return json.loads(s.replace("'", '"'))
             except json.JSONDecodeError:
-                continue
+                return None
+
+    # 1) 先尝试整段
+    whole = _norm_parse(text)
+    if isinstance(whole, dict):
+        return whole
+
+    # 2) 只提取对象块，并优先寻找包含关键字段的块
+    obj_pattern = r"\{[\s\S]*?\}"
+    matches = re.findall(obj_pattern, text, re.DOTALL)
+    if not matches:
         return None
+
+    # 先找包含目标键的 JSON 块（从后往前，优先模型最终输出）
+    for match in reversed(matches):
+        if ("final_answer" not in match) and ("confidence" not in match):
+            continue
+        item = _norm_parse(match)
+        if isinstance(item, dict):
+            if ("final_answer" in item) or ("confidence" in item):
+                return item
+
+    # 兜底：从后往前返回第一个可解析 dict
+    for match in reversed(matches):
+        item = _norm_parse(match)
+        if isinstance(item, dict):
+            return item
+    return None
 
 
 def parse_text_find_number(text: str) -> int:
+    print("[VideoAgent][parse_text_find_number] raw_text:")
+    print(text)
     item = parse_json(text)
+    print(f"[VideoAgent][parse_text_find_number] parsed_json={item}")
     try:
-        match = int(item["final_answer"])
-        if match in range(-1, 5):
+        raw_answer = item["final_answer"]
+        if isinstance(raw_answer, int):
+            match = raw_answer
+            if match in range(-1, 5):
+                print(f"[VideoAgent][parse_text_find_number] parsed_final_answer={match}")
+                return match
+        s = str(raw_answer).strip().upper()
+        # 支持 A-E
+        if s in {"A", "B", "C", "D", "E"}:
+            mapped = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4}[s]
+            print(f"[VideoAgent][parse_text_find_number] parsed_letter_answer={s}->{mapped}")
+            return mapped
+        # 支持字符串中的 0-4 索引（如 "option 2"）
+        m = re.search(r"\b([0-4])\b", s)
+        if m:
+            match = int(m.group(1))
+            print(f"[VideoAgent][parse_text_find_number] parsed_digit_answer={match}")
             return match
-        return random.randint(0, 4)
+        fallback = random.randint(0, 4)
+        print(f"[VideoAgent][parse_text_find_number] out_of_range, fallback_random={fallback}")
+        return fallback
     except Exception:
+        print("[VideoAgent][parse_text_find_number] parse_failed -> return -1")
         return -1
 
 
 def parse_text_find_confidence(text: str) -> int:
+    print("[VideoAgent][parse_text_find_confidence] raw_text:")
+    print(text)
     item = parse_json(text)
+    print(f"[VideoAgent][parse_text_find_confidence] parsed_json={item}")
     try:
         match = int(item["confidence"])
         if match in range(1, 4):
+            print(f"[VideoAgent][parse_text_find_confidence] parsed_confidence={match}")
             return match
-        return random.randint(1, 3)
+        fallback = random.randint(1, 3)
+        print(f"[VideoAgent][parse_text_find_confidence] out_of_range, fallback_random={fallback}")
+        return fallback
     except Exception:
+        print("[VideoAgent][parse_text_find_confidence] parse_failed -> return 1")
         return 1
 
 
@@ -118,8 +168,6 @@ def get_llm_response(
     json_format: bool = True,
     model: str = "gpt-4-1106-preview",
 ) -> str:
-    from openai import OpenAI
-
     try:
         from .VideoAgent.utils_general import get_from_cache, save_to_cache
     except Exception:
@@ -136,6 +184,59 @@ def get_llm_response(
         if cached_value is not None:
             return cached_value
 
+    llm_backend = os.environ.get("VIDEOAGENT_LLM_BACKEND", "local").strip().lower()
+    if llm_backend not in {"local", "api"}:
+        raise ValueError(f"VIDEOAGENT_LLM_BACKEND 仅支持 local/api，当前: {llm_backend}")
+
+    if llm_backend == "local":
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        import torch
+
+        local_model_name = os.environ.get("VIDEOAGENT_LOCAL_MODEL", "Qwen/Qwen2.5-7B-Instruct").strip()
+        if not local_model_name:
+            raise ValueError("VIDEOAGENT_LOCAL_MODEL 不能为空（local 模式下必须提供本地模型名/路径）。")
+
+        def _load_local_llm(model_name: str):
+            if model_name in _LOCAL_LLM_CACHE:
+                return _LOCAL_LLM_CACHE[model_name]
+            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+            model_obj = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype="auto",
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            model_obj.eval()
+            _LOCAL_LLM_CACHE[model_name] = (tokenizer, model_obj)
+            return tokenizer, model_obj
+
+        tokenizer, model_obj = _load_local_llm(local_model_name)
+        user_prompt = f"System: {system_prompt}\n\nUser: {prompt}"
+        if hasattr(tokenizer, "apply_chat_template"):
+            msgs = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+            text = tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+        else:
+            text = user_prompt
+        inputs = tokenizer([text], return_tensors="pt")
+        model_device = model_obj.device if hasattr(model_obj, "device") else next(model_obj.parameters()).device
+        inputs = {k: v.to(model_device) for k, v in inputs.items()}
+        with torch.no_grad():
+            gen = model_obj.generate(
+                **inputs,
+                max_new_tokens=512,
+                do_sample=False,
+                temperature=0.0,
+            )
+        out = tokenizer.batch_decode(gen, skip_special_tokens=True)[0]
+        response = out[len(text) :].strip() if out.startswith(text) else out.strip()
+        if save_to_cache is not None:
+            save_to_cache(key, response)
+        return response
+
+    from openai import OpenAI
     client = OpenAI()
     for _ in range(3):
         try:
@@ -246,7 +347,7 @@ def ask_gpt_caption(question: str, caption: dict[str, str], num_frames: int, mod
     Please think step-by-step and write the best answer index in Json format {answer_format}. Note that only one answer is returned for the question.
     """
     system_prompt = "You are a helpful assistant."
-    response = get_llm_response(system_prompt, prompt, json_format=False, model=model)
+    response = get_llm_response(system_prompt, prompt, json_format=True, model=model)
     return prompt, response
 
 
@@ -264,7 +365,7 @@ def ask_gpt_caption_step(question: str, caption: dict[str, str], num_frames: int
     Please think step-by-step and write the best answer index in Json format {answer_format}. Note that only one answer is returned for the question.
     """
     system_prompt = "You are a helpful assistant."
-    response = get_llm_response(system_prompt, prompt, json_format=False, model=model)
+    response = get_llm_response(system_prompt, prompt, json_format=True, model=model)
     return prompt, response
 
 
@@ -320,28 +421,38 @@ def sample_videoagent_frames(
 
     caption_file = _resolve_caption_file()
     feature_source = _resolve_feature_source()
+    llm_backend = os.environ.get("VIDEOAGENT_LLM_BACKEND", "local").strip().lower()
     llm_model = os.environ.get("VIDEOAGENT_LLM_MODEL", "gpt-4-1106-preview")
 
-    if not caption_file or not feature_source or not os.getenv("OPENAI_API_KEY"):
-        warnings.warn(
-            "VideoAgent 依赖缺失（caption/features/OPENAI_API_KEY），回退为 uniform 选帧。",
-            RuntimeWarning,
-            stacklevel=1,
+    missing_reasons: list[str] = []
+    if llm_backend not in {"local", "api"}:
+        missing_reasons.append(f"VIDEOAGENT_LLM_BACKEND 非法（应为 local/api，当前: {llm_backend}）")
+    if llm_backend == "api" and not os.getenv("OPENAI_API_KEY"):
+        missing_reasons.append("OPENAI_API_KEY 未设置（api 模式需要）")
+    if llm_backend == "local" and not os.environ.get("VIDEOAGENT_LOCAL_MODEL", "").strip():
+        # 给出提示，但允许使用默认值
+        pass
+    if not caption_file:
+        missing_reasons.append(
+            "caption_file 缺失（请设置 VIDEOAGENT_CAPTION_FILE，或确认 frame_samplers/VideoAgent/download/lavila_subset.json 存在）"
         )
-        return sample_uniform_frames(video_path, num_frames, question=question, answer=answer)
+    if not feature_source:
+        missing_reasons.append(
+            "feature_source 缺失（请设置 VIDEOAGENT_FEATURE_DIR，或确认 frame_samplers/VideoAgent/download/ego_features_448(.zip) 存在）"
+        )
+    if missing_reasons:
+        raise RuntimeError("VideoAgent 依赖检查失败: " + "；".join(missing_reasons))
 
     try:
         from .VideoAgent.utils_clip import frame_retrieval_seg_ego
-    except Exception:
-        warnings.warn("加载 VideoAgent.utils_clip 失败，回退为 uniform 选帧。", RuntimeWarning, stacklevel=1)
-        return sample_uniform_frames(video_path, num_frames, question=question, answer=answer)
+    except Exception as e:
+        raise ImportError("加载 frame_samplers.VideoAgent.utils_clip 失败。") from e
 
     video_id = Path(video_path).stem
     all_caps = _load_captions(str(caption_file))
     caps = all_caps.get(video_id, [])
     if len(caps) < 2:
-        warnings.warn("未找到视频对应 captions，回退为 uniform 选帧。", RuntimeWarning, stacklevel=1)
-        return sample_uniform_frames(video_path, num_frames, question=question, answer=answer)
+        raise ValueError(f"未找到视频对应 captions 或帧描述不足: video_id={video_id}")
 
     formatted_question = _build_formatted_question(question)
     num_caps_frames = len(caps)
@@ -356,59 +467,51 @@ def sample_videoagent_frames(
     confidence = parse_text_find_confidence(confidence_str)
 
     if confidence < 3:
-        try:
-            segment_des = {
-                i + 1: f"{sample_idx[i]}-{sample_idx[i + 1]}" for i in range(len(sample_idx) - 1)
-            }
-            candiate_descriptions = generate_description_step(
-                formatted_question, sampled_caps, num_caps_frames, segment_des, llm_model
-            )
-            parsed_candiate_descriptions = parse_json(candiate_descriptions)
-            frame_descriptions = (
-                parsed_candiate_descriptions.get("frame_descriptions", [])
-                if isinstance(parsed_candiate_descriptions, dict)
-                else []
-            )
-            frame_idx = frame_retrieval_seg_ego(frame_descriptions, video_id, sample_idx, feature_dir=str(feature_source))
-            sample_idx += [int(x) for x in frame_idx if isinstance(x, int)]
-            sample_idx = sorted(list(set(sample_idx)))
-            sample_idx = [x for x in sample_idx if 1 <= x <= num_caps_frames]
-            sampled_caps = read_caption(caps, sample_idx)
-            previous_prompt, answer_str = ask_gpt_caption_step(formatted_question, sampled_caps, num_caps_frames, llm_model)
-            pred_answer = parse_text_find_number(answer_str)
-            confidence_str = self_eval(previous_prompt, answer_str, llm_model)
-            confidence = parse_text_find_confidence(confidence_str)
-        except Exception:
-            answer_str = generate_final_answer(formatted_question, sampled_caps, num_caps_frames, llm_model)
-            pred_answer = parse_text_find_number(answer_str)
+        segment_des = {
+            i + 1: f"{sample_idx[i]}-{sample_idx[i + 1]}" for i in range(len(sample_idx) - 1)
+        }
+        candiate_descriptions = generate_description_step(
+            formatted_question, sampled_caps, num_caps_frames, segment_des, llm_model
+        )
+        parsed_candiate_descriptions = parse_json(candiate_descriptions)
+        frame_descriptions = (
+            parsed_candiate_descriptions.get("frame_descriptions", [])
+            if isinstance(parsed_candiate_descriptions, dict)
+            else []
+        )
+        frame_idx = frame_retrieval_seg_ego(frame_descriptions, video_id, sample_idx, feature_dir=str(feature_source))
+        sample_idx += [int(x) for x in frame_idx if isinstance(x, int)]
+        sample_idx = sorted(list(set(sample_idx)))
+        sample_idx = [x for x in sample_idx if 1 <= x <= num_caps_frames]
+        sampled_caps = read_caption(caps, sample_idx)
+        previous_prompt, answer_str = ask_gpt_caption_step(formatted_question, sampled_caps, num_caps_frames, llm_model)
+        pred_answer = parse_text_find_number(answer_str)
+        confidence_str = self_eval(previous_prompt, answer_str, llm_model)
+        confidence = parse_text_find_confidence(confidence_str)
 
     if confidence < 3:
-        try:
-            segment_des = {
-                i + 1: f"{sample_idx[i]}-{sample_idx[i + 1]}" for i in range(len(sample_idx) - 1)
-            }
-            candiate_descriptions = generate_description_step(
-                formatted_question, sampled_caps, num_caps_frames, segment_des, llm_model
-            )
-            parsed_candiate_descriptions = parse_json(candiate_descriptions)
-            frame_descriptions = (
-                parsed_candiate_descriptions.get("frame_descriptions", [])
-                if isinstance(parsed_candiate_descriptions, dict)
-                else []
-            )
-            frame_idx = frame_retrieval_seg_ego(frame_descriptions, video_id, sample_idx, feature_dir=str(feature_source))
-            sample_idx += [int(x) for x in frame_idx if isinstance(x, int)]
-            sample_idx = sorted(list(set(sample_idx)))
-            sample_idx = [x for x in sample_idx if 1 <= x <= num_caps_frames]
-            sampled_caps = read_caption(caps, sample_idx)
-            answer_str = generate_final_answer(formatted_question, sampled_caps, num_caps_frames, llm_model)
-            pred_answer = parse_text_find_number(answer_str)
-        except Exception:
-            answer_str = generate_final_answer(formatted_question, sampled_caps, num_caps_frames, llm_model)
-            pred_answer = parse_text_find_number(answer_str)
+        segment_des = {
+            i + 1: f"{sample_idx[i]}-{sample_idx[i + 1]}" for i in range(len(sample_idx) - 1)
+        }
+        candiate_descriptions = generate_description_step(
+            formatted_question, sampled_caps, num_caps_frames, segment_des, llm_model
+        )
+        parsed_candiate_descriptions = parse_json(candiate_descriptions)
+        frame_descriptions = (
+            parsed_candiate_descriptions.get("frame_descriptions", [])
+            if isinstance(parsed_candiate_descriptions, dict)
+            else []
+        )
+        frame_idx = frame_retrieval_seg_ego(frame_descriptions, video_id, sample_idx, feature_dir=str(feature_source))
+        sample_idx += [int(x) for x in frame_idx if isinstance(x, int)]
+        sample_idx = sorted(list(set(sample_idx)))
+        sample_idx = [x for x in sample_idx if 1 <= x <= num_caps_frames]
+        sampled_caps = read_caption(caps, sample_idx)
+        answer_str = generate_final_answer(formatted_question, sampled_caps, num_caps_frames, llm_model)
+        pred_answer = parse_text_find_number(answer_str)
 
     if pred_answer == -1:
-        pred_answer = random.randint(0, 4)
+        raise ValueError("VideoAgent 未能从模型输出解析出有效 final_answer。")
 
     if len(sample_idx) > num_frames:
         pick = np.linspace(0, len(sample_idx) - 1, num=num_frames, dtype=int).tolist()

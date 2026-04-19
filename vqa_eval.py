@@ -240,7 +240,7 @@ def parse_args():
         "--frame_sampling_method",
         type=str,
         default="uniform",
-        choices=["uniform", "random", "focus", "sevila", "videoagent"],
+        choices=["uniform", "random", "focus", "sevila", "videoagent", "clip", "siglip2", "aks"],
     )
     p.add_argument("--focus_blip_model_name", type=str, default="Salesforce/blip-itm-base-coco")
     p.add_argument("--focus_blip_device", type=str, default=None)

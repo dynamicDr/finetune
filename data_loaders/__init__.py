@@ -3,12 +3,14 @@ from __future__ import annotations
 from .base import BaseDataLoader, VQASample
 from .egoschema import EgoSchemaLoader
 from .nextqa import NextQALoader
+from .videomme import VideoMMELoader
 from .vsibench import VSIBenchLoader
 
 
 LOADER_REGISTRY: dict[str, type[BaseDataLoader]] = {
     "egoschema": EgoSchemaLoader,
     "nextqa": NextQALoader,
+    "videomme": VideoMMELoader,
     "vsibench": VSIBenchLoader,
 }
 

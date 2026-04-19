@@ -1,0 +1,13 @@
+timestamp,dataset,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,model_name,lora_path,train_ratio,eval_split
+2026-04-17 09:20:04,egoschema,42,mcq,500,4,25.20,18.648,videoagent,11.103270,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-17 09:32:12,egoschema,42,mcq,500,4,28.00,20.753,videoagent,9.940258,Qwen/Qwen3-VL-32B-Thinking,,0.0,test
+2026-04-17 09:33:38,egoschema,42,mcq,500,4,41.00,21.086,videoagent,9.789783,Qwen/Qwen3-VL-30B-A3B-Thinking,,0.0,test
+2026-04-17 09:36:35,egoschema,42,mcq,500,4,28.40,20.577,videoagent,11.150987,Qwen/Qwen3-VL-8B-Thinking,,0.0,test
+2026-04-17 14:15:34,egoschema,42,mcq,500,8,26.80,22.170,videoagent,11.180038,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-17 14:55:14,egoschema,42,mcq,500,8,29.80,22.168,videoagent,9.723779,Qwen/Qwen3-VL-8B-Thinking,,0.0,test
+2026-04-17 15:17:50,egoschema,42,mcq,500,8,30.00,24.528,videoagent,9.846667,Qwen/Qwen3-VL-32B-Thinking,,0.0,test
+2026-04-17 15:18:40,egoschema,42,mcq,500,8,40.60,24.737,videoagent,9.795296,Qwen/Qwen3-VL-30B-A3B-Thinking,,0.0,test
+2026-04-17 18:58:29,egoschema,42,mcq,500,16,26.80,22.657,videoagent,11.192653,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-17 19:24:06,egoschema,42,mcq,500,16,29.80,22.362,videoagent,9.746141,Qwen/Qwen3-VL-8B-Thinking,,0.0,test
+2026-04-17 20:03:22,egoschema,42,mcq,500,16,30.00,24.295,videoagent,9.771629,Qwen/Qwen3-VL-32B-Thinking,,0.0,test
+2026-04-17 20:08:06,egoschema,42,mcq,500,16,40.60,24.865,videoagent,9.804058,Qwen/Qwen3-VL-30B-A3B-Thinking,,0.0,test

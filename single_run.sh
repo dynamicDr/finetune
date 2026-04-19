@@ -1,4 +1,23 @@
 #!/bin/bash
+# 用法示例（测试 frame_samplers/clip.py 选帧是否可用）:
+# sbatch single_run.sh run.py \
+#     script=vqa_eval.py \
+#     dataset=egoschema \
+#     dataset_name=lmms-lab/EgoSchema \
+#     dataset_config=Subset \
+#     dataset_split=test \
+#     video_dir=~/dataset/egoschema/videos/videos \
+#     num_samples=2 \
+#     num_frames=8 \
+#     model=qwen3_4b_thinking \
+#     task_filter=mcq \
+#     frame_sampling_method=clip \
+#     train_ratio=0.0 \
+#     seed=42
+#
+# 说明:
+# - 该命令直接走 frame_samplers/clip.py 的 sample_clip_frames 逻辑。
+# - 用 num_samples=2 做快速连通性验证（非完整评测）。
 #SBATCH --job-name=python_job
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=ALL
