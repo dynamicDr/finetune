@@ -345,6 +345,24 @@ python run.py --multirun \
     seed=42 \
     slurm=hgpu_batch
 
+测试所有选帧方法在Video-MME（未测试）：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    num_frames=8 \
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    frame_sampling_method=uniform,clip,aks,siglip2 \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
 测试所有选帧方法在EgoSchema：
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
@@ -354,24 +372,7 @@ python run.py --multirun \
     dataset_config=Subset \
     dataset_split=test \
     video_dir=~/dataset/egoschema/videos/videos \
-    num_frames=4\
-    model=qwen3_4b_thinking \
-    task_filter=mcq \
-    frame_sampling_method=uniform,clip,aks,siglip2 \
-    train_ratio=0.0 \
-    seed=42 \
-    slurm=hgpu_batch
-
-测试所有选帧方法在Video-MME：
-python run.py --multirun \
-    hydra/launcher=submitit_slurm \
-    script=vqa_eval.py \
-    dataset=videomme \
-    dataset_name=lmms-lab/Video-MME \
-    dataset_no_config=true \
-    dataset_split=test \
-    video_dir=~/dataset/Video-MME \
-    num_frames=4 \
+    num_frames=16,32\
     model=qwen3_4b_thinking \
     task_filter=mcq \
     frame_sampling_method=uniform,clip,aks,siglip2 \

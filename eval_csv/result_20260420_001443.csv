@@ -1,0 +1,9 @@
+timestamp,dataset,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,model_name,lora_path,train_ratio,eval_split
+2026-04-20 02:37:41,egoschema,42,mcq,500,4,25.40,16.866,uniform,0.197382,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 02:53:52,egoschema,42,mcq,500,4,27.20,17.339,clip,1.682406,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 02:54:32,egoschema,42,mcq,500,4,27.00,17.442,siglip2,1.658934,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 04:31:35,egoschema,42,mcq,500,4,26.40,17.278,aks,13.453775,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 06:54:15,egoschema,42,mcq,500,8,29.80,30.334,uniform,0.373027,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 07:35:58,egoschema,42,mcq,500,8,27.20,32.104,clip,1.689990,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 09:17:37,egoschema,42,mcq,500,8,29.80,32.250,aks,13.637577,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-20 09:45:26,egoschema,42,mcq,500,8,28.80,35.718,siglip2,1.861140,Qwen/Qwen3-VL-4B-Thinking,,0.0,test

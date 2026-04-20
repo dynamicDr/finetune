@@ -20,8 +20,11 @@
 # - 用 num_samples=2 做快速连通性验证（非完整评测）。
 #SBATCH --job-name=python_job
 #SBATCH --gres=gpu:1
+#SBATCH --partition=q-h800
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=240G
 #SBATCH --mail-type=ALL
-#SBATCH --time=6:00:00
+#SBATCH --time=18:00:00
 #SBATCH --output=/dev/null    # ← 添加这行
 #SBATCH --error=/dev/null     # ← 添加这行
 
