@@ -11,3 +11,11 @@ timestamp,dataset,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_infer
 2026-04-17 01:28:01,egoschema,42,mcq,500,16,33.80,73.094,uniform,0.767167,Qwen/Qwen3-VL-8B-Thinking,,0.0,test
 2026-04-17 02:26:04,egoschema,42,mcq,500,16,32.60,74.472,uniform,0.758591,Qwen/Qwen3-VL-32B-Thinking,,0.0,test
 2026-04-17 02:32:33,egoschema,42,mcq,500,16,43.60,75.393,uniform,0.760748,Qwen/Qwen3-VL-30B-A3B-Thinking,,0.0,test
+2026-04-17 23:26:39,egoschema,42,mcq,500,32,33.60,123.319,uniform,1.527069,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-18 03:37:07,egoschema,42,mcq,500,32,48.00,128.413,uniform,1.430068,Qwen/Qwen3-VL-30B-A3B-Thinking,,0.0,test
+2026-04-18 03:47:22,egoschema,42,mcq,500,32,38.00,129.476,uniform,1.420920,Qwen/Qwen3-VL-32B-Thinking,,0.0,test
+2026-04-18 04:51:57,egoschema,42,mcq,500,32,36.80,138.861,uniform,1.522666,Qwen/Qwen3-VL-8B-Thinking,,0.0,test
+2026-04-19 10:14:12,egoschema,42,mcq,500,64,35.40,247.099,uniform,3.017860,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-19 15:12:56,egoschema,42,mcq,500,64,52.20,251.947,uniform,2.801600,Qwen/Qwen3-VL-30B-A3B-Thinking,,0.0,test
+2026-04-19 15:18:45,egoschema,42,mcq,500,64,41.60,253.888,uniform,2.799222,Qwen/Qwen3-VL-8B-Thinking,,0.0,test
+2026-04-19 20:37:01,egoschema,42,mcq,500,64,43.40,282.634,uniform,2.959465,Qwen/Qwen3-VL-32B-Thinking,,0.0,test

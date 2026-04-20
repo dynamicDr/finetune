@@ -379,3 +379,38 @@ python run.py --multirun \
     train_ratio=0.0 \
     seed=42 \
     slurm=hgpu_batch
+
+测试所有选帧方法在EgoSchema：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    num_frames=16,32\
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    frame_sampling_method=uniform,clip,aks,siglip2 \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+    
+测试所有选帧方法在EgoSchema，高帧数(zzy跑)：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    num_frames=64,128\
+    model=qwen3_4b_thinking \
+    task_filter=mcq \
+    frame_sampling_method=uniform,clip,aks,siglip2 \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
