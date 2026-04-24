@@ -4,7 +4,6 @@ import heapq
 import importlib.util
 import time
 import math
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -111,18 +110,35 @@ def _load_blip(device: str):
         _log(f"reuse cached BLIP model on device={device}")
         return _AKS_MODEL_CACHE[key]
     try:
-        _ensure_aks_lavis_patches(include_blip=True)
-        from lavis.models import load_model_and_preprocess
+        from transformers import BlipForImageTextRetrieval, BlipProcessor
     except ImportError as exc:
-        raise ImportError("AKS-BLIP 依赖缺失：需要安装 lavis。") from exc
-    model, vis_processors, text_processors = load_model_and_preprocess(
-        "blip_image_text_matching",
-        "large",
-        device=device,
-        is_eval=True,
-    )
-    _AKS_MODEL_CACHE[key] = (model, vis_processors, text_processors)
-    _log(f"loaded BLIP model on device={device}")
+        raise ImportError("AKS-BLIP 依赖缺失：需要安装 transformers。") from exc
+    model_id = "Salesforce/blip-itm-base-coco"
+    model = BlipForImageTextRetrieval.from_pretrained(model_id).to(device).eval()
+    processor = BlipProcessor.from_pretrained(model_id)
+    _AKS_MODEL_CACHE[key] = (model, processor)
+    _log(f"loaded BLIP model({model_id}) on device={device}")
+    return _AKS_MODEL_CACHE[key]
+
+
+def _load_blip2(device: str):
+    key = ("blip2", device)
+    if key in _AKS_MODEL_CACHE:
+        _log(f"reuse cached BLIP2 model on device={device}")
+        return _AKS_MODEL_CACHE[key]
+    try:
+        import torch
+        from transformers import Blip2Model, Blip2Processor
+    except ImportError as exc:
+        raise ImportError("AKS-BLIP2 依赖缺失：需要安装 transformers。") from exc
+    model_id = "Salesforce/blip2-opt-2.7b"
+    model_kwargs: dict[str, Any] = {}
+    if device.startswith("cuda"):
+        model_kwargs["torch_dtype"] = torch.float16
+    model = Blip2Model.from_pretrained(model_id, **model_kwargs).to(device).eval()
+    processor = Blip2Processor.from_pretrained(model_id)
+    _AKS_MODEL_CACHE[key] = (model, processor)
+    _log(f"loaded BLIP2 model({model_id}) on device={device}")
     return _AKS_MODEL_CACHE[key]
 
 
@@ -204,34 +220,11 @@ def meanstd(
 
 
 def _format_question_and_options(question: str | None, options: list[str] | None) -> str:
+    _ = options
     q = (question or "").strip()
     if not q:
         raise ValueError("AKS 需要提供 question。")
-    if not options:
-        raise ValueError("AKS 需要提供 options，且每个选项必须包含具体内容。")
-
-    normalized_options: list[str] = []
-    for i, raw_option in enumerate(options):
-        option_text = str(raw_option).strip()
-        if not option_text:
-            raise ValueError(f"AKS 选项不能为空：第 {i + 1} 个选项为空。")
-        if re.fullmatch(r"[A-Ea-e](?:[\.\)\:\-])?", option_text):
-            raise ValueError(
-                f"AKS 选项必须包含具体内容，不能只写字母：'{option_text}'。"
-            )
-        prefixed = re.match(r"^([A-Ea-e])[\.\)\:\-]\s*(.*)$", option_text)
-        if prefixed:
-            content = prefixed.group(2).strip()
-            if not content:
-                raise ValueError(
-                    f"AKS 选项必须包含具体内容，不能只写字母：'{option_text}'。"
-                )
-            normalized_options.append(f"{prefixed.group(1).upper()}. {content}")
-            continue
-        option_letter = chr(ord("A") + i)
-        normalized_options.append(f"{option_letter}. {option_text}")
-
-    return f"{q}\nOptions:\n" + "\n".join(normalized_options)
+    return q
 
 
 def _compose_query(
@@ -245,6 +238,18 @@ def _compose_query(
     if extract_feature_model == "sevila":
         return f"Question: {qa_text}. Is this a good frame can answer the question?"
     return qa_text
+
+
+def _extract_blip_itm_score(outputs, torch) -> float:
+    logits = getattr(outputs, "itm_score", None)
+    if logits is None:
+        logits = getattr(outputs, "logits", None)
+    if logits is None:
+        raise RuntimeError("BLIP 输出中缺少 itm_score/logits，无法计算打分。")
+    probs = torch.nn.functional.softmax(logits, dim=-1)
+    if probs.shape[-1] >= 2:
+        return float(probs[..., 1].item())
+    return float(probs.squeeze().item())
 
 
 def _extract_scores(
@@ -285,19 +290,45 @@ def _extract_scores(
     frame_num: list[int] = []
 
     if extract_feature_model == "blip":
-        model, vis_processors, text_processors = _load_blip(device=device)
-        txt = text_processors["eval"](query)
+        model, processor = _load_blip(device=device)
         for j in range(frame_nums):
             idx = j * step
             raw = _read_frame_rgb(cap, idx)
             if raw is None:
                 continue
             image = Image.fromarray(raw)
-            img = vis_processors["eval"](image).unsqueeze(0).to(device)
+            inputs = processor(
+                images=image,
+                text=query,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+            ).to(device)
             with torch.no_grad():
-                blip_output = model({"image": img, "text_input": txt}, match_head="itm")
-            blip_scores = torch.nn.functional.softmax(blip_output, dim=1)
-            scores.append(float(blip_scores[:, 1].item()))
+                blip_output = model(**inputs, use_itm_head=True)
+            scores.append(_extract_blip_itm_score(blip_output, torch))
+            frame_num.append(idx)
+    elif extract_feature_model == "blip2":
+        model, processor = _load_blip2(device=device)
+        text_inputs = processor(
+            text=query,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        ).to(device)
+        with torch.no_grad():
+            text_features = _to_feature_tensor(model.get_text_features(**text_inputs), torch)
+        for j in range(frame_nums):
+            idx = j * step
+            raw = _read_frame_rgb(cap, idx)
+            if raw is None:
+                continue
+            image = Image.fromarray(raw)
+            image_inputs = processor(images=image, return_tensors="pt").to(device)
+            with torch.no_grad():
+                image_features = _to_feature_tensor(model.get_image_features(**image_inputs), torch)
+            blip2_score = torch.nn.CosineSimilarity(dim=-1)(text_features, image_features)
+            scores.append(float(blip2_score.item()))
             frame_num.append(idx)
     elif extract_feature_model == "clip":
         model, processor = _load_clip(device=device)
@@ -332,7 +363,9 @@ def _extract_scores(
             scores.append(float(sevila_score.squeeze(0).squeeze(0)))
             frame_num.append(idx)
     else:
-        raise ValueError(f"AKS 不支持的 extract_feature_model: {extract_feature_model}")
+        raise ValueError(
+            f"AKS 不支持的 extract_feature_model: {extract_feature_model}，可选 blip/blip2/clip/sevila"
+        )
 
     cap.release()
     if scores:
@@ -404,7 +437,7 @@ def sample_aks_frames(
     question: str | None = None,
     options: list[str] | None = None,
     answer: str | None = None,
-    extract_feature_model: str = "clip",
+    extract_feature_model: str = "blip",
     device: str | None = None,
     ratio: int = 1,
     t1: float = 0.8,

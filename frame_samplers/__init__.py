@@ -6,7 +6,18 @@ from .random import sample_random_frames
 from .uniform import sample_uniform_frames
 
 
-SUPPORTED_FRAME_SAMPLERS = ("uniform", "random", "focus", "sevila", "videoagent", "clip", "siglip2", "aks")
+SUPPORTED_FRAME_SAMPLERS = (
+    "uniform",
+    "random",
+    "focus",
+    "sevila",
+    "videoagent",
+    "clip",
+    "siglip2",
+    "aks",
+    "aks-blip",
+    "aks-clip",
+)
 
 
 def sample_video_frames(
@@ -96,9 +107,10 @@ def sample_video_frames(
             answer=answer,
             random_seed=random_seed,
         )
-    if method == "aks":
+    if method in {"aks", "aks-blip", "aks-clip"}:
         from .aks import sample_aks_frames
 
+        aks_feature_model = "blip" if method in {"aks", "aks-blip"} else "clip"
         return sample_aks_frames(
             video_path,
             num_frames,
@@ -106,6 +118,7 @@ def sample_video_frames(
             options=options,
             answer=answer,
             random_seed=random_seed,
+            extract_feature_model=aks_feature_model,
         )
     raise ValueError(f"不支持的选帧方法: {method}，可选: {', '.join(SUPPORTED_FRAME_SAMPLERS)}")
 
