@@ -15,6 +15,7 @@ def sample_video_frames(
     method: str = "uniform",
     random_seed: int | None = None,
     question: str | None = None,
+    options: list[str] | None = None,
     answer: str | None = None,
     focus_blip_model_name: str = "Salesforce/blip-itm-large-coco",
     focus_blip_device: str | None = None,
@@ -80,6 +81,7 @@ def sample_video_frames(
             video_path,
             num_frames,
             question=question,
+            options=options,
             answer=answer,
             random_seed=random_seed,
         )
@@ -90,6 +92,7 @@ def sample_video_frames(
             video_path,
             num_frames,
             question=question,
+            options=options,
             answer=answer,
             random_seed=random_seed,
         )
@@ -100,6 +103,7 @@ def sample_video_frames(
             video_path,
             num_frames,
             question=question,
+            options=options,
             answer=answer,
             random_seed=random_seed,
         )

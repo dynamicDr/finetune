@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import heapq
+import importlib.util
 import time
 import math
+import re
+import sys
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -10,6 +14,7 @@ import numpy as np
 from PIL import Image
 
 _AKS_MODEL_CACHE: dict[tuple[str, str], Any] = {}
+_AKS_PATCHED_MODULES: set[str] = set()
 
 
 def _log(msg: str) -> None:
@@ -42,6 +47,48 @@ def _resolve_device(device: str | None) -> str:
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def _load_module_from_file(module_name: str, file_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载模块 {module_name}，文件: {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+
+
+def _ensure_aks_lavis_patches(*, include_blip: bool = False, include_sevila: bool = False) -> None:
+    base_dir = Path(__file__).resolve().parent / "AKS"
+    patch_targets: list[tuple[str, Path]] = []
+    if include_blip:
+        patch_targets.append(
+            (
+                "lavis.models.blip_models.blip_image_text_matching",
+                base_dir / "blip_image_text_matching.py",
+            )
+        )
+    if include_sevila:
+        patch_targets.append(
+            (
+                "lavis.models.sevila_models.sevila",
+                base_dir / "sevila.py",
+            )
+        )
+
+    for module_name, file_path in patch_targets:
+        if module_name in _AKS_PATCHED_MODULES:
+            continue
+        if not file_path.exists():
+            raise FileNotFoundError(f"AKS 适配文件不存在: {file_path}")
+        loaded = sys.modules.get(module_name)
+        loaded_file = getattr(loaded, "__file__", None)
+        if loaded_file and Path(loaded_file).resolve() == file_path.resolve():
+            _AKS_PATCHED_MODULES.add(module_name)
+            continue
+        _load_module_from_file(module_name, file_path)
+        _AKS_PATCHED_MODULES.add(module_name)
+        _log(f"patched lavis module: {module_name} <- {file_path}")
+
+
 def _load_clip(device: str):
     key = ("clip", device)
     if key in _AKS_MODEL_CACHE:
@@ -64,6 +111,7 @@ def _load_blip(device: str):
         _log(f"reuse cached BLIP model on device={device}")
         return _AKS_MODEL_CACHE[key]
     try:
+        _ensure_aks_lavis_patches(include_blip=True)
         from lavis.models import load_model_and_preprocess
     except ImportError as exc:
         raise ImportError("AKS-BLIP 依赖缺失：需要安装 lavis。") from exc
@@ -84,6 +132,7 @@ def _load_sevila(device: str):
         _log(f"reuse cached SeViLA model on device={device}")
         return _AKS_MODEL_CACHE[key]
     try:
+        _ensure_aks_lavis_patches(include_sevila=True)
         from lavis.models import load_model_and_preprocess
     except ImportError as exc:
         raise ImportError("AKS-SeViLA 依赖缺失：需要安装 lavis。") from exc
@@ -154,19 +203,54 @@ def meanstd(
     return all_split_score, all_split_fn
 
 
-def _compose_query(question: str | None, answer: str | None, extract_feature_model: str) -> str:
+def _format_question_and_options(question: str | None, options: list[str] | None) -> str:
     q = (question or "").strip()
+    if not q:
+        raise ValueError("AKS 需要提供 question。")
+    if not options:
+        raise ValueError("AKS 需要提供 options，且每个选项必须包含具体内容。")
+
+    normalized_options: list[str] = []
+    for i, raw_option in enumerate(options):
+        option_text = str(raw_option).strip()
+        if not option_text:
+            raise ValueError(f"AKS 选项不能为空：第 {i + 1} 个选项为空。")
+        if re.fullmatch(r"[A-Ea-e](?:[\.\)\:\-])?", option_text):
+            raise ValueError(
+                f"AKS 选项必须包含具体内容，不能只写字母：'{option_text}'。"
+            )
+        prefixed = re.match(r"^([A-Ea-e])[\.\)\:\-]\s*(.*)$", option_text)
+        if prefixed:
+            content = prefixed.group(2).strip()
+            if not content:
+                raise ValueError(
+                    f"AKS 选项必须包含具体内容，不能只写字母：'{option_text}'。"
+                )
+            normalized_options.append(f"{prefixed.group(1).upper()}. {content}")
+            continue
+        option_letter = chr(ord("A") + i)
+        normalized_options.append(f"{option_letter}. {option_text}")
+
+    return f"{q}\nOptions:\n" + "\n".join(normalized_options)
+
+
+def _compose_query(
+    question: str | None,
+    options: list[str] | None,
+    answer: str | None,
+    extract_feature_model: str,
+) -> str:
     _ = answer
+    qa_text = _format_question_and_options(question=question, options=options)
     if extract_feature_model == "sevila":
-        return f"Question: {q}. Is this a good frame can answer the question?"
-    if q:
-        return q
-    raise ValueError("AKS 需要提供 question。")
+        return f"Question: {qa_text}. Is this a good frame can answer the question?"
+    return qa_text
 
 
 def _extract_scores(
     video_path: str,
     question: str | None,
+    options: list[str] | None,
     answer: str | None,
     extract_feature_model: str,
     device: str,
@@ -189,7 +273,12 @@ def _extract_scores(
         f"sampling_step={step}, candidate_count={frame_nums}"
     )
 
-    query = _compose_query(question=question, answer=answer, extract_feature_model=extract_feature_model)
+    query = _compose_query(
+        question=question,
+        options=options,
+        answer=answer,
+        extract_feature_model=extract_feature_model,
+    )
     preview_query = query if len(query) <= 160 else query[:157] + "..."
     _log(f"extract_feature_model={extract_feature_model}, query={preview_query}")
     scores: list[float] = []
@@ -313,6 +402,7 @@ def sample_aks_frames(
     num_frames: int,
     random_seed: int | None = None,
     question: str | None = None,
+    options: list[str] | None = None,
     answer: str | None = None,
     extract_feature_model: str = "clip",
     device: str | None = None,
@@ -339,6 +429,7 @@ def sample_aks_frames(
     scores, frame_num = _extract_scores(
         video_path=video_path,
         question=question,
+        options=options,
         answer=answer,
         extract_feature_model=extract_feature_model,
         device=resolved_device,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 import cv2
@@ -83,13 +84,42 @@ def _collect_candidate_frames(
     return frame_ids, images
 
 
-def _build_query(question: str | None, answer: str | None) -> str:
-    # 需求：自动忽略答案标签，仅使用 question 构造检索文本。
-    _ = answer
+def _format_question_and_options(question: str | None, options: list[str] | None) -> str:
     q = (question or "").strip()
-    if q:
-        return f"This is a video frame relevant to the question '{q}'."
-    return "This is the most relevant frame for the video question."
+    if not q:
+        raise ValueError("SigLIP2 选帧需要提供 question。")
+    if not options:
+        raise ValueError("SigLIP2 选帧需要提供 options，且每个选项必须包含具体内容。")
+
+    normalized_options: list[str] = []
+    for i, raw_option in enumerate(options):
+        option_text = str(raw_option).strip()
+        if not option_text:
+            raise ValueError(f"SigLIP2 选帧选项不能为空：第 {i + 1} 个选项为空。")
+        if re.fullmatch(r"[A-Ea-e](?:[\.\)\:\-])?", option_text):
+            raise ValueError(
+                f"SigLIP2 选帧选项必须包含具体内容，不能只写字母：'{option_text}'。"
+            )
+        prefixed = re.match(r"^([A-Ea-e])[\.\)\:\-]\s*(.*)$", option_text)
+        if prefixed:
+            content = prefixed.group(2).strip()
+            if not content:
+                raise ValueError(
+                    f"SigLIP2 选帧选项必须包含具体内容，不能只写字母：'{option_text}'。"
+                )
+            normalized_options.append(f"{prefixed.group(1).upper()}. {content}")
+            continue
+        option_letter = chr(ord("A") + i)
+        normalized_options.append(f"{option_letter}. {option_text}")
+
+    return f"{q}\nOptions:\n" + "\n".join(normalized_options)
+
+
+def _build_query(question: str | None, options: list[str] | None, answer: str | None) -> str:
+    # 需求：自动忽略答案标签，仅使用 question+options 构造检索文本。
+    _ = answer
+    qa_text = _format_question_and_options(question=question, options=options)
+    return f"This is a video frame relevant to the following question and options:\n{qa_text}"
 
 
 def _encode_images_batched(images, processor, model, torch, device, batch_size=16):
@@ -111,6 +141,7 @@ def sample_siglip2_frames(
     num_frames: int,
     random_seed: int | None = None,
     question: str | None = None,
+    options: list[str] | None = None,
     answer: str | None = None,
     model_id: str = "google/siglip2-base-patch16-224",
     sample_every: int = 15,
@@ -151,7 +182,7 @@ def sample_siglip2_frames(
         device=device,
     )
     _log(f"using device={resolved_device}")
-    query = _build_query(question=question, answer=answer)
+    query = _build_query(question=question, options=options, answer=answer)
     if answer is not None and str(answer).strip():
         _log("answer label is ignored for siglip2 sampling")
     preview_query = query if len(query) <= 160 else query[:157] + "..."

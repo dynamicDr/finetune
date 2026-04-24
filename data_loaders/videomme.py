@@ -36,6 +36,11 @@ class VideoMMELoader(BaseDataLoader):
         self.video_roots = [p for p in dict.fromkeys(candidates) if os.path.isdir(p)]
         self._video_index: dict[str, str] | None = None
 
+    def _include_by_task(self, sample: VQASample) -> bool:
+        if self.task_filter in {"all", "mcq"}:
+            return True
+        return sample.task_type == self.task_filter
+
     def _local_parquet_candidates(self) -> list[str]:
         base_video_dir = os.path.expanduser(self.video_dir)
         parent_video_dir = os.path.dirname(base_video_dir.rstrip("/"))
@@ -134,13 +139,16 @@ class VideoMMELoader(BaseDataLoader):
             return None
 
         sample_id = str(raw_sample.get("question_id", "")).strip() or f"videomme_{index}"
+        duration = str(raw_sample.get("duration", "")).strip().lower()
+        if duration not in {"short", "medium", "long"}:
+            duration = "short"
         return VQASample(
             sample_id=sample_id,
             video_path=video_path,
             question=question,
             answer=answer,
             options=options,
-            task_type="mcq",
+            task_type=duration,
             metadata={
                 "source_index": index,
                 "videoID": raw_sample.get("videoID", ""),

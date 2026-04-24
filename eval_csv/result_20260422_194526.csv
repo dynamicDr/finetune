@@ -1,0 +1,25 @@
+timestamp,dataset,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,model_name,lora_path,train_ratio,eval_split
+2026-04-22 22:24:10,videomme,42,short,135,4,34.07,69.940,uniform,0.369118,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-22 22:37:28,videomme,42,short,135,4,42.22,73.876,clip,2.400268,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-22 22:47:19,videomme,42,short,135,4,44.44,73.165,aks,7.439983,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-22 22:19:07,videomme,42,short,135,4,42.22,66.087,siglip2,2.054847,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 00:49:07,videomme,42,medium,135,4,31.85,66.168,uniform,0.331403,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 01:30:09,videomme,42,medium,135,4,37.04,68.842,clip,13.468082,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 03:24:09,videomme,42,medium,135,4,34.81,76.662,aks,46.178332,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 01:55:21,videomme,42,medium,135,4,34.81,69.577,siglip2,12.814896,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 04:17:48,videomme,42,long,135,4,25.93,68.009,uniform,0.349526,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 07:11:35,videomme,42,long,135,4,25.19,72.422,clip,67.988171,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 13:29:40,videomme,42,long,135,4,23.70,80.466,aks,227.175502,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 08:32:54,videomme,42,long,135,4,28.89,71.510,siglip2,65.563561,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 09:01:02,videomme,42,short,135,8,46.67,125.017,uniform,0.636833,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 12:17:50,videomme,42,short,135,8,42.96,133.739,clip,2.149890,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 13:42:22,videomme,42,short,135,8,48.15,130.106,aks,7.198730,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 14:32:26,videomme,42,short,135,8,46.67,144.489,siglip2,2.546284,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 17:11:34,videomme,42,medium,135,8,37.04,129.773,uniform,0.545803,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 19:47:39,videomme,42,medium,135,8,37.78,152.015,clip,15.786102,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 20:26:46,videomme,42,medium,135,8,39.26,135.677,aks,43.816326,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 20:48:06,videomme,42,medium,135,8,31.11,151.245,siglip2,15.333677,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-23 22:47:28,videomme,42,long,135,8,25.93,148.225,uniform,0.617884,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-24 04:46:42,videomme,42,long,135,8,27.41,159.885,clip,79.350045,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-24 09:43:51,videomme,42,long,135,8,21.48,139.011,aks,214.925128,Qwen/Qwen3-VL-4B-Thinking,,0.85,test
+2026-04-24 05:35:53,videomme,42,long,135,8,28.15,158.005,siglip2,76.330484,Qwen/Qwen3-VL-4B-Thinking,,0.85,test

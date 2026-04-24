@@ -131,6 +131,7 @@ def main():
             method=args.frame_sampling_method,
             random_seed=random_seed,
             question=sample.question,
+            options=sample.options,
             answer=str(sample.answer),
             focus_blip_model_name=args.focus_blip_model_name,
             focus_blip_device=args.focus_blip_device,

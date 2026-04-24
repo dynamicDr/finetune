@@ -35,6 +35,7 @@ def build_training_examples(samples: list[VQASample]) -> list[dict[str, Any]]:
                 "video_path": sample.video_path,
                 "user_text": build_user_text(sample.question, sample.options),
                 "question_text": sample.question,
+                "options": sample.options,
                 "answer": str(sample.answer).strip(),
             }
         )
@@ -58,6 +59,7 @@ def make_collate_fn(processor, num_frames: int, visual_token_ids: list[int]):
                 method=frame_sampling_method,
                 random_seed=random_seed,
                 question=ex.get("question_text", ""),
+                options=ex.get("options", None),
                 answer=ex.get("answer", ""),
                 focus_blip_model_name=ex.get("focus_blip_model_name", "Salesforce/blip-itm-base-coco"),
                 focus_blip_device=ex.get("focus_blip_device", None),

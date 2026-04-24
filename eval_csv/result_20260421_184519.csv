@@ -1,0 +1,4 @@
+timestamp,dataset,seed,task_filter,num_samples,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,model_name,lora_path,train_ratio,eval_split
+2026-04-22 03:49:57,egoschema,42,mcq,500,4,26.40,17.634,aks,13.629881,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-22 05:21:51,egoschema,42,mcq,500,8,29.80,32.509,aks,13.640941,Qwen/Qwen3-VL-4B-Thinking,,0.0,test
+2026-04-22 05:36:21,egoschema,42,mcq,500,16,32.00,61.546,aks,14.270407,Qwen/Qwen3-VL-4B-Thinking,,0.0,test

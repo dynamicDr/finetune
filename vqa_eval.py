@@ -56,7 +56,7 @@ def calculate_mra(pred: float, gt: float) -> float:
 
 def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
     avg_accuracy = 0.0
-    if task_filter == "mcq" and results["total"] > 0:
+    if task_filter in {"mcq", "short", "medium", "long"} and results["total"] > 0:
         avg_accuracy = results["correct"] / results["total"] * 100
     elif task_filter == "numeric" and results["mra_count"] > 0:
         avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
@@ -179,6 +179,7 @@ def evaluate_vqa(
             method=frame_sampling_method,
             random_seed=random_seed,
             question=sample.question,
+            options=sample.options,
             answer=str(sample.answer),
             focus_blip_model_name=focus_blip_model_name,
             focus_blip_device=focus_blip_device,
@@ -199,7 +200,7 @@ def evaluate_vqa(
         pred_answer = extract_answer(response, has_options=bool(sample.options))
         results["inference_times"].append(inference_time)
 
-        if sample.task_type == "mcq":
+        if sample.options is not None:
             is_correct = str(sample.answer).strip().upper() == str(pred_answer).strip().upper()
             results["total"] += 1
             if is_correct:
@@ -246,7 +247,12 @@ def parse_args():
     p.add_argument("--focus_blip_device", type=str, default=None)
     p.add_argument("--focus_blip_batch_size", type=int, default=16)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--task_filter", type=str, default="all", choices=["all", "mcq", "numeric"])
+    p.add_argument(
+        "--task_filter",
+        type=str,
+        default="all",
+        choices=["all", "mcq", "numeric", "short", "medium", "long"],
+    )
     p.add_argument("--log_file", type=str, default="vqa_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
