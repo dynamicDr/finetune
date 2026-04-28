@@ -74,7 +74,7 @@ def main(cfg: DictConfig) -> None:
         cfg.task_filter,
     ]
     dataset_shared: list[str] = []
-    if script_key in ("vqa_train.py", "vqa_eval.py"):
+    if script_key in ("vqa_train.py", "vqa_eval.py", "vqa_eval_embedding.py"):
         dataset_shared += ["--model_name", str(cfg.model.name)]
         dataset_shared += ["--dataset", str(OmegaConf.select(cfg, "dataset", default="vsibench"))]
         frame_sampling_method = OmegaConf.select(cfg, "frame_sampling_method", default=None)

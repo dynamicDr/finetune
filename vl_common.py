@@ -158,3 +158,78 @@ def generate_response(model, processor, frames: list[Image.Image], prompt: str) 
         clean_up_tokenization_spaces=False,
     )[0]
     return response, inference_time
+
+
+def _decode_new_tokens(processor, input_ids: torch.Tensor, generated_ids: torch.Tensor) -> str:
+    prompt_len = int(input_ids.shape[1])
+    token_ids = generated_ids[:, prompt_len:] if generated_ids.shape[1] > prompt_len else generated_ids
+    text = processor.batch_decode(
+        token_ids,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )[0]
+    return text.strip()
+
+
+def _build_image_fused_embeds(model, model_inputs: dict[str, torch.Tensor]) -> torch.Tensor | None:
+    if "pixel_values" not in model_inputs:
+        return None
+    if not hasattr(model, "get_image_features") or not hasattr(model, "get_input_embeddings"):
+        return None
+    if not hasattr(model, "model") or not hasattr(model.model, "get_placeholder_mask"):
+        return None
+
+    image_grid_thw = model_inputs.get("image_grid_thw")
+    with torch.no_grad():
+        image_outputs = model.get_image_features(
+            pixel_values=model_inputs["pixel_values"],
+            image_grid_thw=image_grid_thw,
+            return_dict=True,
+        )
+
+    image_embed_seq = getattr(image_outputs, "pooler_output", None)
+    if not isinstance(image_embed_seq, (list, tuple)) or len(image_embed_seq) == 0:
+        return None
+
+    image_embeds = torch.cat(image_embed_seq, dim=0).to(model.device)
+    token_embeds = model.get_input_embeddings()(model_inputs["input_ids"])
+    image_mask, _ = model.model.get_placeholder_mask(
+        model_inputs["input_ids"],
+        inputs_embeds=token_embeds,
+        image_features=image_embeds,
+    )
+    return token_embeds.masked_scatter(image_mask, image_embeds)
+
+
+def generate_response_with_split_embedding(
+    model,
+    processor,
+    frames: list[Image.Image],
+    prompt: str,
+    max_new_tokens: int = 128,
+) -> tuple[str, float, float]:
+    import time
+
+    content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
+    content.append({"type": "text", "text": prompt})
+    messages = [{"role": "user", "content": content}]
+    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    model_inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+
+    build_start = time.time()
+    fused_embeds = _build_image_fused_embeds(model, model_inputs)
+    embedding_build_time = time.time() - build_start
+    if fused_embeds is None:
+        raise RuntimeError("模型不支持 embedding 分开输入，或构建图像 embedding 失败。")
+
+    infer_start = time.time()
+    with torch.no_grad():
+        generated_ids = model.generate(
+            inputs_embeds=fused_embeds,
+            attention_mask=model_inputs.get("attention_mask"),
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+        )
+    inference_time = time.time() - infer_start
+    response = _decode_new_tokens(processor, model_inputs["input_ids"], generated_ids)
+    return response, inference_time, embedding_build_time
