@@ -130,7 +130,13 @@ def load_model_and_processor(
     return model, processor
 
 
-def generate_response(model, processor, frames: list[Image.Image], prompt: str) -> tuple[str, float]:
+def generate_response(
+    model,
+    processor,
+    frames: list[Image.Image],
+    prompt: str,
+    max_new_tokens: int = 1024,
+) -> tuple[str, float, int, bool]:
     import time
 
     content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
@@ -144,7 +150,7 @@ def generate_response(model, processor, frames: list[Image.Image], prompt: str) 
     with torch.no_grad():
         generated_ids = model.generate(
             **inputs,
-            max_new_tokens=128,
+            max_new_tokens=max_new_tokens,
             do_sample=False,
         )
     inference_time = time.time() - start_time
@@ -157,7 +163,9 @@ def generate_response(model, processor, frames: list[Image.Image], prompt: str) 
         skip_special_tokens=True,
         clean_up_tokenization_spaces=False,
     )[0]
-    return response, inference_time
+    generated_token_count = int(generated_ids_trimmed[0].shape[0]) if generated_ids_trimmed else 0
+    hit_max_tokens = generated_token_count >= max_new_tokens
+    return response, inference_time, generated_token_count, hit_max_tokens
 
 
 def _decode_new_tokens(processor, input_ids: torch.Tensor, generated_ids: torch.Tensor) -> str:
@@ -206,8 +214,8 @@ def generate_response_with_split_embedding(
     processor,
     frames: list[Image.Image],
     prompt: str,
-    max_new_tokens: int = 128,
-) -> tuple[str, float, float]:
+    max_new_tokens: int = 1024,
+) -> tuple[str, float, float, int, bool]:
     import time
 
     content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
@@ -232,4 +240,7 @@ def generate_response_with_split_embedding(
         )
     inference_time = time.time() - infer_start
     response = _decode_new_tokens(processor, model_inputs["input_ids"], generated_ids)
-    return response, inference_time, embedding_build_time
+    prompt_len = int(model_inputs["input_ids"].shape[1])
+    generated_token_count = int(generated_ids.shape[1] - prompt_len)
+    hit_max_tokens = generated_token_count >= max_new_tokens
+    return response, inference_time, embedding_build_time, generated_token_count, hit_max_tokens

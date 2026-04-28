@@ -14,8 +14,9 @@ from tqdm import tqdm
 
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
+from data_loaders.ours import iterative_inference_with_cache, rank_frames_by_clip
 from frame_samplers import sample_video_frames
-from vl_common import generate_response, load_model_and_processor
+from vl_common import generate_response_with_split_embedding, load_model_and_processor
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
@@ -38,7 +39,6 @@ def extract_answer(response: str, has_options: bool = False):
         match = re.search(r"\b([A-E])\b", answer_portion.upper())
         if match:
             return match.group(1)
-    # 仅提取合法数字，避免 "." 这类无效串触发 float 转换报错
     numbers = re.findall(r"[-+]?(?:\d+\.\d+|\d+|\.\d+)", answer_portion)
     for n in numbers:
         try:
@@ -52,14 +52,6 @@ def calculate_mra(pred: float, gt: float) -> float:
     if gt == 0:
         return 1.0 if pred == 0 else 0.0
     return max(0.0, 1 - abs(pred - gt) / abs(gt))
-
-
-def _split_cot_and_answer(response: str) -> tuple[str, str]:
-    text = response.strip()
-    if "</think>" in text:
-        cot_text, ans_text = text.split("</think>", 1)
-        return cot_text.strip(), ans_text.strip()
-    return text, ""
 
 
 def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
@@ -92,6 +84,13 @@ def _compute_avg_frame_sampling_time(results: dict) -> float:
     return sum(times) / len(times)
 
 
+def _compute_avg_embedding_build_time(results: dict) -> float:
+    times = results.get("embedding_build_times", [])
+    if not times:
+        return 0.0
+    return sum(times) / len(times)
+
+
 def log_to_csv(
     log_file: str,
     dataset: str,
@@ -103,6 +102,7 @@ def log_to_csv(
     avg_inference_time: float,
     frame_sampling_method: str,
     avg_frame_sampling_time: float,
+    avg_embedding_build_time: float,
     over_max_tokens_count: int,
     model_name: str,
     lora_path: str,
@@ -124,6 +124,7 @@ def log_to_csv(
         f"{avg_inference_time:.3f}",
         frame_sampling_method,
         f"{avg_frame_sampling_time:.6f}",
+        f"{avg_embedding_build_time:.6f}",
         over_max_tokens_count,
         model_name,
         lora_path,
@@ -145,6 +146,7 @@ def log_to_csv(
                     "avg_inference_time",
                     "frame_sampling_method",
                     "avg_frame_sampling_time",
+                    "avg_embedding_build_time",
                     "over_max_tokens_count",
                     "model_name",
                     "lora_path",
@@ -167,6 +169,9 @@ def evaluate_vqa(
     focus_blip_device: str | None = None,
     focus_blip_batch_size: int = 16,
     max_new_tokens: int = 1024,
+    ours_clip_model_id: str = "openai/clip-vit-base-patch32",
+    ours_clip_device: str | None = None,
+    ours_clip_batch_size: int = 16,
 ) -> dict[str, Any]:
     results = {
         "correct": 0,
@@ -175,65 +180,120 @@ def evaluate_vqa(
         "mra_count": 0,
         "inference_times": [],
         "frame_sampling_times": [],
+        "embedding_build_times": [],
         "over_max_tokens_count": 0,
         "missing_think_end_count": 0,
     }
 
-    pbar = tqdm(samples, desc="评估进度")
+    pbar = tqdm(samples, desc="评估进度(embedding 分开输入)")
     for i, sample in enumerate(pbar):
-        # 按 task_filter 显式过滤样本，避免不匹配类型产生无效计算
         if task_filter != "all" and sample.task_type != task_filter:
             continue
 
-        random_seed = (seed + i) if frame_sampling_method == "random" else None
-        t0 = time.perf_counter()
-        frames = sample_video_frames(
-            video_path=sample.video_path,
-            num_frames=num_frames,
-            method=frame_sampling_method,
-            random_seed=random_seed,
-            question=sample.question,
-            options=sample.options,
-            answer=str(sample.answer),
-            focus_blip_model_name=focus_blip_model_name,
-            focus_blip_device=focus_blip_device,
-            focus_blip_batch_size=focus_blip_batch_size,
-        )
-        frame_sampling_time = time.perf_counter() - t0
-        results["frame_sampling_times"].append(frame_sampling_time)
-        if not frames:
-            warnings.warn(
-                f"样本无可用帧，已跳过: sample_id={sample.sample_id}, video_path={sample.video_path}",
-                RuntimeWarning,
-                stacklevel=1,
-            )
-            continue
-
         prompt = build_user_text(sample.question, sample.options)
-        response, inference_time, generated_token_count, hit_max_tokens = generate_response(
-            model,
-            processor,
-            frames,
-            prompt,
-            max_new_tokens=max_new_tokens,
-        )
+        if frame_sampling_method == "ours":
+            print(
+                f"[vqa_eval_emb][ours] sample_id={sample.sample_id} 开始粗采样+CLIP排序, "
+                f"video={sample.video_path}, top_m={num_frames}",
+                flush=True,
+            )
+            t0 = time.perf_counter()
+            ranked_frames = rank_frames_by_clip(
+                video_path=sample.video_path,
+                question=sample.question,
+                options=sample.options,
+                answer=str(sample.answer),
+                clip_model_id=ours_clip_model_id,
+                clip_device=ours_clip_device,
+                clip_batch_size=ours_clip_batch_size,
+                max_frames=num_frames,
+            )
+            frame_sampling_time = time.perf_counter() - t0
+            results["frame_sampling_times"].append(frame_sampling_time)
+            print(
+                f"[vqa_eval_emb][ours] sample_id={sample.sample_id} CLIP排序完成, "
+                f"候选top帧数={len(ranked_frames)}, frame_sampling_time={frame_sampling_time:.4f}s",
+                flush=True,
+            )
+            iterative_out = iterative_inference_with_cache(
+                model=model,
+                processor=processor,
+                prompt=prompt,
+                ranked_frames=ranked_frames,
+                extract_answer_fn=extract_answer,
+                has_options=bool(sample.options),
+                max_new_tokens=max_new_tokens,
+            )
+            response = iterative_out["response"]
+            pred_answer = iterative_out["pred_answer"]
+            inference_time = iterative_out["inference_time"]
+            embedding_build_time = iterative_out["embedding_build_time"]
+            generated_token_count = int(iterative_out["generated_token_count"])
+            hit_max_tokens = bool(iterative_out["hit_max_tokens"])
+            print(
+                f"[vqa_eval_emb][ours] sample_id={sample.sample_id} 迭代结束: "
+                f"rounds_used={iterative_out['rounds_used']}, "
+                f"answer={pred_answer}, answer_prob={iterative_out['answer_confidence']:.6f}, "
+                f"answer_logprob={iterative_out['answer_logprob']:.6f}, "
+                f"cache_size={iterative_out['cache_size']}, "
+                f"cache_hit={iterative_out['cache_hits']}, cache_miss={iterative_out['cache_misses']}, "
+                f"inference_time_total={inference_time:.4f}s, "
+                f"embedding_build_time_total={embedding_build_time:.4f}s, "
+                f"generated_tokens={generated_token_count}, limit={max_new_tokens}, hit_limit={hit_max_tokens}",
+                flush=True,
+            )
+        else:
+            random_seed = (seed + i) if frame_sampling_method == "random" else None
+            t0 = time.perf_counter()
+            frames = sample_video_frames(
+                video_path=sample.video_path,
+                num_frames=num_frames,
+                method=frame_sampling_method,
+                random_seed=random_seed,
+                question=sample.question,
+                options=sample.options,
+                answer=str(sample.answer),
+                focus_blip_model_name=focus_blip_model_name,
+                focus_blip_device=focus_blip_device,
+                focus_blip_batch_size=focus_blip_batch_size,
+            )
+            frame_sampling_time = time.perf_counter() - t0
+            results["frame_sampling_times"].append(frame_sampling_time)
+            if not frames:
+                warnings.warn(
+                    f"样本无可用帧，已跳过: sample_id={sample.sample_id}, video_path={sample.video_path}",
+                    RuntimeWarning,
+                    stacklevel=1,
+                )
+                continue
+            try:
+                response, inference_time, embedding_build_time, generated_token_count, hit_max_tokens = (
+                    generate_response_with_split_embedding(
+                        model=model,
+                        processor=processor,
+                        frames=frames,
+                        prompt=prompt,
+                        max_new_tokens=max_new_tokens,
+                    )
+                )
+            except RuntimeError as e:
+                warnings.warn(
+                    f"embedding 分开输入失败，样本已跳过: sample_id={sample.sample_id}, error={e}",
+                    RuntimeWarning,
+                    stacklevel=1,
+                )
+                continue
+            pred_answer = extract_answer(response, has_options=bool(sample.options))
+
         if hit_max_tokens:
             results["over_max_tokens_count"] += 1
         has_think_end = "</think>" in response
         if not has_think_end:
             results["missing_think_end_count"] += 1
-        cot_text, ans_text = _split_cot_and_answer(response)
-        print(f"[vqa_eval] sample_id={sample.sample_id} RAW:\n{response}", flush=True)
-        print(f"[vqa_eval] sample_id={sample.sample_id} COT:\n{cot_text}", flush=True)
-        print(f"[vqa_eval] sample_id={sample.sample_id} ANS:\n{ans_text}", flush=True)
-        print(
-            f"[vqa_eval] sample_id={sample.sample_id} TOKENS: "
-            f"generated={generated_token_count}, limit={max_new_tokens}, hit_limit={hit_max_tokens}, "
-            f"has_think_end={has_think_end}",
-            flush=True,
-        )
-        pred_answer = extract_answer(response, has_options=bool(sample.options)) if has_think_end else None
+            pred_answer = None
+
         results["inference_times"].append(inference_time)
+        results["embedding_build_times"].append(embedding_build_time)
 
         if sample.options is not None:
             is_correct = has_think_end and (
@@ -255,20 +315,26 @@ def evaluate_vqa(
                 results["mra_count"] += 1
 
         partial_acc, partial_time = _compute_accuracy_from_results(results, task_filter)
-        pbar.set_postfix(Acc=f"{partial_acc:.2f}%", AvgTime=f"{partial_time:.2f}s", n=i + 1)
+        avg_embed_time = _compute_avg_embedding_build_time(results)
+        pbar.set_postfix(
+            Acc=f"{partial_acc:.2f}%",
+            AvgTime=f"{partial_time:.2f}s",
+            AvgEmbed=f"{avg_embed_time:.2f}s",
+            n=i + 1,
+        )
 
     return results
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="通用 VQA 评估脚本")
+    p = argparse.ArgumentParser(description="通用 VQA 评估脚本（embedding 分开输入）")
     p.add_argument("--dataset", type=str, default="vsibench", choices=list_supported_datasets())
     p.add_argument("--dataset_split", type=str, default="test")
     p.add_argument("--dataset_name", type=str, default="nyu-visionx/VSI-Bench")
     p.add_argument("--dataset_config", type=str, default="full")
     p.add_argument("--no_dataset_config", action="store_true")
 
-    p.add_argument("--model_path", type=str, default="Qwen/Qwen2.5-VL-3B-Instruct")
+    p.add_argument("--model_path", type=str, default="Qwen/Qwen3-VL-4B-Thinking")
     p.add_argument("--model_name", type=str, default=None, help="模型名称（可选，优先用于日志）")
     p.add_argument("--use_lora", action="store_true")
     p.add_argument("--base_model", type=str, default=None)
@@ -292,6 +358,7 @@ def parse_args():
             "aks",
             "aks-blip",
             "aks-clip",
+            "ours",
         ],
     )
     p.add_argument("--focus_blip_model_name", type=str, default="Salesforce/blip-itm-base-coco")
@@ -305,7 +372,10 @@ def parse_args():
         choices=["all", "mcq", "numeric", "short", "medium", "long"],
     )
     p.add_argument("--max_new_tokens", type=int, default=1024)
-    p.add_argument("--log_file", type=str, default="vqa_evaluation_log.csv")
+    p.add_argument("--ours_clip_model_id", type=str, default="openai/clip-vit-base-patch32")
+    p.add_argument("--ours_clip_device", type=str, default=None)
+    p.add_argument("--ours_clip_batch_size", type=int, default=16)
+    p.add_argument("--log_file", type=str, default="vqa_embedding_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
     return p.parse_args()
@@ -340,7 +410,7 @@ def main():
     if args.model_name:
         model_name = args.model_name
     elif args.use_lora:
-        model_name = os.path.expanduser(args.base_model) if args.base_model else "Qwen/Qwen2.5-VL-3B-Instruct"
+        model_name = os.path.expanduser(args.base_model) if args.base_model else "Qwen/Qwen3-VL-4B-Thinking"
         lora_path = resolved_model_path
     else:
         model_name = os.path.basename(resolved_model_path.rstrip("/"))
@@ -364,9 +434,13 @@ def main():
         focus_blip_device=args.focus_blip_device,
         focus_blip_batch_size=args.focus_blip_batch_size,
         max_new_tokens=args.max_new_tokens,
+        ours_clip_model_id=args.ours_clip_model_id,
+        ours_clip_device=args.ours_clip_device,
+        ours_clip_batch_size=args.ours_clip_batch_size,
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)
+    avg_embedding_build_time = _compute_avg_embedding_build_time(results)
     log_to_csv(
         log_file=log_file,
         dataset=args.dataset,
@@ -378,6 +452,7 @@ def main():
         avg_inference_time=avg_inference_time,
         frame_sampling_method=args.frame_sampling_method,
         avg_frame_sampling_time=avg_frame_sampling_time,
+        avg_embedding_build_time=avg_embedding_build_time,
         over_max_tokens_count=results["over_max_tokens_count"],
         model_name=model_name,
         lora_path=lora_path,
@@ -387,10 +462,10 @@ def main():
     print(
         f"评估完成：样本 {len(samples)}, Accuracy {avg_accuracy:.2f}%, "
         f"AvgInfer {avg_inference_time:.3f}s, AvgFrameSampling {avg_frame_sampling_time:.6f}s, "
-        f"OverLimit {results['over_max_tokens_count']}, MissingThinkEnd {results['missing_think_end_count']}"
+        f"AvgEmbedBuild {avg_embedding_build_time:.6f}s, OverLimit {results['over_max_tokens_count']}, "
+        f"MissingThinkEnd {results['missing_think_end_count']}"
     )
 
 
 if __name__ == "__main__":
     main()
-

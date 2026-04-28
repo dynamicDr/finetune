@@ -1,6 +1,5 @@
 项目简述  
 这个项目是在 HuggingFace TRL 示例项目基础上，加了一套“用 VSI-Bench 评测多模态视频模型”的脚本和配置。现在评测流程已经切到 Hydra + Submitit 的统一配置和并行架构。
-
 术语表  
 - TRL：HuggingFace 出的大模型对齐/微调库（SFT、RLHF、DPO、GRPO 等），`scripts/`、`datasets/`、`notebooks/` 主要是官方示例脚本，可以直接改着用。  
 - VSI-Bench：视频理解评测集，里面是短视频配问题（有选择题，也有数值题），我们用它来测试多模态模型对视频的理解能力。  
@@ -13,7 +12,6 @@
 - PEFT：Parameter-Efficient Fine-Tuning（参数高效微调）。核心思想是在不更新/少更新基座大模型参数的情况下，只训练一小部分“可插拔”的参数（如 LoRA），显著降低显存与训练成本。常见实现是 HuggingFace 的 `peft` 库。  
 - Adapter：可插拔的微调增量权重/模块的统称（在 PEFT 语境下尤其常见）。训练时把 adapter“挂”到基座模型上，只训练 adapter；推理/评测时加载基座模型 + adapter 组合得到微调后的能力。 
 - LoRA：Low-Rank Adaptation，一种最常用的 PEFT 方法。它通过在部分线性层旁路注入低秩矩阵（增量权重）来拟合任务差异；训练时只更新这些低秩参数，基座权重保持不变。  
-
 baseline：
 sevila：https://github.com/Yui010206/SeViLA
 focus：https://github.com/NUS-HPC-AI-Lab/FOCUS
@@ -525,3 +523,34 @@ python run.py --multirun \
     seed=42 \
     slurm=hgpu_batch
 
+测试ours：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_emb.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    num_frames=4 \
+    model=qwen3_8b_thinking \
+    task_filter=short,medium,long \
+    frame_sampling_method=ours \
+    train_ratio=0.85 \
+    seed=42 \
+    slurm=hgpu_batch
+
+测试原版是否有截断：
+python vqa_eval.py \
+    --dataset videomme \
+    --dataset_name lmms-lab/Video-MME \
+    --no_dataset_config \
+    --dataset_split test \
+    --video_dir ~/dataset/Video-MME \
+    --num_frames 4 \
+    --model_path Qwen/Qwen3-VL-8B-Thinking \
+    --model_name qwen3_8b_thinking \
+    --task_filter short \
+    --frame_sampling_method uniform \
+    --train_ratio 0.85 \
+    --seed 42
