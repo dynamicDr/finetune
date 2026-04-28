@@ -564,9 +564,9 @@ python run.py --multirun \
     dataset_no_config=true \
     dataset_split=test \
     video_dir=~/dataset/Video-MME \
-    frame_sampling_method=uniform,clip,aks-clip,siglip2 \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2 \
     num_frames=16,32\
-    model=qwen3_4b_thinking \
+    model=qwen3_8b_thinking \
     task_filter=short,medium,long \
     train_ratio=0.85 \
     seed=42 \
