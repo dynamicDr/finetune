@@ -554,3 +554,20 @@ python vqa_eval.py \
     --frame_sampling_method uniform \
     --train_ratio 0.85 \
     --seed 42
+
+新：测试所高帧率在Video-MME(zzy再跑)：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,siglip2 \
+    num_frames=16,32\
+    model=qwen3_4b_thinking \
+    task_filter=short,medium,long \
+    train_ratio=0.85 \
+    seed=42 \
+    slurm=hgpu_batch

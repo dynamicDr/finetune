@@ -103,6 +103,8 @@ def log_to_csv(
     avg_inference_time: float,
     frame_sampling_method: str,
     avg_frame_sampling_time: float,
+    avg_embedding_build_time: float,
+    avg_total_time_hours: float,
     over_max_tokens_count: int,
     model_name: str,
     lora_path: str,
@@ -124,6 +126,8 @@ def log_to_csv(
         f"{avg_inference_time:.3f}",
         frame_sampling_method,
         f"{avg_frame_sampling_time:.6f}",
+        f"{avg_embedding_build_time:.6f}",
+        f"{avg_total_time_hours:.6f}",
         over_max_tokens_count,
         model_name,
         lora_path,
@@ -145,6 +149,8 @@ def log_to_csv(
                     "avg_inference_time",
                     "frame_sampling_method",
                     "avg_frame_sampling_time",
+                    "avg_embedding_build_time",
+                    "avg_total_time_hours",
                     "over_max_tokens_count",
                     "model_name",
                     "lora_path",
@@ -367,6 +373,8 @@ def main():
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)
+    avg_embedding_build_time = 0.0
+    avg_total_time_hours = (avg_inference_time + avg_frame_sampling_time + avg_embedding_build_time) / 3600.0
     log_to_csv(
         log_file=log_file,
         dataset=args.dataset,
@@ -378,6 +386,8 @@ def main():
         avg_inference_time=avg_inference_time,
         frame_sampling_method=args.frame_sampling_method,
         avg_frame_sampling_time=avg_frame_sampling_time,
+        avg_embedding_build_time=avg_embedding_build_time,
+        avg_total_time_hours=avg_total_time_hours,
         over_max_tokens_count=results["over_max_tokens_count"],
         model_name=model_name,
         lora_path=lora_path,
@@ -387,6 +397,7 @@ def main():
     print(
         f"评估完成：样本 {len(samples)}, Accuracy {avg_accuracy:.2f}%, "
         f"AvgInfer {avg_inference_time:.3f}s, AvgFrameSampling {avg_frame_sampling_time:.6f}s, "
+        f"AvgEmbedBuild {avg_embedding_build_time:.6f}s, AvgTotal {avg_total_time_hours:.6f}h, "
         f"OverLimit {results['over_max_tokens_count']}, MissingThinkEnd {results['missing_think_end_count']}"
     )
 
