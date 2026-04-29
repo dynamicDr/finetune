@@ -172,7 +172,7 @@ def evaluate_vqa(
     focus_blip_model_name: str = "Salesforce/blip-itm-base-coco",
     focus_blip_device: str | None = None,
     focus_blip_batch_size: int = 16,
-    max_new_tokens: int = 1024,
+    max_new_tokens: int = 2048,
 ) -> dict[str, Any]:
     results = {
         "correct": 0,
@@ -310,7 +310,7 @@ def parse_args():
         default="all",
         choices=["all", "mcq", "numeric", "short", "medium", "long"],
     )
-    p.add_argument("--max_new_tokens", type=int, default=1024)
+    p.add_argument("--max_new_tokens", type=int, default=2048)
     p.add_argument("--log_file", type=str, default="vqa_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
@@ -318,6 +318,7 @@ def parse_args():
 
 
 def main():
+    experiment_start_time = time.perf_counter()
     args = parse_args()
     video_dir = os.path.expanduser(args.video_dir)
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
@@ -374,7 +375,8 @@ def main():
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)
     avg_embedding_build_time = 0.0
-    avg_total_time_hours = (avg_inference_time + avg_frame_sampling_time + avg_embedding_build_time) / 3600.0
+    # 保留历史字段名 avg_total_time_hours，但语义改为整次实验总耗时（wall-clock）
+    avg_total_time_hours = (time.perf_counter() - experiment_start_time) / 3600.0
     log_to_csv(
         log_file=log_file,
         dataset=args.dataset,

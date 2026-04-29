@@ -565,9 +565,27 @@ python run.py --multirun \
     dataset_split=test \
     video_dir=~/dataset/Video-MME \
     frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2 \
-    num_frames=16,32\
+    num_frames=16\
     model=qwen3_8b_thinking \
     task_filter=short,medium,long \
-    train_ratio=0.85 \
+    train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+新：测试所低帧率在Video-MME(dty再跑)：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2 \
+    num_frames=4\
+    model=qwen3_8b_thinking \
+    task_filter=short,medium,long \
+    train_ratio=0.9 \
     seed=42 \
     slurm=hgpu_batch
