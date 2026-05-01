@@ -634,3 +634,104 @@ python run.py --multirun \
 
 
 现在我要重新评估到底使用thinking还是instruct，从推理时间和准确率层面（dty再跑）。我更想用intruct，可以解决截断问题，也可以省时间。
+
+
+为了在旅游的时候一键跑baseline，我要先测试好其他数据集和模型是否可以运行：
+数据集：Egoschema的subset共500个视频。VideoMME长中短各900个视频（共2700）。
+
+
+测试新模型llava_next_video_7b_hf ：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform\
+    num_frames=8 \
+    model=llava_next_video_7b_hf \
+    task_filter=short \
+    train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch
+
+测试新数据集EgoSchema ：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_4b_instruct \
+    task_filter=mcq \
+    num_frames=4 \
+    frame_sampling_method=uniform \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+
+
+
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform\
+    num_frames=4,8,16 \
+    model=llava_next_video_7b_hf \
+    task_filter=short \
+    train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+qwen慢到底是slurm的问题吗？
+# 直接在命令行跑（不经过 run.py / slurm）
+MODEL_PATH="$HOME/.cache/huggingface/hub/models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281ec70b05090aa6165b016eac8ec08e71b17"
+python vqa_eval.py \
+    --model_name Qwen/Qwen3-VL-4B-Instruct \
+    --model_path "$MODEL_PATH" \
+    --dataset videomme \
+    --dataset_name lmms-lab/Video-MME \
+    --no_dataset_config \
+    --dataset_split test \
+    --video_dir ~/dataset/Video-MME \
+    --frame_sampling_method uniform \
+    --num_frames 4 \
+    --task_filter short \
+    --train_ratio 0.9 \
+    --seed 42 \
+    --num_samples all \
+    --log_file result_qwen3_4b_instruct_direct_nf4.csv
+
+
+
+
+
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform\
+    num_frames=4,16,32 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    task_filter=short \
+    train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch

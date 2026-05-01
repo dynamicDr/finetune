@@ -14,7 +14,7 @@ from tqdm import tqdm
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from frame_samplers import sample_video_frames
-from model_response_mode import extract_answer_by_mode, load_model_response_mode_config, resolve_model_mode
+from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from vl_common import generate_response, load_model_and_processor
 
 MODE_MAX_NEW_TOKENS = {
@@ -37,14 +37,6 @@ def calculate_mra(pred: float, gt: float) -> float:
     if gt == 0:
         return 1.0 if pred == 0 else 0.0
     return max(0.0, 1 - abs(pred - gt) / abs(gt))
-
-
-def _split_cot_and_answer(response: str) -> tuple[str, str]:
-    text = response.strip()
-    if "</think>" in text:
-        cot_text, ans_text = text.split("</think>", 1)
-        return cot_text.strip(), ans_text.strip()
-    return text, ""
 
 
 def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
@@ -221,6 +213,8 @@ def evaluate_vqa(
             continue
 
         prompt = build_user_text(sample.question, sample.options)
+        sample_t0 = time.time()
+        sample_t1 = sample_t0 + frame_sampling_time
         response, inference_time, generated_token_count, hit_max_tokens = generate_response(
             model,
             processor,
@@ -228,12 +222,25 @@ def evaluate_vqa(
             prompt,
             max_new_tokens=max_new_tokens,
         )
+        sample_t4 = time.time()
+        # processor / generate / decode timing are printed in generate_response.
+        # Here we provide the requested frame+end-to-end line on the same sample.
+        print(
+            "[perf-debug][sample-timing] "
+            f"frame_load={sample_t1 - sample_t0:.2f}s, "
+            f"processor+generate+decode={sample_t4 - sample_t1:.2f}s",
+            flush=True,
+        )
         if hit_max_tokens:
             results["over_max_tokens_count"] += 1
         has_think_end = "</think>" in response
         if not has_think_end:
             results["missing_think_end_count"] += 1
-        cot_text, ans_text = _split_cot_and_answer(response)
+        cot_text, ans_text, pred_answer = parse_response_by_mode(
+            response=response,
+            has_options=bool(sample.options),
+            model_mode=model_mode,
+        )
         print(f"[vqa_eval] sample_id={sample.sample_id} RAW:\n{response}", flush=True)
         print(f"[vqa_eval] sample_id={sample.sample_id} COT:\n{cot_text}", flush=True)
         print(f"[vqa_eval] sample_id={sample.sample_id} ANS:\n{ans_text}", flush=True)
@@ -243,11 +250,6 @@ def evaluate_vqa(
             f"has_think_end={has_think_end}, model_mode={model_mode}, "
             f"require_think_end_for_scoring={require_think_end_for_scoring}",
             flush=True,
-        )
-        pred_answer = extract_answer_by_mode(
-            response=response,
-            has_options=bool(sample.options),
-            model_mode=model_mode,
         )
         answer_usable = has_think_end or (not require_think_end_for_scoring)
         if not answer_usable:

@@ -1,0 +1,2 @@
+name: lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+path: ${oc.env:HOME}/.cache/huggingface/hub/models--lmms-lab--LLaVA-OneVision-1.5-8B-Instruct

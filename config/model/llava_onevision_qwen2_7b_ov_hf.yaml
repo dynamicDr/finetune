@@ -1,0 +1,2 @@
+name: llava-hf/llava-onevision-qwen2-7b-ov-hf
+path: ${oc.env:HOME}/.cache/huggingface/hub/models--llava-hf--llava-onevision-qwen2-7b-ov-hf

@@ -15,7 +15,7 @@ from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from data_loaders.ours import iterative_inference_with_cache, rank_frames_by_clip
 from frame_samplers import sample_video_frames
-from model_response_mode import extract_answer_by_mode, load_model_response_mode_config, resolve_model_mode
+from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from vl_common import generate_response_with_split_embedding, load_model_and_processor
 
 MODE_MAX_NEW_TOKENS = {
@@ -255,11 +255,11 @@ def evaluate_vqa(
                 processor=processor,
                 prompt=prompt,
                 ranked_frames=ranked_frames,
-                    extract_answer_fn=lambda x, has_options: extract_answer_by_mode(
-                        response=x,
-                        has_options=has_options,
-                        model_mode=model_mode,
-                    ),
+                extract_answer_fn=lambda x, has_options: parse_response_by_mode(
+                    response=x,
+                    has_options=has_options,
+                    model_mode=model_mode,
+                )[2],
                 has_options=bool(sample.options),
                 max_new_tokens=max_new_tokens,
             )
@@ -346,13 +346,18 @@ def evaluate_vqa(
                 )
                 continue
 
-            t_step = time.perf_counter()
-            pred_answer = extract_answer_by_mode(
-                response=response,
-                has_options=bool(sample.options),
-                model_mode=model_mode,
-            )
-            step_times["answer_extract"] += time.perf_counter() - t_step
+        t_step = time.perf_counter()
+        cot_text, ans_text, parsed_pred_answer = parse_response_by_mode(
+            response=response,
+            has_options=bool(sample.options),
+            model_mode=model_mode,
+        )
+        pred_answer = parsed_pred_answer
+        step_times["answer_extract"] += time.perf_counter() - t_step
+        print(f"[vqa_eval_emb] sample_id={sample.sample_id} RAW:\n{response}", flush=True)
+        print(f"[vqa_eval_emb] sample_id={sample.sample_id} COT:\n{cot_text}", flush=True)
+        print(f"[vqa_eval_emb] sample_id={sample.sample_id} ANS:\n{ans_text}", flush=True)
+        print(f"[vqa_eval_emb] sample_id={sample.sample_id} PRED:\n{pred_answer}", flush=True)
 
         t_step = time.perf_counter()
         if hit_max_tokens:

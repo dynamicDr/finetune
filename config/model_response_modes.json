@@ -3,5 +3,11 @@
   "Qwen/Qwen3-VL-4B-Thinking": "thinking",
   "Qwen/Qwen3-VL-8B-Instruct": "instruct",
   "Qwen/Qwen3-VL-4B-Instruct": "instruct",
-  "Qwen/Qwen2.5-VL-3B-Instruct": "instruct"
+  "Qwen/Qwen2.5-VL-3B-Instruct": "instruct",
+  "lmms-lab/LLaVA-OneVision-1.5-8B-Instruct": "instruct",
+  "LLaVA-OneVision-1.5-8B-Instruct": "instruct",
+  "llava-hf/llava-onevision-qwen2-7b-ov-hf": "instruct",
+  "llava-onevision-qwen2-7b-ov-hf": "instruct",
+  "llava-hf/LLaVA-NeXT-Video-7B-hf": "instruct",
+  "LLaVA-NeXT-Video-7B-hf": "instruct"
 }

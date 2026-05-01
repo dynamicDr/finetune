@@ -42,15 +42,23 @@ def resolve_model_mode(
     return mode, require_think_end, f"exact:{model_identifier}"
 
 
-def extract_answer_by_mode(response: str, has_options: bool, model_mode: str):
+def parse_response_by_mode(
+    response: str,
+    has_options: bool,
+    model_mode: str,
+) -> tuple[str, str, str | float]:
     text = response.strip()
     mode = model_mode.strip().lower()
 
     if "</think>" in text:
-        answer_portion = text.split("</think>", 1)[-1].strip()
+        cot_text, answer_portion = text.split("</think>", 1)
+        cot_text = cot_text.strip()
+        answer_portion = answer_portion.strip()
     elif mode == "thinking":
+        cot_text = text
         answer_portion = text
     else:
+        cot_text = ""
         answer_portion = text
 
     answer_match = re.search(r"<answer>\s*(.*?)\s*</answer>", answer_portion, re.DOTALL | re.IGNORECASE)
@@ -60,13 +68,22 @@ def extract_answer_by_mode(response: str, has_options: bool, model_mode: str):
     if has_options:
         match = re.search(r"\b([A-E])\b", answer_portion.upper())
         if match:
-            return match.group(1)
+            return cot_text, answer_portion, match.group(1)
 
     numbers = re.findall(r"[-+]?(?:\d+\.\d+|\d+|\.\d+)", answer_portion)
     for n in numbers:
         try:
-            return float(n)
+            return cot_text, answer_portion, float(n)
         except ValueError:
             continue
 
-    return text
+    return cot_text, answer_portion, text
+
+
+def extract_answer_by_mode(response: str, has_options: bool, model_mode: str):
+    _, _, pred_answer = parse_response_by_mode(
+        response=response,
+        has_options=has_options,
+        model_mode=model_mode,
+    )
+    return pred_answer

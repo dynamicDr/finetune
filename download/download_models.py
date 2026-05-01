@@ -6,54 +6,28 @@ download_models.py
 - 之后其它脚本直接用 from_pretrained("模型名") 即可，无需重复下载
 """
 
-from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
-
-try:
-    # 与当前仓库其它脚本（vqa_eval/vqa_train）保持一致的 VL 自动类
-    from transformers import AutoModelForImageTextToText as _AutoModelForVL
-except ImportError:
-    # 兼容部分旧版 transformers
-    from transformers import AutoModelForVision2Seq as _AutoModelForVL
+from huggingface_hub import snapshot_download
 
 
 MODEL_LIST = [
     # "Qwen/Qwen3-VL-30B-A3B-Instruct",
     # "Qwen/Qwen3-VL-8B-Instruct",
-    "Qwen/Qwen2.5-7B-Instruct",
+    # "lmms-lab/LLaVA-OneVision-1.5-8B-Instruct",
+    "llava-hf/llava-onevision-qwen2-7b-ov-hf",
     # "Qwen/Qwen3-VL-4B-Thinking",
     # "Qwen/Qwen3-VL-8B-Thinking",
     # "Qwen/Qwen3-VL-30B-A3B-Thinking",
     # "Qwen/Qwen3-VL-32B-Thinking",
 ]
 
-
 def download_one(model_id: str) -> None:
     print(f"\n[{MODEL_LIST.index(model_id) + 1}/{len(MODEL_LIST)}] 下载模型: {model_id}")
-    is_vl = "-VL-" in model_id.upper()
-    if is_vl:
-        model = _AutoModelForVL.from_pretrained(
-            model_id,
-            torch_dtype="auto",
-            trust_remote_code=True,
-        )
-        processor = AutoProcessor.from_pretrained(
-            model_id,
-            trust_remote_code=True,
-        )
-        del processor
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            torch_dtype="auto",
-            trust_remote_code=True,
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_id,
-            trust_remote_code=True,
-        )
-        del tokenizer
-    # 释放显存，只保留本地缓存
-    del model
+    # 仅做仓库快照下载，不在下载阶段实例化模型，避免触发本地环境依赖冲突。
+    snapshot_download(
+        repo_id=model_id,
+        repo_type="model",
+        local_files_only=False,
+    )
     print(f"✓ 完成: {model_id}")
 
 
