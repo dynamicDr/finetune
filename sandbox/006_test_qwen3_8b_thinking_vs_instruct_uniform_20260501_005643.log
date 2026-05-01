@@ -1,0 +1,74 @@
+加载数据...
+short: 可用=182, 取样=3
+medium: 可用=182, 取样=3
+uniform帧缓存完成: 6 个样本
+
+================ 加载模型: thinking (Qwen/Qwen3-VL-8B-Thinking) ================
+Loading weights:   0%|          | 0/750 [00:00<?, ?it/s]Loading weights:   0%|          | 2/750 [00:00<01:27,  8.52it/s]Loading weights:   3%|▎         | 25/750 [00:00<00:07, 91.07it/s]Loading weights:   7%|▋         | 49/750 [00:00<00:04, 140.91it/s]Loading weights:  10%|▉         | 72/750 [00:00<00:04, 166.58it/s]Loading weights:  13%|█▎        | 100/750 [00:00<00:03, 202.14it/s]Loading weights:  17%|█▋        | 125/750 [00:00<00:02, 213.91it/s]Loading weights:  20%|█▉        | 148/750 [00:00<00:02, 216.01it/s]Loading weights:  23%|██▎       | 171/750 [00:00<00:02, 217.37it/s]Loading weights:  27%|██▋       | 199/750 [00:01<00:02, 235.83it/s]Loading weights:  30%|██▉       | 224/750 [00:01<00:02, 237.26it/s]Loading weights:  33%|███▎      | 249/750 [00:01<00:02, 230.13it/s]Loading weights:  37%|███▋      | 277/750 [00:01<00:01, 244.18it/s]Loading weights:  40%|████      | 302/750 [00:01<00:01, 234.26it/s]Loading weights:  43%|████▎     | 326/750 [00:01<00:01, 233.27it/s]Loading weights:  47%|████▋     | 353/750 [00:01<00:01, 243.05it/s]Loading weights:  50%|█████     | 378/750 [00:01<00:01, 240.16it/s]Loading weights:  60%|██████    | 453/750 [00:01<00:00, 386.24it/s]Loading weights:  97%|█████████▋| 727/750 [00:02<00:00, 1067.02it/s]Loading weights: 100%|██████████| 750/750 [00:02<00:00, 366.75it/s] 
+
+===== 开始测试 model=thinking, task=short, num_samples=3 =====
+thinking-short-uniform:   0%|          | 0/3 [00:00<?, ?it/s]===============218-1=============
+ground truth: C
+thinking-short-uniform:   0%|          | 0/3 [02:44<?, ?it/s, acc=0.00%, avg_total=164.76s, n=1][timing][sample] model=thinking, task=short, idx=1, sample_id=218-1, total=164.7601s, prompt_build=0.0000s, frame_sampling=0.3787s, model_call_total=164.7597s, embedding_build=140.7876s, inference=23.7417s, model_other=0.2304s, answer_extract=0.0005s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=957, hit_max_tokens=False
+thinking-short-uniform:  33%|███▎      | 1/3 [02:44<05:29, 164.76s/it, acc=0.00%, avg_total=164.76s, n=1]===============183-1=============
+ground truth: B
+thinking-short-uniform:  33%|███▎      | 1/3 [03:15<05:29, 164.76s/it, acc=50.00%, avg_total=97.85s, n=2][timing][sample] model=thinking, task=short, idx=2, sample_id=183-1, total=30.9332s, prompt_build=0.0000s, frame_sampling=0.1439s, model_call_total=30.9330s, embedding_build=28.9786s, inference=1.9081s, model_other=0.0464s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=82, hit_max_tokens=False
+thinking-short-uniform:  67%|██████▋   | 2/3 [03:15<01:26, 86.04s/it, acc=50.00%, avg_total=97.85s, n=2] ===============166-3=============
+ground truth: C
+thinking-short-uniform:  67%|██████▋   | 2/3 [05:43<01:26, 86.04s/it, acc=33.33%, avg_total=114.56s, n=3][timing][sample] model=thinking, task=short, idx=3, sample_id=166-3, total=148.0007s, prompt_build=0.0000s, frame_sampling=0.5809s, model_call_total=148.0006s, embedding_build=141.5007s, inference=6.2921s, model_other=0.2078s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=229, hit_max_tokens=False
+thinking-short-uniform: 100%|██████████| 3/3 [05:43<00:00, 114.33s/it, acc=33.33%, avg_total=114.56s, n=3]thinking-short-uniform: 100%|██████████| 3/3 [05:43<00:00, 114.57s/it, acc=33.33%, avg_total=114.56s, n=3]
+
+===== 开始测试 model=thinking, task=medium, num_samples=3 =====
+thinking-medium-uniform:   0%|          | 0/3 [00:00<?, ?it/s]===============375-3=============
+ground truth: A
+thinking-medium-uniform:   0%|          | 0/3 [02:39<?, ?it/s, acc=0.00%, avg_total=159.30s, n=1][timing][sample] model=thinking, task=medium, idx=1, sample_id=375-3, total=159.2963s, prompt_build=0.0000s, frame_sampling=0.3641s, model_call_total=159.2961s, embedding_build=141.3056s, inference=17.7799s, model_other=0.2106s, answer_extract=0.0002s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=712, hit_max_tokens=False
+thinking-medium-uniform:  33%|███▎      | 1/3 [02:39<05:18, 159.30s/it, acc=0.00%, avg_total=159.30s, n=1]===============327-2=============
+ground truth: A
+thinking-medium-uniform:  33%|███▎      | 1/3 [05:33<05:18, 159.30s/it, acc=0.00%, avg_total=166.99s, n=2][timing][sample] model=thinking, task=medium, idx=2, sample_id=327-2, total=174.6901s, prompt_build=0.0000s, frame_sampling=0.2321s, model_call_total=174.6899s, embedding_build=141.3229s, inference=33.1576s, model_other=0.2094s, answer_extract=0.0002s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=1352, hit_max_tokens=False
+thinking-medium-uniform:  67%|██████▋   | 2/3 [05:33<02:48, 168.35s/it, acc=0.00%, avg_total=166.99s, n=2]===============379-2=============
+ground truth: C
+thinking-medium-uniform:  67%|██████▋   | 2/3 [07:59<02:48, 168.35s/it, acc=0.00%, avg_total=159.76s, n=3][timing][sample] model=thinking, task=medium, idx=3, sample_id=379-2, total=145.2821s, prompt_build=0.0000s, frame_sampling=0.4356s, model_call_total=145.2819s, embedding_build=141.1803s, inference=3.8998s, model_other=0.2018s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=128, hit_max_tokens=False
+thinking-medium-uniform: 100%|██████████| 3/3 [07:59<00:00, 157.82s/it, acc=0.00%, avg_total=159.76s, n=3]thinking-medium-uniform: 100%|██████████| 3/3 [07:59<00:00, 159.76s/it, acc=0.00%, avg_total=159.76s, n=3]
+
+================ 加载模型: instruct (Qwen/Qwen3-VL-8B-Instruct) ================
+Loading weights:   0%|          | 0/750 [00:00<?, ?it/s]Loading weights:   0%|          | 2/750 [00:00<00:38, 19.41it/s]Loading weights:   3%|▎         | 26/750 [00:00<00:05, 143.60it/s]Loading weights:   7%|▋         | 49/750 [00:00<00:03, 177.78it/s]Loading weights:   9%|▉         | 71/750 [00:00<00:03, 190.68it/s]Loading weights:  80%|████████  | 602/750 [00:00<00:00, 1981.42it/s]Loading weights: 100%|██████████| 750/750 [00:00<00:00, 1245.46it/s]
+Some parameters are on the meta device because they were offloaded to the cpu.
+
+===== 开始测试 model=instruct, task=short, num_samples=3 =====
+instruct-short-uniform:   0%|          | 0/3 [00:00<?, ?it/s]===============218-1=============
+ground truth: C
+instruct-short-uniform:   0%|          | 0/3 [02:29<?, ?it/s, acc=100.00%, avg_total=149.04s, n=1][timing][sample] model=instruct, task=short, idx=1, sample_id=218-1, total=149.0428s, prompt_build=0.0000s, frame_sampling=0.3787s, model_call_total=149.0424s, embedding_build=135.0708s, inference=13.7701s, model_other=0.2015s, answer_extract=0.0004s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=False, generated_tokens=10, hit_max_tokens=False
+instruct-short-uniform:  33%|███▎      | 1/3 [02:29<04:58, 149.04s/it, acc=100.00%, avg_total=149.04s, n=1]===============183-1=============
+ground truth: B
+instruct-short-uniform:  33%|███▎      | 1/3 [03:04<04:58, 149.04s/it, acc=100.00%, avg_total=92.15s, n=2] [timing][sample] model=instruct, task=short, idx=2, sample_id=183-1, total=35.2563s, prompt_build=0.0000s, frame_sampling=0.1439s, model_call_total=35.2562s, embedding_build=27.5505s, inference=7.6644s, model_other=0.0413s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=False, generated_tokens=6, hit_max_tokens=False
+instruct-short-uniform:  67%|██████▋   | 2/3 [03:04<01:22, 82.11s/it, acc=100.00%, avg_total=92.15s, n=2] ===============166-3=============
+ground truth: C
+instruct-short-uniform:  67%|██████▋   | 2/3 [05:27<01:22, 82.11s/it, acc=66.67%, avg_total=109.30s, n=3][timing][sample] model=instruct, task=short, idx=3, sample_id=166-3, total=143.5901s, prompt_build=0.0000s, frame_sampling=0.5809s, model_call_total=143.5900s, embedding_build=135.0005s, inference=8.4121s, model_other=0.1774s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=False, generated_tokens=6, hit_max_tokens=False
+instruct-short-uniform: 100%|██████████| 3/3 [05:27<00:00, 110.18s/it, acc=66.67%, avg_total=109.30s, n=3]instruct-short-uniform: 100%|██████████| 3/3 [05:27<00:00, 109.30s/it, acc=66.67%, avg_total=109.30s, n=3]
+
+===== 开始测试 model=instruct, task=medium, num_samples=3 =====
+instruct-medium-uniform:   0%|          | 0/3 [00:00<?, ?it/s]===============375-3=============
+ground truth: A
+instruct-medium-uniform:   0%|          | 0/3 [02:18<?, ?it/s, acc=0.00%, avg_total=138.47s, n=1][timing][sample] model=instruct, task=medium, idx=1, sample_id=375-3, total=138.4694s, prompt_build=0.0000s, frame_sampling=0.3641s, model_call_total=138.4693s, embedding_build=134.9192s, inference=3.3712s, model_other=0.1789s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=False, generated_tokens=2, hit_max_tokens=False
+instruct-medium-uniform:  33%|███▎      | 1/3 [02:18<04:36, 138.47s/it, acc=0.00%, avg_total=138.47s, n=1]===============327-2=============
+ground truth: A
+instruct-medium-uniform:  33%|███▎      | 1/3 [04:47<04:36, 138.47s/it, acc=0.00%, avg_total=143.57s, n=2][timing][sample] model=instruct, task=medium, idx=2, sample_id=327-2, total=148.6771s, prompt_build=0.0000s, frame_sampling=0.2321s, model_call_total=148.6770s, embedding_build=135.0583s, inference=13.4455s, model_other=0.1732s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=False, generated_tokens=10, hit_max_tokens=False
+instruct-medium-uniform:  67%|██████▋   | 2/3 [04:47<02:24, 144.47s/it, acc=0.00%, avg_total=143.57s, n=2]===============379-2=============
+ground truth: C
+instruct-medium-uniform:  67%|██████▋   | 2/3 [07:05<02:24, 144.47s/it, acc=33.33%, avg_total=141.85s, n=3][timing][sample] model=instruct, task=medium, idx=3, sample_id=379-2, total=138.4054s, prompt_build=0.0000s, frame_sampling=0.4356s, model_call_total=138.4053s, embedding_build=134.8585s, inference=3.3724s, model_other=0.1744s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=False, generated_tokens=2, hit_max_tokens=False
+instruct-medium-uniform: 100%|██████████| 3/3 [07:05<00:00, 141.70s/it, acc=33.33%, avg_total=141.85s, n=3]instruct-medium-uniform: 100%|██████████| 3/3 [07:05<00:00, 141.85s/it, acc=33.33%, avg_total=141.85s, n=3]
+
+================ 最终统计（按模型 + short/medium） ================
+
+----- model=thinking -----
+task=short, count=3, acc=33.33%, missing_think_end=0, over_max_tokens=0
+  avg_total=114.5647s, avg_prompt_build=0.0000s, avg_frame_sampling=0.3678s, avg_model_call_total=114.5644s, avg_embedding_build=103.7556s, avg_inference=10.6473s, avg_model_other=0.1615s, avg_answer_extract=0.0002s, avg_score_update=0.0000s
+task=medium, count=3, acc=0.00%, missing_think_end=0, over_max_tokens=0
+  avg_total=159.7562s, avg_prompt_build=0.0000s, avg_frame_sampling=0.3439s, avg_model_call_total=159.7560s, avg_embedding_build=141.2696s, avg_inference=18.2791s, avg_model_other=0.2073s, avg_answer_extract=0.0002s, avg_score_update=0.0000s
+
+----- model=instruct -----
+task=short, count=3, acc=66.67%, missing_think_end=3, over_max_tokens=0
+  avg_total=109.2964s, avg_prompt_build=0.0000s, avg_frame_sampling=0.3678s, avg_model_call_total=109.2962s, avg_embedding_build=99.2073s, avg_inference=9.9489s, avg_model_other=0.1401s, avg_answer_extract=0.0002s, avg_score_update=0.0000s
+task=medium, count=3, acc=33.33%, missing_think_end=3, over_max_tokens=0
+  avg_total=141.8507s, avg_prompt_build=0.0000s, avg_frame_sampling=0.3439s, avg_model_call_total=141.8505s, avg_embedding_build=134.9453s, avg_inference=6.7297s, avg_model_other=0.1755s, avg_answer_extract=0.0001s, avg_score_update=0.0000s
+明细表已写入: /userhome/cs3/duanty/finetune/sandbox/006_test_qwen3_8b_thinking_vs_instruct_uniform_details_20260501_012321.csv

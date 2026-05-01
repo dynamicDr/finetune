@@ -236,6 +236,66 @@ def _find_subsequence(seq: list[int], sub: list[int]) -> tuple[int, int]:
     raise RuntimeError(f"在生成 token 中未找到答案 token 序列: {sub}")
 
 
+def _find_subsequence_last(seq: list[int], sub: list[int]) -> tuple[int, int]:
+    if not sub:
+        raise RuntimeError("答案 token 序列为空，无法计算答案 token 的置信度。")
+    n = len(seq)
+    m = len(sub)
+    for i in range(n - m, -1, -1):
+        if seq[i:i + m] == sub:
+            return i, i + m
+    raise RuntimeError(f"在生成 token 中未找到答案 token 序列(倒序匹配): {sub}")
+
+
+def _extract_generated_token_ids_for_scores(
+    generated_ids: torch.Tensor,
+    scores: tuple[torch.Tensor, ...],
+) -> torch.Tensor:
+    score_len = len(scores)
+    if score_len <= 0:
+        raise RuntimeError("scores 为空，无法计算答案置信度。")
+    if generated_ids.shape[1] < score_len:
+        raise RuntimeError(
+            f"生成 token 长度小于 scores 长度: generated={generated_ids.shape[1]}, scores={score_len}"
+        )
+    gen_token_ids = generated_ids[:, -score_len:]
+    if gen_token_ids.shape[0] != 1:
+        raise RuntimeError(f"只支持 batch=1，当前 batch={gen_token_ids.shape[0]}")
+    if gen_token_ids.shape[1] == 0:
+        raise RuntimeError("生成 token 为空，无法计算答案置信度。")
+    return gen_token_ids
+
+
+def _option_token_ids(processor, option: str) -> set[int]:
+    candidates = {
+        option,
+        option.lower(),
+        f" {option}",
+        f" {option.lower()}",
+    }
+    token_ids: set[int] = set()
+    for text in candidates:
+        ids = processor.tokenizer(text, add_special_tokens=False)["input_ids"]
+        if ids:
+            token_ids.add(int(ids[0]))
+    return token_ids
+
+
+def _option_probs_from_step_logits(processor, logits: torch.Tensor) -> dict[str, float]:
+    probs = torch.softmax(logits, dim=-1)
+    out: dict[str, float] = {}
+    for option in ("A", "B", "C", "D"):
+        token_ids = _option_token_ids(processor, option)
+        if not token_ids:
+            out[option] = 0.0
+            continue
+        p = 0.0
+        for tid in token_ids:
+            p += float(probs[tid].item())
+        out[option] = p
+    return out
+
+
 def _answer_confidence_from_scores(
     processor,
     generated_ids: torch.Tensor,
@@ -243,18 +303,9 @@ def _answer_confidence_from_scores(
     scores: tuple[torch.Tensor, ...],
     answer_text: str,
 ) -> tuple[float, float, list[float]]:
-    if generated_ids.shape[1] > prompt_len:
-        gen_token_ids = generated_ids[:, prompt_len:]
-    else:
-        gen_token_ids = generated_ids
-    if gen_token_ids.shape[0] != 1:
-        raise RuntimeError(f"只支持 batch=1，当前 batch={gen_token_ids.shape[0]}")
-    if gen_token_ids.shape[1] == 0:
-        raise RuntimeError("生成 token 为空，无法计算答案置信度。")
-    if len(scores) != gen_token_ids.shape[1]:
-        raise RuntimeError(
-            f"scores 长度与生成 token 数不一致: scores={len(scores)}, tokens={gen_token_ids.shape[1]}"
-        )
+    # 仅使用与 scores 对齐的“新生成 token”来计算概率，避免把思维链前缀/提示词切片规则耦合进来。
+    # generate 的不同返回形态下，generated_ids 可能是 [prompt + generated] 或 [generated]。
+    gen_token_ids = _extract_generated_token_ids_for_scores(generated_ids, scores)
 
     step_logprobs: list[float] = []
     for t in range(gen_token_ids.shape[1]):
@@ -266,7 +317,8 @@ def _answer_confidence_from_scores(
     answer_ids = processor.tokenizer(answer_text, add_special_tokens=False)["input_ids"]
     gen_ids_list = [int(x) for x in gen_token_ids[0].tolist()]
     try:
-        s, e = _find_subsequence(gen_ids_list, answer_ids)
+        # 答案 token 可能在思维链里被提前提及；取“最后一次出现”更贴近最终答案段。
+        s, e = _find_subsequence_last(gen_ids_list, answer_ids)
     except RuntimeError:
         decoded_gen = processor.tokenizer.decode(gen_ids_list, skip_special_tokens=False)
         think_text, answer_text_decoded = _split_thinking_and_answer_text(decoded_gen)
@@ -328,6 +380,7 @@ def iterative_inference_with_cache(
     final_logprob = float("-inf")
     final_generated_token_count = 0
     final_hit_max_tokens = False
+    round_details: list[dict[str, Any]] = []
 
     _log(f"开始迭代推理: 总候选帧={len(ranked_frames)}，固定跑满top-1到top-{len(ranked_frames)}")
 
@@ -398,46 +451,80 @@ def iterative_inference_with_cache(
 
         generated_ids = outputs.sequences
         prompt_len = int(model_inputs["input_ids"].shape[1])
-        generated_token_count = int(generated_ids.shape[1] - prompt_len)
+        generated_token_count = int(len(outputs.scores))
         hit_max_tokens = generated_token_count >= max_new_tokens
         response = _decode_response(processor, model_inputs["input_ids"], generated_ids)
         think_text, answer_text = _split_thinking_and_answer_text(response)
         has_think_end = "</think>" in response
         if has_think_end:
             pred_answer = extract_answer_fn(response, has_options=has_options)
-            avg_logprob, answer_prob, token_lps = _answer_confidence_from_scores(
-                processor=processor,
-                generated_ids=generated_ids,
-                prompt_len=prompt_len,
-                scores=outputs.scores,
-                answer_text=str(pred_answer),
-            )
+            try:
+                avg_logprob, answer_prob, token_lps = _answer_confidence_from_scores(
+                    processor=processor,
+                    generated_ids=generated_ids,
+                    prompt_len=prompt_len,
+                    scores=outputs.scores,
+                    answer_text=str(pred_answer),
+                )
+                gen_token_ids = _extract_generated_token_ids_for_scores(generated_ids, outputs.scores)
+                answer_ids = processor.tokenizer(str(pred_answer), add_special_tokens=False)["input_ids"]
+                s, _ = _find_subsequence_last([int(x) for x in gen_token_ids[0].tolist()], answer_ids)
+                option_probs = _option_probs_from_step_logits(processor, outputs.scores[s][0])
+            except RuntimeError as e:
+                _log(f"第{k}轮答案概率计算失败，降级为默认值: {e}")
+                avg_logprob = float("-inf")
+                answer_prob = 0.0
+                token_lps = []
+                option_probs = {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0}
         else:
-            pred_answer = None
+            # 即使没有 </think>，也尽量提取最终答案，避免整轮结果被置空。
+            pred_answer = extract_answer_fn(response, has_options=has_options)
             avg_logprob = float("-inf")
             answer_prob = 0.0
             token_lps = []
-            _log("第{k}轮未检测到 </think> 结束符，按无效答案处理。".format(k=k))
+            option_probs = {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0}
+            _log("第{k}轮未检测到 </think> 结束符，跳过概率计算，仅保留答案文本。".format(k=k))
         _log(
             f"第{k}轮结果: infer_time={infer_time:.4f}s, pred_answer={pred_answer}, "
             f"answer_avg_logprob={avg_logprob:.6f}, answer_prob={answer_prob:.6f}, "
+            f"option_probs(A/B/C/D)={[round(option_probs[x], 6) for x in ('A', 'B', 'C', 'D')]}, "
             f"answer_token_logprobs={[round(x, 6) for x in token_lps]}, "
             f"generated_tokens={generated_token_count}, limit={max_new_tokens}, hit_limit={hit_max_tokens}"
         )
         _log(f"第{k}轮思维链输出:\n{think_text}")
         _log(f"第{k}轮最终回复输出:\n{answer_text}")
-        _log(f"第{k}轮大模型完整输出:\n{response}")
 
-        final_answer = pred_answer
+        if pred_answer is not None:
+            final_answer = pred_answer
         final_response = response
         final_prob = answer_prob
         final_logprob = avg_logprob
         final_generated_token_count = generated_token_count
         final_hit_max_tokens = hit_max_tokens
+        round_details.append(
+            {
+                "round_idx": k,
+                "selected_frame_ids": selected_ids,
+                "selected_clip_scores": selected_scores,
+                "embedding_build_time": build_time,
+                "inference_time": infer_time,
+                "pred_answer": pred_answer,
+                "answer_prob": answer_prob,
+                "answer_logprob": avg_logprob,
+                "answer_token_logprobs": token_lps,
+                "option_probs": option_probs,
+                "generated_token_count": generated_token_count,
+                "hit_max_tokens": hit_max_tokens,
+                "has_think_end": has_think_end,
+            }
+        )
         _log(f"第{k}轮结束：不启用早停，继续下一轮。")
 
     if final_answer is None:
-        raise RuntimeError("迭代推理未产生任何答案。")
+        final_answer = extract_answer_fn(final_response, has_options=has_options)
+        if final_answer is None:
+            final_answer = ""
+        _log("所有轮次均未得到稳定答案，已使用最终输出做兜底提取。")
 
     return {
         "response": final_response,
@@ -452,4 +539,5 @@ def iterative_inference_with_cache(
         "inference_time": total_infer_time,
         "generated_token_count": final_generated_token_count,
         "hit_max_tokens": final_hit_max_tokens,
+        "round_details": round_details,
     }

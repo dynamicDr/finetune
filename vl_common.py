@@ -48,7 +48,7 @@ def build_mcq_prompt(question: str, options: list[str]) -> str:
     return (
         f"{question}\n\nOptions:\n"
         + "\n".join(lines)
-        + "\n\nPlease answer with the option letter directly."
+        + "\n\nDirectly answer with the option letter only. Do not explain."
     )
 
 
@@ -232,15 +232,17 @@ def generate_response_with_split_embedding(
 
     infer_start = time.time()
     with torch.no_grad():
-        generated_ids = model.generate(
+        outputs = model.generate(
             inputs_embeds=fused_embeds,
             attention_mask=model_inputs.get("attention_mask"),
             max_new_tokens=max_new_tokens,
             do_sample=False,
+            return_dict_in_generate=True,
+            output_scores=True,
         )
     inference_time = time.time() - infer_start
+    generated_ids = outputs.sequences
     response = _decode_new_tokens(processor, model_inputs["input_ids"], generated_ids)
-    prompt_len = int(model_inputs["input_ids"].shape[1])
-    generated_token_count = int(generated_ids.shape[1] - prompt_len)
+    generated_token_count = int(len(outputs.scores))
     hit_max_tokens = generated_token_count >= max_new_tokens
     return response, inference_time, embedding_build_time, generated_token_count, hit_max_tokens

@@ -22,7 +22,7 @@ def build_user_text(question: str, options: list[str] | None) -> str:
         return (
             f"{question}\n\nOptions:\n"
             + "\n".join(options)
-            + "\n\nPlease answer with the option letter directly."
+            + "\n\nDirectly answer with the option letter only. Do not explain."
         )
     return f"{question}\n\nPlease provide the numerical answer directly."
 

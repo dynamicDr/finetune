@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import csv
 import os
-import re
 import time
 import warnings
 from datetime import datetime
@@ -15,7 +14,13 @@ from tqdm import tqdm
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from frame_samplers import sample_video_frames
+from model_response_mode import extract_answer_by_mode, load_model_response_mode_config, resolve_model_mode
 from vl_common import generate_response, load_model_and_processor
+
+MODE_MAX_NEW_TOKENS = {
+    "thinking": 4086,
+    "instruct": 128,
+}
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
@@ -23,29 +28,9 @@ def build_user_text(question: str, options: list[str] | None) -> str:
         return (
             f"{question}\n\nOptions:\n"
             + "\n".join(options)
-            + "\n\nPlease answer with the option letter directly."
+            + "\n\nDirectly answer with the option letter only. Do not explain."
         )
     return f"{question}\n\nPlease provide the numerical answer directly."
-
-
-def extract_answer(response: str, has_options: bool = False):
-    response = response.strip()
-    answer_portion = response.split("</think>", 1)[-1].strip() if "</think>" in response else response
-    answer_match = re.search(r"<answer>\s*(.*?)\s*</answer>", answer_portion, re.DOTALL | re.IGNORECASE)
-    if answer_match:
-        answer_portion = answer_match.group(1).strip()
-    if has_options:
-        match = re.search(r"\b([A-E])\b", answer_portion.upper())
-        if match:
-            return match.group(1)
-    # 仅提取合法数字，避免 "." 这类无效串触发 float 转换报错
-    numbers = re.findall(r"[-+]?(?:\d+\.\d+|\d+|\.\d+)", answer_portion)
-    for n in numbers:
-        try:
-            return float(n)
-        except ValueError:
-            continue
-    return response
 
 
 def calculate_mra(pred: float, gt: float) -> float:
@@ -173,6 +158,8 @@ def evaluate_vqa(
     focus_blip_device: str | None = None,
     focus_blip_batch_size: int = 16,
     max_new_tokens: int = 2048,
+    model_mode: str = "thinking",
+    require_think_end_for_scoring: bool = True,
 ) -> dict[str, Any]:
     results = {
         "correct": 0,
@@ -235,21 +222,29 @@ def evaluate_vqa(
         print(
             f"[vqa_eval] sample_id={sample.sample_id} TOKENS: "
             f"generated={generated_token_count}, limit={max_new_tokens}, hit_limit={hit_max_tokens}, "
-            f"has_think_end={has_think_end}",
+            f"has_think_end={has_think_end}, model_mode={model_mode}, "
+            f"require_think_end_for_scoring={require_think_end_for_scoring}",
             flush=True,
         )
-        pred_answer = extract_answer(response, has_options=bool(sample.options)) if has_think_end else None
+        pred_answer = extract_answer_by_mode(
+            response=response,
+            has_options=bool(sample.options),
+            model_mode=model_mode,
+        )
+        answer_usable = has_think_end or (not require_think_end_for_scoring)
+        if not answer_usable:
+            pred_answer = None
         results["inference_times"].append(inference_time)
 
         if sample.options is not None:
-            is_correct = has_think_end and (
+            is_correct = answer_usable and (
                 str(sample.answer).strip().upper() == str(pred_answer).strip().upper()
             )
             results["total"] += 1
             if is_correct:
                 results["correct"] += 1
         else:
-            if has_think_end:
+            if answer_usable:
                 try:
                     pred_num = float(pred_answer) if pred_answer else 0.0
                     gt_num = float(sample.answer)
@@ -311,6 +306,12 @@ def parse_args():
         choices=["all", "mcq", "numeric", "short", "medium", "long"],
     )
     p.add_argument("--max_new_tokens", type=int, default=2048)
+    p.add_argument(
+        "--model_mode_config",
+        type=str,
+        default="config/model_response_modes.json",
+        help="模型响应模式配置文件(JSON): 通过规则自动判断 thinking/instruct。",
+    )
     p.add_argument("--log_file", type=str, default="vqa_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
@@ -353,6 +354,44 @@ def main():
         model_name = os.path.basename(resolved_model_path.rstrip("/"))
         lora_path = ""
 
+    mode_config = load_model_response_mode_config(args.model_mode_config)
+    model_identifier_candidates = [resolved_model_path]
+    if model_name:
+        model_identifier_candidates.append(model_name)
+    if args.base_model:
+        model_identifier_candidates.append(os.path.expanduser(args.base_model))
+
+    last_error: Exception | None = None
+    model_mode = ""
+    require_think_end_for_scoring = True
+    matched_rule = ""
+    for candidate in model_identifier_candidates:
+        try:
+            model_mode, require_think_end_for_scoring, matched_rule = resolve_model_mode(
+                model_identifier=candidate,
+                config=mode_config,
+            )
+            break
+        except (KeyError, ValueError) as e:
+            last_error = e
+    if not model_mode:
+        raise RuntimeError(
+            "模型模式识别失败，请在 model_response_modes.json 中添加精确键。"
+            f" tried={model_identifier_candidates}"
+        ) from last_error
+    print(
+        f"[vqa_eval] 模型模式识别: model_mode={model_mode}, "
+        f"require_think_end_for_scoring={require_think_end_for_scoring}, "
+        f"matched_rule={matched_rule}",
+        flush=True,
+    )
+    effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
+    print(
+        f"[vqa_eval] max_new_tokens 已按模式固定: mode={model_mode}, "
+        f"effective_max_new_tokens={effective_max_new_tokens}",
+        flush=True,
+    )
+
     model, processor = load_model_and_processor(
         resolved_model_path,
         use_lora=args.use_lora,
@@ -370,7 +409,9 @@ def main():
         focus_blip_model_name=args.focus_blip_model_name,
         focus_blip_device=args.focus_blip_device,
         focus_blip_batch_size=args.focus_blip_batch_size,
-        max_new_tokens=args.max_new_tokens,
+        max_new_tokens=effective_max_new_tokens,
+        model_mode=model_mode,
+        require_think_end_for_scoring=require_think_end_for_scoring,
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)

@@ -55,26 +55,26 @@ LoRA 微调输出目录（`outputs/vsibench_train/.../<task>_frames<num>/`）文
    - 在新开的终端里激活环境：  
      - conda activate finetune  
    - 然后直接运行：  
-     - python run.py script=vqa_eval.py dataset=vsibench model=qwen3_8b num_frames=16 frame_sampling_method=uniform  
+    - python run.py script=vqa_eval.py dataset=vsibench model=qwen3_8b_instruct num_frames=16 frame_sampling_method=uniform  
 
 2. SLURM 单任务评测（Submitit 模式）  
    - 小模型用 RTX4090（默认走 slurm=default_4090）：  
-     - python run.py script=vqa_eval.py dataset=vsibench --hydra/launcher=submitit_slurm model=qwen3_4b frame_sampling_method=uniform  
+    - python run.py script=vqa_eval.py dataset=vsibench --hydra/launcher=submitit_slurm model=qwen3_4b_instruct frame_sampling_method=uniform  
    - 大模型用单卡 H800：  
-     - python run.py script=vqa_eval.py dataset=vsibench --hydra/launcher=submitit_slurm model=qwen3_30b frame_sampling_method=uniform slurm=h800  
+    - python run.py script=vqa_eval.py dataset=vsibench --hydra/launcher=submitit_slurm model=qwen3_30b_a3b_instruct frame_sampling_method=uniform slurm=h800  
    - 单纯跑一个脚本在服务器：
       sbatch single_run.sh benchmark_vl_vision_vs_lm_time.py
 3. SLURM 并行多任务（多模型、多任务、多帧数一起扫）  
    - 并行扫参，小模型用默认 RTX4090：  
      - python run.py script=vqa_eval.py dataset=vsibench --multirun --hydra/launcher=submitit_slurm \
-       model=qwen3_4b,qwen3_8b \
+      model=qwen3_4b_instruct,qwen3_8b_instruct \
        task_filter=mcq,numeric \
        num_frames=4,8 \
        frame_sampling_method=uniform  
    - 并行扫参或长时间大任务，用 hgpu-batch：  
      - python run.py script=vqa_eval.py dataset=vsibench --multirun \
         hydra/launcher=submitit_slurm \
-        model=qwen3_4b,qwen3_8b,qwen3_30b \
+       model=qwen3_4b_instruct,qwen3_8b_instruct,qwen3_30b_a3b_instruct \
         task_filter=mcq,numeric \
         num_frames=4 \
         frame_sampling_method=uniform \
@@ -104,7 +104,7 @@ python run.py --multirun \
       hydra/launcher=submitit_slurm \
       script=vqa_eval.py \
       dataset=vsibench \
-      model=qwen3_8b,qwen3_30b_a3b \
+      model=qwen3_8b_instruct,qwen3_30b_a3b_instruct \
       task_filter=mcq,numeric \
       num_frames=4 \
       frame_sampling_method=uniform \
@@ -131,7 +131,7 @@ python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval.py \
     dataset=vsibench \
-    model=qwen3_4b,qwen3_8b,qwen3_30b_a3b,qwen3_32b \
+    model=qwen3_4b_instruct,qwen3_8b_instruct,qwen3_30b_a3b_instruct,qwen3_32b_instruct \
     task_filter=mcq,numeric \
     num_frames=4 \
     frame_sampling_method=uniform \
@@ -583,9 +583,54 @@ python run.py --multirun \
     dataset_split=test \
     video_dir=~/dataset/Video-MME \
     frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2 \
-    num_frames=4\
+    num_frames=8\
     model=qwen3_8b_thinking \
     task_filter=short,medium,long \
     train_ratio=0.9 \
     seed=42 \
     slurm=hgpu_batch
+
+测试ours（python直接运行脚本）
+python vqa_eval_emb.py \
+    --dataset videomme \
+    --dataset_name lmms-lab/Video-MME \
+    --no_dataset_config \
+    --dataset_split test \
+    --video_dir ~/dataset/Video-MME \
+    --num_frames 4 \
+    --model_path Qwen/Qwen3-VL-8B-Thinking \
+    --model_name qwen3_8b_thinking \
+    --task_filter short \
+    --frame_sampling_method ours \
+    --train_ratio 0.99 \
+    --seed 42
+
+
+
+
+新：重新测试think和instruct的区别(dty再跑)：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform \
+    num_frames=8 \
+    model=qwen3_8b_thinking,qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+
+现在的问题是，
+1，看看流程对不对，有没有正确读取embedding，计算概率
+2，既然context window变了，推理时间要重新统计
+3，agent认为自己拿到的已经是全部了，我下一步需要在prompt层面统计agent的信心和安慰她
+
+
+现在我要重新评估到底使用thinking还是instruct，从推理时间和准确率层面（dty再跑）。我更想用intruct，可以解决截断问题，也可以省时间。

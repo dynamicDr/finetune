@@ -1,0 +1,2 @@
+name: Qwen/Qwen3-VL-8B-Instruct
+path: ${oc.env:HOME}/.cache/huggingface/hub/models--Qwen--Qwen3-VL-8B-Instruct

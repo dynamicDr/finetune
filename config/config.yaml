@@ -1,5 +1,5 @@
 defaults:
-  - model: qwen3_4b
+  - model: qwen3_4b_instruct
   - slurm: default_4090
   - _self_
 
