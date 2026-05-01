@@ -378,3 +378,63 @@ def generate_response_with_split_embedding(
     generated_token_count = int(len(outputs.scores))
     hit_max_tokens = generated_token_count >= max_new_tokens
     return response, inference_time, embedding_build_time, generated_token_count, hit_max_tokens
+
+
+def generate_response_with_split_embedding_detailed(
+    model,
+    processor,
+    frames: list[Image.Image],
+    prompt: str,
+    max_new_tokens: int = 1024,
+) -> dict[str, Any]:
+    import time
+
+    model_call_start = time.perf_counter()
+    content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
+    content.append({"type": "text", "text": prompt})
+    messages = [{"role": "user", "content": content}]
+    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+    processor_start = time.perf_counter()
+    model_inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+    processor_time = time.perf_counter() - processor_start
+
+    embedding_start = time.perf_counter()
+    fused_embeds = _build_image_fused_embeds(model, model_inputs)
+    embedding_build_time = time.perf_counter() - embedding_start
+    if fused_embeds is None:
+        raise RuntimeError("模型不支持 embedding 分开输入，或构建图像 embedding 失败。")
+
+    infer_start = time.perf_counter()
+    with torch.no_grad():
+        outputs = model.generate(
+            inputs_embeds=fused_embeds,
+            attention_mask=model_inputs.get("attention_mask"),
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            return_dict_in_generate=True,
+            output_scores=True,
+        )
+    inference_time = time.perf_counter() - infer_start
+
+    decode_start = time.perf_counter()
+    generated_ids = outputs.sequences
+    response = _decode_new_tokens(processor, model_inputs["input_ids"], generated_ids)
+    decode_time = time.perf_counter() - decode_start
+
+    generated_token_count = int(len(outputs.scores))
+    hit_max_tokens = generated_token_count >= max_new_tokens
+    total_model_call_time = time.perf_counter() - model_call_start
+
+    return {
+        "response": response,
+        "generated_token_count": generated_token_count,
+        "hit_max_tokens": hit_max_tokens,
+        "timings": {
+            "processor": processor_time,
+            "embedding_build": embedding_build_time,
+            "inference": inference_time,
+            "decode": decode_time,
+            "total_model_call": total_model_call_time,
+        },
+    }

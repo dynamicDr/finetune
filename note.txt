@@ -729,9 +729,46 @@ python run.py --multirun \
     dataset_split=test \
     video_dir=~/dataset/Video-MME \
     frame_sampling_method=uniform\
-    num_frames=4,16,32 \
-    model=llava_onevision_qwen2_7b_ov_hf \
+    num_frames=4,8,16,32 \
+    model=llava_onevision_qwen2_7b_ov_hf,qwen3_8b_instruct \
     task_filter=short \
     train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+
+【dty在跑】直接开跑qwen+16的所有方法：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2\
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+【zzy在跑】直接开跑qwen+16的所有方法：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2\
+    num_frames=16 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    task_filter=short,medium,long \
+    train_ratio=0.0 \
     seed=42 \
     slurm=hgpu_batch

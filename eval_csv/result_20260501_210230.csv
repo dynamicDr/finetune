@@ -1,0 +1,5 @@
+timestamp,dataset,seed,task_filter,num_samples,evaluated_samples,correct_count,accuracy_percent,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,avg_embedding_build_time,avg_total_time_hours,over_max_tokens_count,model_name,lora_path,train_ratio,eval_split
+2026-05-01 21:04:36,videomme,42,short,90,90,64.000000,71.11,8,71.11,0.468,uniform,0.510539,0.000000,0.032338,0,Qwen/Qwen3-VL-8B-Instruct,,0.9,test
+2026-05-01 21:06:09,videomme,42,short,90,90,70.000000,77.78,16,77.78,0.949,uniform,0.919779,0.000000,0.058247,0,Qwen/Qwen3-VL-8B-Instruct,,0.9,test
+2026-05-01 21:15:12,videomme,42,short,90,90,66.000000,73.33,8,73.33,7.518,uniform,0.519560,0.000000,0.209181,0,Qwen/Qwen3-VL-8B-Thinking,,0.9,test
+2026-05-01 21:14:40,videomme,42,short,90,90,67.000000,74.44,16,74.44,6.569,uniform,0.922575,0.000000,0.200214,0,Qwen/Qwen3-VL-8B-Thinking,,0.9,test

@@ -19,7 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from data_loaders import get_data_loader
 from data_loaders.base import VQASample
 from frame_samplers import sample_video_frames
-from vl_common import generate_response_with_split_embedding, load_model_and_processor
+from vl_common import generate_response_with_split_embedding_detailed, load_model_and_processor
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
@@ -72,8 +72,10 @@ def _init_stats() -> dict[str, float | int]:
         "prompt_build": 0.0,
         "frame_sampling": 0.0,
         "model_call_total": 0.0,
+        "processor": 0.0,
         "embedding_build": 0.0,
         "inference": 0.0,
+        "decode": 0.0,
         "model_other": 0.0,
         "answer_extract": 0.0,
         "score_update": 0.0,
@@ -131,8 +133,8 @@ def run() -> None:
     TRAIN_RATIO = 0.8
     USE_TRAIN_SPLIT = False
 
-    TASKS = ["short", "medium"]
-    N_EACH = 3
+    TASKS = ["short"]
+    N_EACH = 10
     # ==========================
 
     print("加载数据...", flush=True)
@@ -230,17 +232,27 @@ def run() -> None:
                     continue
 
                 t0 = time.perf_counter()
-                response, infer_t, embedding_t, generated_token_count, hit_max_tokens = (
-                    generate_response_with_split_embedding(
-                        model=model,
-                        processor=processor,
-                        frames=frames,
-                        prompt=prompt,
-                        max_new_tokens=effective_max_new_tokens,
-                    )
+                detailed_out = generate_response_with_split_embedding_detailed(
+                    model=model,
+                    processor=processor,
+                    frames=frames,
+                    prompt=prompt,
+                    max_new_tokens=effective_max_new_tokens,
                 )
                 model_call_t = time.perf_counter() - t0
-                model_other_t = max(0.0, model_call_t - embedding_t - infer_t)
+                response = str(detailed_out["response"])
+                generated_token_count = int(detailed_out["generated_token_count"])
+                hit_max_tokens = bool(detailed_out["hit_max_tokens"])
+                timings = detailed_out["timings"]
+                processor_t = float(timings["processor"])
+                embedding_t = float(timings["embedding_build"])
+                infer_t = float(timings["inference"])
+                decode_t = float(timings["decode"])
+                measured_model_call_t = float(timings["total_model_call"])
+                model_other_t = max(
+                    0.0,
+                    measured_model_call_t - processor_t - embedding_t - infer_t - decode_t,
+                )
 
                 t0 = time.perf_counter()
                 pred_answer = extract_answer_fn(response, has_options=bool(sample.options))
@@ -267,9 +279,11 @@ def run() -> None:
                 st["total"] += sample_total_t
                 st["prompt_build"] += prompt_t
                 st["frame_sampling"] += frame_t
-                st["model_call_total"] += model_call_t
+                st["model_call_total"] += measured_model_call_t
+                st["processor"] += processor_t
                 st["embedding_build"] += embedding_t
                 st["inference"] += infer_t
+                st["decode"] += decode_t
                 st["model_other"] += model_other_t
                 st["answer_extract"] += answer_extract_t
                 st["score_update"] += score_update_t
@@ -297,9 +311,11 @@ def run() -> None:
                         "frame_sampling_method": FRAME_SAMPLING_METHOD,
                         "num_frames": NUM_FRAMES,
                         "selected_frame_count": len(frames),
+                        "processor_time_s": float(processor_t),
                         "embedding_build_time_s": float(embedding_t),
                         "inference_time_s": float(infer_t),
-                        "model_call_total_s": float(model_call_t),
+                        "decode_time_s": float(decode_t),
+                        "model_call_total_s": float(measured_model_call_t),
                         "model_other_time_s": float(model_other_t),
                         "prompt_build_time_s": float(prompt_t),
                         "frame_sampling_time_s": float(frame_t),
@@ -314,8 +330,9 @@ def run() -> None:
                 print(
                     f"[timing][sample] model={model_key}, task={task}, idx={idx}, sample_id={sample.sample_id}, "
                     f"total={sample_total_t:.4f}s, prompt_build={prompt_t:.4f}s, frame_sampling={frame_t:.4f}s, "
-                    f"model_call_total={model_call_t:.4f}s, embedding_build={embedding_t:.4f}s, "
-                    f"inference={infer_t:.4f}s, model_other={model_other_t:.4f}s, "
+                    f"model_call_total={measured_model_call_t:.4f}s, processor={processor_t:.4f}s, "
+                    f"embedding_build={embedding_t:.4f}s, inference={infer_t:.4f}s, decode={decode_t:.4f}s, "
+                    f"model_other={model_other_t:.4f}s, wall_model_call={model_call_t:.4f}s, "
                     f"answer_extract={answer_extract_t:.4f}s, score_update={score_update_t:.4f}s, "
                     f"is_correct={is_correct}, basic_match={basic_match}, has_think_end={has_think_end}, "
                     f"generated_tokens={generated_token_count}, hit_max_tokens={hit_max_tokens}",
@@ -342,8 +359,10 @@ def run() -> None:
                 f"avg_prompt_build={float(st['prompt_build']) / cnt:.4f}s, "
                 f"avg_frame_sampling={float(st['frame_sampling']) / cnt:.4f}s, "
                 f"avg_model_call_total={float(st['model_call_total']) / cnt:.4f}s, "
+                f"avg_processor={float(st['processor']) / cnt:.4f}s, "
                 f"avg_embedding_build={float(st['embedding_build']) / cnt:.4f}s, "
                 f"avg_inference={float(st['inference']) / cnt:.4f}s, "
+                f"avg_decode={float(st['decode']) / cnt:.4f}s, "
                 f"avg_model_other={float(st['model_other']) / cnt:.4f}s, "
                 f"avg_answer_extract={float(st['answer_extract']) / cnt:.4f}s, "
                 f"avg_score_update={float(st['score_update']) / cnt:.4f}s",
@@ -351,7 +370,7 @@ def run() -> None:
             )
 
     detail_csv = Path(__file__).resolve().parent / (
-        "006_test_qwen3_8b_thinking_vs_instruct_uniform_details_"
+        "007_test_qwen3_8b_thinking_vs_instruct_uniform_details_"
         + datetime.now().strftime("%Y%m%d_%H%M%S")
         + ".csv"
     )
@@ -372,8 +391,10 @@ def run() -> None:
             "frame_sampling_method",
             "num_frames",
             "selected_frame_count",
+            "processor_time_s",
             "embedding_build_time_s",
             "inference_time_s",
+            "decode_time_s",
             "model_call_total_s",
             "model_other_time_s",
             "prompt_build_time_s",
@@ -393,7 +414,7 @@ def run() -> None:
 def main() -> None:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = Path(__file__).resolve().parent / (
-        f"006_test_qwen3_8b_thinking_vs_instruct_uniform_{ts}.log"
+        f"007_test_qwen3_8b_thinking_vs_instruct_uniform_{ts}.log"
     )
     with open(log_file, "w", encoding="utf-8") as f:
         with redirect_stdout(f), redirect_stderr(f):
