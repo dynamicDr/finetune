@@ -77,12 +77,24 @@ def _compute_avg_embedding_build_time(results: dict) -> float:
     return sum(times) / len(times)
 
 
+def _compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int, float]:
+    if task_filter in {"mcq", "short", "medium", "long"}:
+        return int(results["total"]), float(results["correct"])
+    if task_filter == "numeric":
+        return int(results["mra_count"]), float(results["mra_sum"])
+    # all: 汇总离散正确数与数值题MRA分数
+    return int(results["total"] + results["mra_count"]), float(results["correct"] + results["mra_sum"])
+
+
 def log_to_csv(
     log_file: str,
     dataset: str,
     seed: int,
     task_filter: str,
     num_samples: int,
+    evaluated_samples: int,
+    correct_count: float,
+    accuracy_percent: float,
     num_frames: int,
     avg_accuracy: float,
     avg_inference_time: float,
@@ -106,6 +118,9 @@ def log_to_csv(
         seed,
         task_filter,
         num_samples,
+        evaluated_samples,
+        f"{correct_count:.6f}",
+        f"{accuracy_percent:.2f}",
         num_frames,
         f"{avg_accuracy:.2f}",
         f"{avg_inference_time:.3f}",
@@ -129,6 +144,9 @@ def log_to_csv(
                     "seed",
                     "task_filter",
                     "num_samples",
+                    "evaluated_samples",
+                    "correct_count",
+                    "accuracy_percent",
                     "num_frames",
                     "avg_accuracy",
                     "avg_inference_time",
@@ -561,6 +579,7 @@ def main():
         require_think_end_for_scoring=require_think_end_for_scoring,
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
+    evaluated_samples, correct_count = _compute_score_counts_for_csv(results, args.task_filter)
     avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)
     avg_embedding_build_time = _compute_avg_embedding_build_time(results)
     # 保留历史字段名 avg_total_time_hours，但语义改为整次实验总耗时（wall-clock）
@@ -571,6 +590,9 @@ def main():
         seed=args.seed,
         task_filter=args.task_filter,
         num_samples=len(samples),
+        evaluated_samples=evaluated_samples,
+        correct_count=correct_count,
+        accuracy_percent=avg_accuracy,
         num_frames=args.num_frames,
         avg_accuracy=avg_accuracy,
         avg_inference_time=avg_inference_time,
