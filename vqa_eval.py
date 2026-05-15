@@ -21,7 +21,15 @@ MODE_MAX_NEW_TOKENS = {
     "thinking": 4086,
     "instruct": 128,
 }
-PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"clip", "aks", "aks-blip", "aks-clip"}
+PREPROCESSED_CLIP_COMPATIBLE_METHODS = {
+    "clip",
+    "aks",
+    "aks-blip",
+    "aks-clip",
+    "uniform",
+    "random",
+    "siglip2",
+}
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
@@ -396,7 +404,7 @@ def main():
     if args.use_preprocessed_clip_frames:
         if args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
             raise ValueError(
-                "use_preprocessed_clip_frames 仅支持 clip/aks/aks-blip/aks-clip，"
+                "use_preprocessed_clip_frames 仅支持 clip/aks/aks-blip/aks-clip/uniform/random/siglip2，"
                 f"当前 frame_sampling_method={args.frame_sampling_method}"
             )
         print(
