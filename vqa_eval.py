@@ -373,13 +373,13 @@ def parse_args():
         "--preprocessed_clip_fps",
         type=float,
         default=1.0,
-        help="预处理目录命名中的 fps（默认对应 ~/dataset_preposcess/{dataset}/clip_1）。",
+        help="预处理目录命名中的 fps（默认对应 /userhome/cs3/duanty/dataset_preposcess/{dataset}/clip_1）。",
     )
     p.add_argument(
         "--preprocessed_clip_dir",
         type=str,
         default="",
-        help="预处理帧根目录；为空时自动使用 ~/dataset_preposcess/{dataset}/clip_{fps}。",
+        help="预处理帧根目录；为空时自动使用 /userhome/cs3/duanty/dataset_preposcess/{dataset}/clip_{fps}。",
     )
     return p.parse_args()
 
@@ -392,7 +392,7 @@ def main():
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
     default_preprocessed_dir = (
-        Path(os.path.expanduser("~/dataset_preposcess"))
+        Path("/userhome/cs3/duanty/dataset_preposcess")
         / args.dataset
         / f"clip_{args.preprocessed_clip_fps:g}"
     )

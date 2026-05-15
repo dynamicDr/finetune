@@ -119,7 +119,7 @@ def parse_args() -> argparse.Namespace:
         help="默认 0.0 表示不做二次切分，按所选 split 全量处理。",
     )
     p.add_argument("--use_train_split", action="store_true")
-    p.add_argument("--output_base", type=str, default="~/dataset_preposcess")
+    p.add_argument("--output_base", type=str, default="/userhome/cs3/duanty/dataset_preposcess")
     p.add_argument(
         "--overwrite",
         action=argparse.BooleanOptionalAction,
