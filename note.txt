@@ -756,7 +756,7 @@ python run.py --multirun \
     slurm=hgpu_batch
 
 
-【zzy在跑】直接开跑qwen+16的所有方法：
+【zzy在跑】直接开跑llava+16的所有方法：
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval.py \
@@ -769,6 +769,92 @@ python run.py --multirun \
     num_frames=16 \
     model=llava_onevision_qwen2_7b_ov_hf \
     task_filter=short,medium,long \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+目前问题：clip太慢了。决定所有数据集提前做粗采样。
+
+# 版本1：使用预存粗采样（默认读取 dataset/egoschema/clip_1）
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_8b_thinking \
+    task_filter=mcq \
+    num_frames=4 \
+    frame_sampling_method=clip \
+    use_preprocessed_clip_frames=true \
+    preprocessed_clip_fps=1 \
+    train_ratio=0.90 \
+    seed=42 \
+    slurm=hgpu_batch
+
+# 版本2：不使用预存粗采样（在线从原视频采样）
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=egoschema \
+    dataset_name=lmms-lab/EgoSchema \
+    dataset_config=Subset \
+    dataset_split=test \
+    video_dir=~/dataset/egoschema/videos/videos \
+    model=qwen3_8b_thinking \
+    task_filter=mcq \
+    num_frames=4 \
+    frame_sampling_method=clip \
+    train_ratio=0.9 \
+    seed=42 \
+    slurm=hgpu_batch
+
+粗采样：
+sbatch single_run.sh sandbox/010_preprocess_clip_frames.py --dataset videomme --dataset_name lmms-lab/Video-MME --no_dataset_config --dataset_split test --video_dir ~/dataset/Video-MME --fps 1
+
+sbatch single_run.sh sandbox/010_preprocess_clip_frames.py --dataset egoschema --dataset_name lmms-lab/EgoSchema --dataset_config Subset --dataset_split test --video_dir ~/dataset/egoschema/videos/videos --fps 1
+
+
+icassp回来了，继续工作，粗采样成功，试着跑一下测速。
+问题来了，怎么感觉优化速度不是很大？但好歹会快点，先用着吧。
+
+
+【dty在跑】直接开跑qwen+16frames的所有方法：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2\
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+【zzy在跑】直接开跑llava+16frames的所有方法：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2\
+    num_frames=16 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    task_filter=short,medium,long \
+    use_preprocessed_clip_frames=true \
     train_ratio=0.0 \
     seed=42 \
     slurm=hgpu_batch

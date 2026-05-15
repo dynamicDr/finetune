@@ -1,0 +1,2 @@
+timestamp,dataset,seed,task_filter,num_samples,evaluated_samples,correct_count,accuracy_percent,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,avg_embedding_build_time,avg_total_time_hours,over_max_tokens_count,model_name,lora_path,train_ratio,eval_split
+2026-05-02 19:03:32,egoschema,42,mcq,50,50,35.000000,70.00,4,70.00,11.258,clip,2.102544,0.000000,0.189039,0,Qwen/Qwen3-VL-8B-Thinking,,0.9,test

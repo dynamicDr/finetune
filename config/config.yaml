@@ -17,6 +17,9 @@ num_samples: all
 task_filter: mcq
 num_frames: 4
 frame_sampling_method: uniform
+use_preprocessed_clip_frames: false
+preprocessed_clip_fps: 1.0
+preprocessed_clip_dir: ""
 focus_blip_model_name: Salesforce/blip-itm-base-coco
 focus_blip_device: null
 focus_blip_batch_size: 16

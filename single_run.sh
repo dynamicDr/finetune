@@ -20,11 +20,12 @@
 # - 用 num_samples=2 做快速连通性验证（非完整评测）。
 #SBATCH --job-name=python_job
 #SBATCH --gres=gpu:1
-#SBATCH --partition=q-h800
+#SBATCH --partition=q-hgpu-batch
+#SBATCH --account=duanty
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=240G
+#SBATCH --mem=190G
 #SBATCH --mail-type=ALL
-#SBATCH --time=18:00:00
+#SBATCH --time=7-00:00:00
 #SBATCH --output=/dev/null    # ← 添加这行
 #SBATCH --error=/dev/null     # ← 添加这行
 
@@ -71,6 +72,9 @@ if [ $? -ne 0 ]; then
     echo "错误: 无法激活conda环境 finetune"
     exit 1
 fi
+
+# 确保可导入仓库内模块（如 data_loaders、frame_samplers 等）
+export PYTHONPATH="$(pwd):${PYTHONPATH}"
 
 # 检查Python脚本是否存在
 if [ ! -f "$PYTHON_SCRIPT" ]; then

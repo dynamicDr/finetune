@@ -25,12 +25,15 @@ def sample_video_frames(
     num_frames: int = 8,
     method: str = "uniform",
     random_seed: int | None = None,
+    sample_id: str | None = None,
     question: str | None = None,
     options: list[str] | None = None,
     answer: str | None = None,
     focus_blip_model_name: str = "Salesforce/blip-itm-large-coco",
     focus_blip_device: str | None = None,
     focus_blip_batch_size: int = 16,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
 ) -> list[Image.Image]:
     method = method.strip().lower()
     if method == "uniform":
@@ -38,16 +41,22 @@ def sample_video_frames(
             video_path,
             num_frames,
             random_seed=random_seed,
+            sample_id=sample_id,
             question=question,
             answer=answer,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
         )
     if method == "random":
         return sample_random_frames(
             video_path,
             num_frames,
             random_seed=random_seed,
+            sample_id=sample_id,
             question=question,
             answer=answer,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
         )
     if method == "focus":
         from .focus import sample_focus_frames
@@ -91,10 +100,13 @@ def sample_video_frames(
         return sample_clip_frames(
             video_path,
             num_frames,
+            sample_id=sample_id,
             question=question,
             options=options,
             answer=answer,
             random_seed=random_seed,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
         )
     if method == "siglip2":
         from .siglip2 import sample_siglip2_frames
@@ -102,10 +114,13 @@ def sample_video_frames(
         return sample_siglip2_frames(
             video_path,
             num_frames,
+            sample_id=sample_id,
             question=question,
             options=options,
             answer=answer,
             random_seed=random_seed,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
         )
     if method in {"aks", "aks-blip", "aks-clip"}:
         from .aks import sample_aks_frames
@@ -114,11 +129,14 @@ def sample_video_frames(
         return sample_aks_frames(
             video_path,
             num_frames,
+            sample_id=sample_id,
             question=question,
             options=options,
             answer=answer,
             random_seed=random_seed,
             extract_feature_model=aks_feature_model,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
         )
     raise ValueError(f"不支持的选帧方法: {method}，可选: {', '.join(SUPPORTED_FRAME_SAMPLERS)}")
 

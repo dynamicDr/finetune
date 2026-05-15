@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 import re
 import time
 from typing import Any
@@ -84,6 +87,59 @@ def _collect_candidate_frames(
     return frame_ids, images
 
 
+def _normalize_sample_id(sample_id: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", sample_id.strip())
+    return normalized.strip("_")
+
+
+def _load_preprocessed_candidate_frames(
+    preprocessed_clip_dir: str,
+    sample_id: str,
+) -> tuple[list[int], list[Image.Image]]:
+    normalized_sample_id = _normalize_sample_id(sample_id)
+    if not normalized_sample_id:
+        raise ValueError(f"sample_id 非法，无法定位预处理帧目录: {sample_id!r}")
+    sample_dir = Path(preprocessed_clip_dir).expanduser().resolve() / normalized_sample_id
+    if not sample_dir.is_dir():
+        raise FileNotFoundError(f"预处理帧目录不存在: {sample_dir}")
+
+    meta_path = sample_dir / "metadata.json"
+    frame_ids: list[int] = []
+    image_paths: list[Path] = []
+    if meta_path.is_file():
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        listed_ids = meta.get("frame_ids", [])
+        listed_files = meta.get("files", [])
+        if (
+            isinstance(listed_ids, list)
+            and isinstance(listed_files, list)
+            and len(listed_ids) == len(listed_files)
+        ):
+            for fid, rel_name in zip(listed_ids, listed_files):
+                p = sample_dir / str(rel_name)
+                if p.is_file():
+                    frame_ids.append(int(fid))
+                    image_paths.append(p)
+
+    if not image_paths:
+        for p in sorted(sample_dir.glob("frame_*.jpg")):
+            m = re.match(r"frame_(\d+)\.jpg$", p.name)
+            if not m:
+                continue
+            frame_ids.append(int(m.group(1)))
+            image_paths.append(p)
+
+    if not image_paths:
+        raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
+
+    images: list[Image.Image] = []
+    for p in image_paths:
+        with Image.open(p) as img:
+            images.append(img.convert("RGB"))
+    return frame_ids, images
+
+
 def _format_question_and_options(question: str | None, options: list[str] | None) -> str:
     q = (question or "").strip()
     if not q:
@@ -140,6 +196,7 @@ def sample_siglip2_frames(
     video_path: str,
     num_frames: int,
     random_seed: int | None = None,
+    sample_id: str | None = None,
     question: str | None = None,
     options: list[str] | None = None,
     answer: str | None = None,
@@ -148,6 +205,8 @@ def sample_siglip2_frames(
     device: str | None = None,
     batch_size: int = 16,
     min_frame_gap: int = 30,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
 ) -> list[Image.Image]:
     t0 = time.time()
     _ = random_seed
@@ -168,7 +227,21 @@ def sample_siglip2_frames(
     if min_frame_gap < 0:
         raise ValueError(f"min_frame_gap 必须 >= 0，当前为 {min_frame_gap}")
 
-    frame_ids, images = _collect_candidate_frames(video_path, sample_every=sample_every)
+    if use_preprocessed_clip_frames:
+        if not preprocessed_clip_dir:
+            raise ValueError("启用预处理 clip 帧时，必须提供 preprocessed_clip_dir。")
+        if not sample_id:
+            raise ValueError("启用预处理 clip 帧时，必须提供 sample_id。")
+        frame_ids, images = _load_preprocessed_candidate_frames(
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            sample_id=sample_id,
+        )
+        _log(
+            "loaded preprocessed candidate frames: "
+            f"sample_id={sample_id}, dir={os.path.expanduser(preprocessed_clip_dir)}, count={len(images)}"
+        )
+    else:
+        frame_ids, images = _collect_candidate_frames(video_path, sample_every=sample_every)
     if not images:
         _log("no candidate frames collected, return []")
         return []

@@ -100,6 +100,16 @@ def main(cfg: DictConfig) -> None:
             dataset_shared += ["--dataset_config", str(dataset_config)]
         if OmegaConf.select(cfg, "dataset_no_config", default=False):
             dataset_shared.append("--no_dataset_config")
+        if script_key == "vqa_eval.py":
+            use_preprocessed_clip_frames = OmegaConf.select(cfg, "use_preprocessed_clip_frames", default=False)
+            if bool(use_preprocessed_clip_frames):
+                dataset_shared.append("--use_preprocessed_clip_frames")
+            preprocessed_clip_fps = OmegaConf.select(cfg, "preprocessed_clip_fps", default=None)
+            if preprocessed_clip_fps is not None and str(preprocessed_clip_fps).strip() not in ("", "null", "None"):
+                dataset_shared += ["--preprocessed_clip_fps", str(float(preprocessed_clip_fps))]
+            preprocessed_clip_dir = OmegaConf.select(cfg, "preprocessed_clip_dir", default=None)
+            if preprocessed_clip_dir is not None and str(preprocessed_clip_dir).strip() not in ("", "null", "None"):
+                dataset_shared += ["--preprocessed_clip_dir", str(preprocessed_clip_dir)]
     model_snapshot = resolve_model_path(cfg.model.path)
 
     if script_key in ("train_vsibench.py", "vqa_train.py"):

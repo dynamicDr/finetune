@@ -21,6 +21,7 @@ MODE_MAX_NEW_TOKENS = {
     "thinking": 4086,
     "instruct": 128,
 }
+PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"clip", "aks", "aks-blip", "aks-clip"}
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
@@ -170,6 +171,8 @@ def evaluate_vqa(
     max_new_tokens: int = 2048,
     model_mode: str = "thinking",
     require_think_end_for_scoring: bool = True,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
 ) -> dict[str, Any]:
     results = {
         "correct": 0,
@@ -190,21 +193,39 @@ def evaluate_vqa(
 
         random_seed = (seed + i) if frame_sampling_method == "random" else None
         t0 = time.perf_counter()
-        frames = sample_video_frames(
-            video_path=sample.video_path,
-            num_frames=num_frames,
-            method=frame_sampling_method,
-            random_seed=random_seed,
-            question=sample.question,
-            options=sample.options,
-            answer=str(sample.answer),
-            focus_blip_model_name=focus_blip_model_name,
-            focus_blip_device=focus_blip_device,
-            focus_blip_batch_size=focus_blip_batch_size,
-        )
+        try:
+            frames = sample_video_frames(
+                video_path=sample.video_path,
+                num_frames=num_frames,
+                method=frame_sampling_method,
+                random_seed=random_seed,
+                sample_id=sample.sample_id,
+                question=sample.question,
+                options=sample.options,
+                answer=str(sample.answer),
+                focus_blip_model_name=focus_blip_model_name,
+                focus_blip_device=focus_blip_device,
+                focus_blip_batch_size=focus_blip_batch_size,
+                use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+                preprocessed_clip_dir=preprocessed_clip_dir,
+            )
+        except Exception as e:
+            if use_preprocessed_clip_frames:
+                raise RuntimeError(
+                    "预处理 clip 帧读取失败，实验已中断: "
+                    f"sample_id={sample.sample_id}, video_path={sample.video_path}, "
+                    f"preprocessed_dir={preprocessed_clip_dir}"
+                ) from e
+            raise
         frame_sampling_time = time.perf_counter() - t0
         results["frame_sampling_times"].append(frame_sampling_time)
         if not frames:
+            if use_preprocessed_clip_frames:
+                raise RuntimeError(
+                    "启用预处理 clip 帧后仍未拿到任何帧，实验已中断: "
+                    f"sample_id={sample.sample_id}, video_path={sample.video_path}, "
+                    f"preprocessed_dir={preprocessed_clip_dir}"
+                )
             warnings.warn(
                 f"样本无可用帧，已跳过: sample_id={sample.sample_id}, video_path={sample.video_path}",
                 RuntimeWarning,
@@ -335,6 +356,23 @@ def parse_args():
     p.add_argument("--log_file", type=str, default="vqa_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
+    p.add_argument(
+        "--use_preprocessed_clip_frames",
+        action="store_true",
+        help="启用后，clip/aks 会优先读取离线预处理帧。",
+    )
+    p.add_argument(
+        "--preprocessed_clip_fps",
+        type=float,
+        default=1.0,
+        help="预处理目录命名中的 fps（默认对应 ~/dataset_preposcess/{dataset}/clip_1）。",
+    )
+    p.add_argument(
+        "--preprocessed_clip_dir",
+        type=str,
+        default="",
+        help="预处理帧根目录；为空时自动使用 ~/dataset_preposcess/{dataset}/clip_{fps}。",
+    )
     return p.parse_args()
 
 
@@ -345,6 +383,27 @@ def main():
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
+    default_preprocessed_dir = (
+        Path(os.path.expanduser("~/dataset_preposcess"))
+        / args.dataset
+        / f"clip_{args.preprocessed_clip_fps:g}"
+    )
+    preprocessed_clip_dir = (
+        os.path.expanduser(args.preprocessed_clip_dir)
+        if args.preprocessed_clip_dir.strip()
+        else str(default_preprocessed_dir)
+    )
+    if args.use_preprocessed_clip_frames:
+        if args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
+            raise ValueError(
+                "use_preprocessed_clip_frames 仅支持 clip/aks/aks-blip/aks-clip，"
+                f"当前 frame_sampling_method={args.frame_sampling_method}"
+            )
+        print(
+            "[vqa_eval] 启用预处理 clip 帧: "
+            f"dir={preprocessed_clip_dir}, fps={args.preprocessed_clip_fps:g}",
+            flush=True,
+        )
 
     sample_count = None if args.num_samples.lower() == "all" else int(args.num_samples)
     loader = get_data_loader(
@@ -432,6 +491,8 @@ def main():
         max_new_tokens=effective_max_new_tokens,
         model_mode=model_mode,
         require_think_end_for_scoring=require_think_end_for_scoring,
+        use_preprocessed_clip_frames=args.use_preprocessed_clip_frames,
+        preprocessed_clip_dir=preprocessed_clip_dir,
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     evaluated_samples, correct_count = _compute_score_counts_for_csv(results, args.task_filter)

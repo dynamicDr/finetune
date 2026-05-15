@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import heapq
 import importlib.util
+import json
 import time
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -171,6 +173,56 @@ def _read_frame_rgb(cap: cv2.VideoCapture, frame_idx: int) -> np.ndarray | None:
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
 
+def _normalize_sample_id(sample_id: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", sample_id.strip())
+    return normalized.strip("_")
+
+
+def _load_preprocessed_candidate_frames(
+    preprocessed_clip_dir: str,
+    sample_id: str,
+) -> tuple[list[int], list[Image.Image]]:
+    normalized_sample_id = _normalize_sample_id(sample_id)
+    if not normalized_sample_id:
+        raise ValueError(f"sample_id 非法，无法定位预处理帧目录: {sample_id!r}")
+    sample_dir = Path(preprocessed_clip_dir).expanduser().resolve() / normalized_sample_id
+    if not sample_dir.is_dir():
+        raise FileNotFoundError(f"预处理帧目录不存在: {sample_dir}")
+
+    meta_path = sample_dir / "metadata.json"
+    frame_ids: list[int] = []
+    image_paths: list[Path] = []
+
+    if meta_path.is_file():
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        listed_ids = meta.get("frame_ids", [])
+        listed_files = meta.get("files", [])
+        if isinstance(listed_ids, list) and isinstance(listed_files, list) and len(listed_ids) == len(listed_files):
+            for fid, rel_name in zip(listed_ids, listed_files):
+                p = sample_dir / str(rel_name)
+                if p.is_file():
+                    frame_ids.append(int(fid))
+                    image_paths.append(p)
+
+    if not image_paths:
+        for p in sorted(sample_dir.glob("frame_*.jpg")):
+            m = re.match(r"frame_(\d+)\.jpg$", p.name)
+            if not m:
+                continue
+            frame_ids.append(int(m.group(1)))
+            image_paths.append(p)
+
+    if not image_paths:
+        raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
+
+    images: list[Image.Image] = []
+    for p in image_paths:
+        with Image.open(p) as img:
+            images.append(img.convert("RGB"))
+    return frame_ids, images
+
+
 def meanstd(
     len_scores: int,
     dic_scores: list[dict[str, Any]],
@@ -254,29 +306,19 @@ def _extract_blip_itm_score(outputs, torch) -> float:
 
 def _extract_scores(
     video_path: str,
+    sample_id: str | None,
     question: str | None,
     options: list[str] | None,
     answer: str | None,
     extract_feature_model: str,
     device: str,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
 ) -> tuple[list[float], list[int]]:
     try:
         import torch
     except ImportError as exc:
         raise ImportError("AKS 依赖缺失：需要安装 torch。") from exc
-
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"无法打开视频文件: {video_path}")
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    step = max(1, int(fps) if fps and fps > 0 else 1)
-    frame_nums = int(total_frames / step)
-    _log(
-        f"video stats: total_frames={total_frames}, fps={fps:.4f}, "
-        f"sampling_step={step}, candidate_count={frame_nums}"
-    )
 
     query = _compose_query(
         question=question,
@@ -288,15 +330,51 @@ def _extract_scores(
     _log(f"extract_feature_model={extract_feature_model}, query={preview_query}")
     scores: list[float] = []
     frame_num: list[int] = []
+    candidate_frame_ids: list[int] | None = None
+    candidate_images: list[Image.Image] | None = None
+
+    if use_preprocessed_clip_frames:
+        if not preprocessed_clip_dir:
+            raise ValueError("启用预处理 clip 帧时，必须提供 preprocessed_clip_dir。")
+        if not sample_id:
+            raise ValueError("启用预处理 clip 帧时，必须提供 sample_id。")
+        candidate_frame_ids, candidate_images = _load_preprocessed_candidate_frames(
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            sample_id=sample_id,
+        )
+        _log(
+            "loaded preprocessed candidate frames: "
+            f"sample_id={sample_id}, count={len(candidate_images)}"
+        )
+        if not candidate_images:
+            return scores, frame_num
+    else:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise RuntimeError(f"无法打开视频文件: {video_path}")
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        step = max(1, int(fps) if fps and fps > 0 else 1)
+        frame_nums = int(total_frames / step)
+        _log(
+            f"video stats: total_frames={total_frames}, fps={fps:.4f}, "
+            f"sampling_step={step}, candidate_count={frame_nums}"
+        )
 
     if extract_feature_model == "blip":
         model, processor = _load_blip(device=device)
-        for j in range(frame_nums):
-            idx = j * step
-            raw = _read_frame_rgb(cap, idx)
-            if raw is None:
-                continue
-            image = Image.fromarray(raw)
+        if candidate_images is not None and candidate_frame_ids is not None:
+            iterator = zip(candidate_frame_ids, candidate_images)
+        else:
+            iterator = []
+            if frame_nums > 0:
+                iterator = (
+                    (j * step, Image.fromarray(raw))
+                    for j in range(frame_nums)
+                    if (raw := _read_frame_rgb(cap, j * step)) is not None
+                )
+        for idx, image in iterator:
             inputs = processor(
                 images=image,
                 text=query,
@@ -318,12 +396,17 @@ def _extract_scores(
         ).to(device)
         with torch.no_grad():
             text_features = _to_feature_tensor(model.get_text_features(**text_inputs), torch)
-        for j in range(frame_nums):
-            idx = j * step
-            raw = _read_frame_rgb(cap, idx)
-            if raw is None:
-                continue
-            image = Image.fromarray(raw)
+        if candidate_images is not None and candidate_frame_ids is not None:
+            iterator = zip(candidate_frame_ids, candidate_images)
+        else:
+            iterator = []
+            if frame_nums > 0:
+                iterator = (
+                    (j * step, Image.fromarray(raw))
+                    for j in range(frame_nums)
+                    if (raw := _read_frame_rgb(cap, j * step)) is not None
+                )
+        for idx, image in iterator:
             image_inputs = processor(images=image, return_tensors="pt").to(device)
             with torch.no_grad():
                 image_features = _to_feature_tensor(model.get_image_features(**image_inputs), torch)
@@ -335,12 +418,17 @@ def _extract_scores(
         inputs_text = processor(text=query, return_tensors="pt", padding=True, truncation=True).to(device)
         with torch.no_grad():
             text_features = _to_feature_tensor(model.get_text_features(**inputs_text), torch)
-        for j in range(frame_nums):
-            idx = j * step
-            raw = _read_frame_rgb(cap, idx)
-            if raw is None:
-                continue
-            image = Image.fromarray(raw)
+        if candidate_images is not None and candidate_frame_ids is not None:
+            iterator = zip(candidate_frame_ids, candidate_images)
+        else:
+            iterator = []
+            if frame_nums > 0:
+                iterator = (
+                    (j * step, Image.fromarray(raw))
+                    for j in range(frame_nums)
+                    if (raw := _read_frame_rgb(cap, j * step)) is not None
+                )
+        for idx, image in iterator:
             inputs_image = processor(images=image, return_tensors="pt", padding=True).to(device)
             with torch.no_grad():
                 image_features = _to_feature_tensor(model.get_image_features(**inputs_image), torch)
@@ -350,12 +438,17 @@ def _extract_scores(
     elif extract_feature_model == "sevila":
         model, vis_processors, text_processors = _load_sevila(device=device)
         txt = text_processors["eval"](query)
-        for j in range(frame_nums):
-            idx = j * step
-            raw = _read_frame_rgb(cap, idx)
-            if raw is None:
-                continue
-            image = Image.fromarray(raw)
+        if candidate_images is not None and candidate_frame_ids is not None:
+            iterator = zip(candidate_frame_ids, candidate_images)
+        else:
+            iterator = []
+            if frame_nums > 0:
+                iterator = (
+                    (j * step, Image.fromarray(raw))
+                    for j in range(frame_nums)
+                    if (raw := _read_frame_rgb(cap, j * step)) is not None
+                )
+        for idx, image in iterator:
             img = vis_processors["eval"](image).unsqueeze(0).unsqueeze(0).to(device)
             samples = {"video": img, "loc_input": txt}
             with torch.no_grad():
@@ -367,7 +460,8 @@ def _extract_scores(
             f"AKS 不支持的 extract_feature_model: {extract_feature_model}，可选 blip/blip2/clip/sevila"
         )
 
-    cap.release()
+    if not use_preprocessed_clip_frames:
+        cap.release()
     if scores:
         arr = np.asarray(scores, dtype=np.float32)
         _log(
@@ -434,6 +528,7 @@ def sample_aks_frames(
     video_path: str,
     num_frames: int,
     random_seed: int | None = None,
+    sample_id: str | None = None,
     question: str | None = None,
     options: list[str] | None = None,
     answer: str | None = None,
@@ -443,6 +538,8 @@ def sample_aks_frames(
     t1: float = 0.8,
     t2: float = -100.0,
     all_depth: int = 5,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
 ) -> list[Image.Image]:
     t0 = time.time()
     _ = random_seed
@@ -461,11 +558,14 @@ def sample_aks_frames(
     _log(f"resolved device={resolved_device}")
     scores, frame_num = _extract_scores(
         video_path=video_path,
+        sample_id=sample_id,
         question=question,
         options=options,
         answer=answer,
         extract_feature_model=extract_feature_model,
         device=resolved_device,
+        use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+        preprocessed_clip_dir=preprocessed_clip_dir,
     )
 
     if not scores or not frame_num:
