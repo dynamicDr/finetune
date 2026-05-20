@@ -29,6 +29,7 @@ PREPROCESSED_CLIP_COMPATIBLE_METHODS = {
     "uniform",
     "random",
     "siglip2",
+    "qframe",
 }
 
 
@@ -339,6 +340,7 @@ def parse_args():
             "videoagent",
             "clip",
             "siglip2",
+            "qframe",
             "aks",
             "aks-blip",
             "aks-clip",
@@ -404,7 +406,7 @@ def main():
     if args.use_preprocessed_clip_frames:
         if args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
             raise ValueError(
-                "use_preprocessed_clip_frames 仅支持 clip/aks/aks-blip/aks-clip/uniform/random/siglip2，"
+                "use_preprocessed_clip_frames 仅支持 clip/aks/aks-blip/aks-clip/uniform/random/siglip2/qframe，"
                 f"当前 frame_sampling_method={args.frame_sampling_method}"
             )
         print(

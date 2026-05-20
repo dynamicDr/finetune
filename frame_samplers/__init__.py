@@ -14,6 +14,7 @@ SUPPORTED_FRAME_SAMPLERS = (
     "videoagent",
     "clip",
     "siglip2",
+    "qframe",
     "aks",
     "aks-blip",
     "aks-clip",
@@ -112,6 +113,20 @@ def sample_video_frames(
         from .siglip2 import sample_siglip2_frames
 
         return sample_siglip2_frames(
+            video_path,
+            num_frames,
+            sample_id=sample_id,
+            question=question,
+            options=options,
+            answer=answer,
+            random_seed=random_seed,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+        )
+    if method == "qframe":
+        from .qframe import sample_qframe_frames
+
+        return sample_qframe_frames(
             video_path,
             num_frames,
             sample_id=sample_id,

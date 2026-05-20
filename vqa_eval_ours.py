@@ -22,6 +22,9 @@ MODE_MAX_NEW_TOKENS = {
     "thinking": 4086,
     "instruct": 128,
 }
+PREPROCESSED_CLIP_COMPATIBLE_METHODS = {
+    "ours",
+}
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
@@ -77,6 +80,13 @@ def _compute_avg_embedding_build_time(results: dict) -> float:
     return sum(times) / len(times)
 
 
+def _compute_avg_selected_frame_count(results: dict) -> float:
+    counts = results.get("selected_frame_counts", [])
+    if not counts:
+        return 0.0
+    return float(sum(counts) / len(counts))
+
+
 def _compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int, float]:
     if task_filter in {"mcq", "short", "medium", "long"}:
         return int(results["total"]), float(results["correct"])
@@ -101,12 +111,21 @@ def log_to_csv(
     frame_sampling_method: str,
     avg_frame_sampling_time: float,
     avg_embedding_build_time: float,
+    avg_selected_frame_count: float,
     avg_total_time_hours: float,
     over_max_tokens_count: int,
     model_name: str,
     lora_path: str,
     train_ratio: float,
     use_train_split: bool,
+    ours_clip_model_id: str,
+    ours_clip_batch_size: int,
+    use_preprocessed_clip_frames: bool,
+    preprocessed_clip_fps: float,
+    enable_early_stop: bool,
+    early_stop_window: int,
+    early_stop_conf_threshold: float,
+    frame_increment: int,
 ):
     Path(log_file).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
     file_exists = os.path.exists(log_file)
@@ -127,12 +146,21 @@ def log_to_csv(
         frame_sampling_method,
         f"{avg_frame_sampling_time:.6f}",
         f"{avg_embedding_build_time:.6f}",
+        f"{avg_selected_frame_count:.6f}",
         f"{avg_total_time_hours:.6f}",
         over_max_tokens_count,
         model_name,
         lora_path,
         train_ratio,
         split_name,
+        ours_clip_model_id,
+        ours_clip_batch_size,
+        use_preprocessed_clip_frames,
+        preprocessed_clip_fps,
+        enable_early_stop,
+        early_stop_window,
+        early_stop_conf_threshold,
+        frame_increment,
     ]
     with open(log_file, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -153,12 +181,21 @@ def log_to_csv(
                     "frame_sampling_method",
                     "avg_frame_sampling_time",
                     "avg_embedding_build_time",
+                    "avg_selected_frame_count",
                     "avg_total_time_hours",
                     "over_max_tokens_count",
                     "model_name",
                     "lora_path",
                     "train_ratio",
                     "eval_split",
+                    "ours_clip_model_id",
+                    "ours_clip_batch_size",
+                    "use_preprocessed_clip_frames",
+                    "preprocessed_clip_fps",
+                    "enable_early_stop",
+                    "early_stop_window",
+                    "early_stop_conf_threshold",
+                    "frame_increment",
                 ]
             )
         writer.writerow(row_data)
@@ -181,6 +218,12 @@ def evaluate_vqa(
     ours_clip_batch_size: int = 16,
     model_mode: str = "thinking",
     require_think_end_for_scoring: bool = True,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
+    enable_early_stop: bool = True,
+    early_stop_window: int = 3,
+    early_stop_conf_threshold: float = 0.9,
+    frame_increment: int = 1,
 ) -> dict[str, Any]:
     results = {
         "correct": 0,
@@ -190,6 +233,7 @@ def evaluate_vqa(
         "inference_times": [],
         "frame_sampling_times": [],
         "embedding_build_times": [],
+        "selected_frame_counts": [],
         "over_max_tokens_count": 0,
         "missing_think_end_count": 0,
     }
@@ -209,8 +253,9 @@ def evaluate_vqa(
             "progress_update": 0.0,
         }
 
-        print(f"==============={sample.sample_id}=============", flush=True)
-        print(f"ground truth: {sample.answer}", flush=True)
+        print(f"问题: {sample.question}", flush=True)
+        print(f"选项: {sample.options if sample.options is not None else '无'}", flush=True)
+        print(f"正确答案: {sample.answer}", flush=True)
 
         t_step = time.perf_counter()
         prompt = build_user_text(sample.question, sample.options)
@@ -224,14 +269,10 @@ def evaluate_vqa(
         hit_max_tokens = False
 
         if frame_sampling_method == "ours":
-            print(
-                f"[vqa_eval_emb][ours] sample_id={sample.sample_id} 开始粗采样+CLIP排序, "
-                f"video={sample.video_path}, top_m={num_frames}",
-                flush=True,
-            )
             t_step = time.perf_counter()
             ranked_frames = rank_frames_by_clip(
                 video_path=sample.video_path,
+                sample_id=sample.sample_id,
                 question=sample.question,
                 options=sample.options,
                 answer=str(sample.answer),
@@ -239,15 +280,12 @@ def evaluate_vqa(
                 clip_device=ours_clip_device,
                 clip_batch_size=ours_clip_batch_size,
                 max_frames=num_frames,
+                use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+                preprocessed_clip_dir=preprocessed_clip_dir,
             )
             frame_sampling_time = time.perf_counter() - t_step
             results["frame_sampling_times"].append(frame_sampling_time)
             step_times["frame_sampling"] += frame_sampling_time
-            print(
-                f"[vqa_eval_emb][ours] sample_id={sample.sample_id} CLIP排序完成, "
-                f"候选top帧数={len(ranked_frames)}, frame_sampling_time={frame_sampling_time:.4f}s",
-                flush=True,
-            )
 
             t_step = time.perf_counter()
             iterative_out = iterative_inference_with_cache(
@@ -262,6 +300,11 @@ def evaluate_vqa(
                 )[2],
                 has_options=bool(sample.options),
                 max_new_tokens=max_new_tokens,
+                model_mode=model_mode,
+                enable_early_stop=enable_early_stop,
+                early_stop_window=early_stop_window,
+                early_stop_conf_threshold=early_stop_conf_threshold,
+                frame_increment=frame_increment,
             )
             step_times["model_call"] += time.perf_counter() - t_step
 
@@ -271,18 +314,11 @@ def evaluate_vqa(
             embedding_build_time = iterative_out["embedding_build_time"]
             generated_token_count = int(iterative_out["generated_token_count"])
             hit_max_tokens = bool(iterative_out["hit_max_tokens"])
-            print(
-                f"[vqa_eval_emb][ours] sample_id={sample.sample_id} 迭代结束: "
-                f"rounds_used={iterative_out['rounds_used']}, "
-                f"answer={pred_answer}, answer_prob={iterative_out['answer_confidence']:.6f}, "
-                f"answer_logprob={iterative_out['answer_logprob']:.6f}, "
-                f"cache_size={iterative_out['cache_size']}, "
-                f"cache_hit={iterative_out['cache_hits']}, cache_miss={iterative_out['cache_misses']}, "
-                f"inference_time_total={inference_time:.4f}s, "
-                f"embedding_build_time_total={embedding_build_time:.4f}s, "
-                f"generated_tokens={generated_token_count}, limit={max_new_tokens}, hit_limit={hit_max_tokens}",
-                flush=True,
-            )
+            round_details = iterative_out.get("round_details", [])
+            if round_details:
+                results["selected_frame_counts"].append(int(round_details[-1].get("frame_count", 0)))
+            else:
+                results["selected_frame_counts"].append(int(iterative_out.get("rounds_used", 0)))
         else:
             random_seed = (seed + i) if frame_sampling_method == "random" else None
             t_step = time.perf_counter()
@@ -307,16 +343,8 @@ def evaluate_vqa(
                     RuntimeWarning,
                     stacklevel=1,
                 )
-                sample_total_time = time.perf_counter() - sample_total_start
-                print(
-                    f"[vqa_eval_emb][timing] round={i + 1}, sample_id={sample.sample_id}, "
-                    f"total={sample_total_time:.4f}s, prompt_build={step_times['prompt_build']:.4f}s, "
-                    f"frame_sampling={step_times['frame_sampling']:.4f}s, model_call={step_times['model_call']:.4f}s, "
-                    f"answer_extract={step_times['answer_extract']:.4f}s, score_update={step_times['score_update']:.4f}s, "
-                    f"progress_update={step_times['progress_update']:.4f}s",
-                    flush=True,
-                )
                 continue
+            results["selected_frame_counts"].append(len(frames))
             try:
                 t_step = time.perf_counter()
                 response, inference_time, embedding_build_time, generated_token_count, hit_max_tokens = (
@@ -335,15 +363,6 @@ def evaluate_vqa(
                     RuntimeWarning,
                     stacklevel=1,
                 )
-                sample_total_time = time.perf_counter() - sample_total_start
-                print(
-                    f"[vqa_eval_emb][timing] round={i + 1}, sample_id={sample.sample_id}, "
-                    f"total={sample_total_time:.4f}s, prompt_build={step_times['prompt_build']:.4f}s, "
-                    f"frame_sampling={step_times['frame_sampling']:.4f}s, model_call={step_times['model_call']:.4f}s, "
-                    f"answer_extract={step_times['answer_extract']:.4f}s, score_update={step_times['score_update']:.4f}s, "
-                    f"progress_update={step_times['progress_update']:.4f}s",
-                    flush=True,
-                )
                 continue
 
         t_step = time.perf_counter()
@@ -354,10 +373,6 @@ def evaluate_vqa(
         )
         pred_answer = parsed_pred_answer
         step_times["answer_extract"] += time.perf_counter() - t_step
-        print(f"[vqa_eval_emb] sample_id={sample.sample_id} RAW:\n{response}", flush=True)
-        print(f"[vqa_eval_emb] sample_id={sample.sample_id} COT:\n{cot_text}", flush=True)
-        print(f"[vqa_eval_emb] sample_id={sample.sample_id} ANS:\n{ans_text}", flush=True)
-        print(f"[vqa_eval_emb] sample_id={sample.sample_id} PRED:\n{pred_answer}", flush=True)
 
         t_step = time.perf_counter()
         if hit_max_tokens:
@@ -403,23 +418,9 @@ def evaluate_vqa(
         )
         step_times["progress_update"] += time.perf_counter() - t_step
 
-        sample_total_time = time.perf_counter() - sample_total_start
-        print(
-            f"[vqa_eval_emb][timing] round={i + 1}, sample_id={sample.sample_id}, "
-            f"total={sample_total_time:.4f}s, prompt_build={step_times['prompt_build']:.4f}s, "
-            f"frame_sampling={step_times['frame_sampling']:.4f}s, model_call={step_times['model_call']:.4f}s, "
-            f"answer_extract={step_times['answer_extract']:.4f}s, score_update={step_times['score_update']:.4f}s, "
-            f"progress_update={step_times['progress_update']:.4f}s",
-            flush=True,
-        )
-        if step_times["model_call"] > 0:
-            model_other_time = max(0.0, step_times["model_call"] - embedding_build_time - inference_time)
-            print(
-                f"[vqa_eval_emb][timing][model_breakdown] sample_id={sample.sample_id}, "
-                f"model_call_total={step_times['model_call']:.4f}s, embedding_build={embedding_build_time:.4f}s, "
-                f"inference={inference_time:.4f}s, other={model_other_time:.4f}s",
-                flush=True,
-            )
+        _ = sample_total_start
+        _ = cot_text
+        _ = ans_text
 
     return results
 
@@ -474,6 +475,30 @@ def parse_args():
     p.add_argument("--ours_clip_device", type=str, default=None)
     p.add_argument("--ours_clip_batch_size", type=int, default=16)
     p.add_argument(
+        "--enable_early_stop",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="是否启用 ours 迭代早停机制（默认启用）。",
+    )
+    p.add_argument(
+        "--early_stop_window",
+        type=int,
+        default=3,
+        help="连续满足条件多少轮后触发早停。",
+    )
+    p.add_argument(
+        "--early_stop_conf_threshold",
+        type=float,
+        default=0.9,
+        help="早停置信度阈值：所选答案的 option_prob 必须大于该值。",
+    )
+    p.add_argument(
+        "--frame_increment",
+        type=int,
+        default=1,
+        help="ours 迭代时每轮新增帧数（默认1，即 top-1, top-2, ...）。",
+    )
+    p.add_argument(
         "--model_mode_config",
         type=str,
         default="config/model_response_modes.json",
@@ -482,6 +507,23 @@ def parse_args():
     p.add_argument("--log_file", type=str, default="vqa_embedding_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
+    p.add_argument(
+        "--use_preprocessed_clip_frames",
+        action="store_true",
+        help="启用后，ours 在 CLIP 排序阶段优先读取离线预处理帧。",
+    )
+    p.add_argument(
+        "--preprocessed_clip_fps",
+        type=float,
+        default=1.0,
+        help="预处理目录命名中的 fps（默认对应 /userhome/cs3/duanty/dataset_preposcess/{dataset}/clip_1）。",
+    )
+    p.add_argument(
+        "--preprocessed_clip_dir",
+        type=str,
+        default="",
+        help="预处理帧根目录；为空时自动使用 /userhome/cs3/duanty/dataset_preposcess/{dataset}/clip_{fps}。",
+    )
     return p.parse_args()
 
 
@@ -492,6 +534,23 @@ def main():
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
+    default_preprocessed_dir = (
+        Path("/userhome/cs3/duanty/dataset_preposcess")
+        / args.dataset
+        / f"clip_{args.preprocessed_clip_fps:g}"
+    )
+    preprocessed_clip_dir = (
+        os.path.expanduser(args.preprocessed_clip_dir)
+        if args.preprocessed_clip_dir.strip()
+        else str(default_preprocessed_dir)
+    )
+    if args.use_preprocessed_clip_frames:
+        if args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
+            raise ValueError(
+                "use_preprocessed_clip_frames 仅支持 ours，"
+                f"当前 frame_sampling_method={args.frame_sampling_method}"
+            )
+        _ = preprocessed_clip_dir
 
     sample_count = None if args.num_samples.lower() == "all" else int(args.num_samples)
     loader = get_data_loader(
@@ -546,18 +605,8 @@ def main():
             "模型模式识别失败，请在 model_response_modes.json 中添加精确键。"
             f" tried={model_identifier_candidates}"
         ) from last_error
-    print(
-        f"[vqa_eval_emb] 模型模式识别: model_mode={model_mode}, "
-        f"require_think_end_for_scoring={require_think_end_for_scoring}, "
-        f"matched_rule={matched_rule}",
-        flush=True,
-    )
+    _ = matched_rule
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
-    print(
-        f"[vqa_eval_emb] max_new_tokens 已按模式固定: mode={model_mode}, "
-        f"effective_max_new_tokens={effective_max_new_tokens}",
-        flush=True,
-    )
 
     model, processor = load_model_and_processor(
         resolved_model_path,
@@ -582,11 +631,18 @@ def main():
         ours_clip_batch_size=args.ours_clip_batch_size,
         model_mode=model_mode,
         require_think_end_for_scoring=require_think_end_for_scoring,
+        use_preprocessed_clip_frames=args.use_preprocessed_clip_frames,
+        preprocessed_clip_dir=preprocessed_clip_dir,
+        enable_early_stop=args.enable_early_stop,
+        early_stop_window=args.early_stop_window,
+        early_stop_conf_threshold=args.early_stop_conf_threshold,
+        frame_increment=args.frame_increment,
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     evaluated_samples, correct_count = _compute_score_counts_for_csv(results, args.task_filter)
     avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)
     avg_embedding_build_time = _compute_avg_embedding_build_time(results)
+    avg_selected_frame_count = _compute_avg_selected_frame_count(results)
     # 保留历史字段名 avg_total_time_hours，但语义改为整次实验总耗时（wall-clock）
     avg_total_time_hours = (time.perf_counter() - experiment_start_time) / 3600.0
     log_to_csv(
@@ -604,19 +660,21 @@ def main():
         frame_sampling_method=args.frame_sampling_method,
         avg_frame_sampling_time=avg_frame_sampling_time,
         avg_embedding_build_time=avg_embedding_build_time,
+        avg_selected_frame_count=avg_selected_frame_count,
         avg_total_time_hours=avg_total_time_hours,
         over_max_tokens_count=results["over_max_tokens_count"],
         model_name=model_name,
         lora_path=lora_path,
         train_ratio=args.train_ratio,
         use_train_split=args.use_train_split,
-    )
-    print(
-        f"评估完成：样本 {len(samples)}, Accuracy {avg_accuracy:.2f}%, "
-        f"AvgInfer {avg_inference_time:.3f}s, AvgFrameSampling {avg_frame_sampling_time:.6f}s, "
-        f"AvgEmbedBuild {avg_embedding_build_time:.6f}s, AvgTotal {avg_total_time_hours:.6f}h, "
-        f"OverLimit {results['over_max_tokens_count']}, "
-        f"MissingThinkEnd {results['missing_think_end_count']}"
+        ours_clip_model_id=args.ours_clip_model_id,
+        ours_clip_batch_size=args.ours_clip_batch_size,
+        use_preprocessed_clip_frames=args.use_preprocessed_clip_frames,
+        preprocessed_clip_fps=args.preprocessed_clip_fps,
+        enable_early_stop=args.enable_early_stop,
+        early_stop_window=args.early_stop_window,
+        early_stop_conf_threshold=args.early_stop_conf_threshold,
+        frame_increment=args.frame_increment,
     )
 
 

@@ -23,6 +23,11 @@ preprocessed_clip_dir: ""
 focus_blip_model_name: Salesforce/blip-itm-base-coco
 focus_blip_device: null
 focus_blip_batch_size: 16
+# vqa_eval_ours.py 早停与迭代步长超参数
+enable_early_stop: true
+early_stop_window: 3
+early_stop_conf_threshold: 0.9
+frame_increment: 1
 # 与 eval_vsibench / train_vsibench 划分一致时可覆盖
 train_ratio: 0.8
 

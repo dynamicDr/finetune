@@ -63,7 +63,7 @@ LoRA 微调输出目录（`outputs/vsibench_train/.../<task>_frames<num>/`）文
    - 大模型用单卡 H800：  
     - python run.py script=vqa_eval.py dataset=vsibench --hydra/launcher=submitit_slurm model=qwen3_30b_a3b_instruct frame_sampling_method=uniform slurm=h800  
    - 单纯跑一个脚本在服务器：
-      sbatch single_run.sh benchmark_vl_vision_vs_lm_time.py
+      bash single_run.sh --submit --slurm-config hgpu_batch sandbox/011_test_videomme_short_random_confidence.py
 3. SLURM 并行多任务（多模型、多任务、多帧数一起扫）  
    - 并行扫参，小模型用默认 RTX4090：  
      - python run.py script=vqa_eval.py dataset=vsibench --multirun --hydra/launcher=submitit_slurm \
@@ -870,3 +870,64 @@ python run.py --multirun \
 你应该：1，修改vqa_eval_emb.py作为ours方法的入口。2，创建一个新的ours.py在data_loaders中。3，代码风格不要过度封装，尽可能简单清晰。不做退化，如果有错误直接报错。4，代码中一定要有print，每步尽可能多print关键信息，如每个答案的概率、每次大模型输出等。
 
 明天我要重新评估一下这个idea怎么样，所有流程和应该做的任务。
+
+5/18：
+our的测评脚本：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=ours \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+同步测试新basleine qframe
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=qframe\
+    num_frames=16,32 \
+    model=qwen3_8b_instruct \
+    task_filter=short \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+尝试ours不同的hyperparameter:
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=ours \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0 \
+    seed=42 \
+    slurm=hgpu_batch \
+    enable_early_stop=true \
+    early_stop_conf_threshold=0.9 \
+    early_stop_window=2,3,4,5 \
+    frame_increment=1,2,4

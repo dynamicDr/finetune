@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -66,9 +68,7 @@ def _load_clip(model_id: str, device: str | None):
     resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     cache_key = f"{model_id}::{resolved_device}"
     if cache_key in _CLIP_CACHE:
-        _log(f"复用 CLIP 缓存: model={model_id}, device={resolved_device}")
         return _CLIP_CACHE[cache_key]
-    _log(f"加载 CLIP: model={model_id}, device={resolved_device}")
     processor = AutoProcessor.from_pretrained(model_id)
     model = AutoModel.from_pretrained(model_id).to(resolved_device).eval()
     _CLIP_CACHE[cache_key] = (processor, model, resolved_device)
@@ -85,13 +85,8 @@ def _collect_candidate_frames(video_path: str, sample_every: int) -> tuple[list[
             cap.release()
             raise RuntimeError(f"无法读取视频 FPS，不能按 1fps 粗采样: {video_path}")
         resolved_sample_every = max(1, int(round(video_fps)))
-        _log(
-            "sample_every<=0，启用默认1fps粗采样: "
-            f"video_fps={video_fps:.4f}, resolved_sample_every={resolved_sample_every}"
-        )
     else:
         resolved_sample_every = sample_every
-        _log(f"使用指定粗采样步长: sample_every={resolved_sample_every}")
     frame_ids: list[int] = []
     images: list[Image.Image] = []
     idx = 0
@@ -107,9 +102,55 @@ def _collect_candidate_frames(video_path: str, sample_every: int) -> tuple[list[
             idx += 1
     finally:
         cap.release()
-    _log(f"粗采样完成: 候选帧数={len(images)}, sample_every={resolved_sample_every}")
     if not images:
         raise RuntimeError(f"视频无可用候选帧: {video_path}")
+    return frame_ids, images
+
+
+def _normalize_sample_id(sample_id: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", sample_id.strip())
+    return normalized.strip("_")
+
+
+def _load_preprocessed_candidate_frames(
+    preprocessed_clip_dir: str,
+    sample_id: str,
+) -> tuple[list[int], list[Image.Image]]:
+    normalized_sample_id = _normalize_sample_id(sample_id)
+    if not normalized_sample_id:
+        raise ValueError(f"sample_id 非法，无法定位预处理帧目录: {sample_id!r}")
+    sample_dir = Path(preprocessed_clip_dir).expanduser().resolve() / normalized_sample_id
+    if not sample_dir.is_dir():
+        raise FileNotFoundError(f"预处理帧目录不存在: {sample_dir}")
+
+    meta_path = sample_dir / "metadata.json"
+    frame_ids: list[int] = []
+    image_paths: list[Path] = []
+    if meta_path.is_file():
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        listed_ids = meta.get("frame_ids", [])
+        listed_files = meta.get("files", [])
+        if isinstance(listed_ids, list) and isinstance(listed_files, list) and len(listed_ids) == len(listed_files):
+            for fid, rel_name in zip(listed_ids, listed_files):
+                p = sample_dir / str(rel_name)
+                if p.is_file():
+                    frame_ids.append(int(fid))
+                    image_paths.append(p)
+    if not image_paths:
+        for p in sorted(sample_dir.glob("frame_*.jpg")):
+            m = re.match(r"frame_(\d+)\.jpg$", p.name)
+            if not m:
+                continue
+            frame_ids.append(int(m.group(1)))
+            image_paths.append(p)
+    if not image_paths:
+        raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
+
+    images: list[Image.Image] = []
+    for p in image_paths:
+        with Image.open(p) as img:
+            images.append(img.convert("RGB"))
     return frame_ids, images
 
 
@@ -123,7 +164,6 @@ def _encode_images_batched(
     feats: list[torch.Tensor] = []
     for start in range(0, len(images), batch_size):
         batch = images[start:start + batch_size]
-        _log(f"CLIP 图像编码 batch: start={start}, size={len(batch)}")
         inputs = processor(images=batch, return_tensors="pt").to(device)
         with torch.no_grad():
             batch_feats = _to_feature_tensor(model.get_image_features(**inputs))
@@ -149,12 +189,24 @@ def rank_frames_by_clip(
     clip_batch_size: int = 16,
     coarse_sample_every: int = 0,
     max_frames: int | None = None,
+    sample_id: str | None = None,
+    use_preprocessed_clip_frames: bool = False,
+    preprocessed_clip_dir: str | None = None,
 ) -> list[RankedFrame]:
     t0 = time.perf_counter()
-    frame_ids, images = _collect_candidate_frames(video_path, sample_every=coarse_sample_every)
+    if use_preprocessed_clip_frames:
+        if not preprocessed_clip_dir:
+            raise ValueError("启用预处理 clip 帧时，必须提供 preprocessed_clip_dir。")
+        if not sample_id:
+            raise ValueError("启用预处理 clip 帧时，必须提供 sample_id。")
+        frame_ids, images = _load_preprocessed_candidate_frames(
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            sample_id=sample_id,
+        )
+    else:
+        frame_ids, images = _collect_candidate_frames(video_path, sample_every=coarse_sample_every)
     processor, model, resolved_device = _load_clip(clip_model_id, clip_device)
     query = _build_clip_query(question=question, options=options, answer=answer)
-    _log(f"CLIP query: {(query[:200] + '...') if len(query) > 200 else query}")
 
     image_feats = _encode_images_batched(
         images=images,
@@ -188,10 +240,8 @@ def rank_frames_by_clip(
         ranked_frames = ranked_frames[:max_frames]
 
     top_preview = [(x.frame_id, round(x.score, 6)) for x in ranked_frames[: min(10, len(ranked_frames))]]
-    _log(
-        f"CLIP 排序完成: 总帧数={len(ranked_frames)}, top预览={top_preview}, "
-        f"耗时={time.perf_counter() - t0:.3f}s"
-    )
+    _ = top_preview
+    _ = t0
     return ranked_frames
 
 
@@ -323,14 +373,11 @@ def _answer_confidence_from_scores(
         decoded_gen = processor.tokenizer.decode(gen_ids_list, skip_special_tokens=False)
         think_text, answer_text_decoded = _split_thinking_and_answer_text(decoded_gen)
         decoded_answer = processor.tokenizer.decode(answer_ids, skip_special_tokens=False)
-        _log("答案 token 对齐失败，下面是调试信息：")
-        _log(f"answer_text(raw)={answer_text!r}")
-        _log(f"answer_ids={answer_ids}")
-        _log(f"answer_ids_decode={decoded_answer!r}")
-        _log(f"generated_ids={gen_ids_list}")
-        _log(f"generated_think_text={think_text!r}")
-        _log(f"generated_final_answer_text={answer_text_decoded!r}")
-        _log(f"generated_decode={decoded_gen!r}")
+        _ = decoded_answer
+        _ = gen_ids_list
+        _ = think_text
+        _ = answer_text_decoded
+        _ = decoded_gen
         raise
     answer_token_logprobs = step_logprobs[s:e]
     avg_answer_logprob = float(sum(answer_token_logprobs) / len(answer_token_logprobs))
@@ -349,10 +396,12 @@ def _decode_response(processor, input_ids: torch.Tensor, generated_ids: torch.Te
     return text.strip()
 
 
-def _split_thinking_and_answer_text(response: str) -> tuple[str, str]:
-    if "</think>" in response:
+def _split_thinking_and_answer_text(response: str, model_mode: str = "thinking") -> tuple[str, str]:
+    if model_mode == "thinking" and "</think>" in response:
         think, answer = response.split("</think>", 1)
         return think.strip(), answer.strip()
+    if model_mode == "instruct":
+        return "", response.strip()
     return response.strip(), ""
 
 
@@ -364,9 +413,16 @@ def iterative_inference_with_cache(
     extract_answer_fn,
     has_options: bool,
     max_new_tokens: int = 1024,
+    model_mode: str = "thinking",
+    enable_early_stop: bool = True,
+    early_stop_window: int = 3,
+    early_stop_conf_threshold: float = 0.9,
+    frame_increment: int = 1,
 ) -> dict[str, Any]:
     if not ranked_frames:
         raise RuntimeError("ranked_frames 为空，无法进行迭代推理。")
+    if frame_increment <= 0:
+        raise ValueError(f"frame_increment 必须 > 0，当前为 {frame_increment}")
 
     visual_cache: dict[int, torch.Tensor] = {}
     cache_hits = 0
@@ -381,19 +437,25 @@ def iterative_inference_with_cache(
     final_generated_token_count = 0
     final_hit_max_tokens = False
     round_details: list[dict[str, Any]] = []
+    stable_answer_for_early_stop: str | None = None
+    stable_round_count = 0
 
-    _log(f"开始迭代推理: 总候选帧={len(ranked_frames)}，固定跑满top-1到top-{len(ranked_frames)}")
 
-    for k in range(1, len(ranked_frames) + 1):
-        rounds = k
-        selected = ranked_frames[:k]
+    total_candidates = len(ranked_frames)
+    round_frame_counts = list(range(frame_increment, total_candidates + 1, frame_increment))
+    if not round_frame_counts or round_frame_counts[-1] != total_candidates:
+        round_frame_counts.append(total_candidates)
+
+    for round_idx, frame_count in enumerate(round_frame_counts, start=1):
+        rounds = round_idx
+        selected_by_score = ranked_frames[:frame_count]
+        # top-k 按分数选出后，构建视觉输入时按时间顺序排列，保持视频时序一致。
+        selected = sorted(selected_by_score, key=lambda x: x.frame_id)
         selected_frames = [x.image for x in selected]
         selected_ids = [x.frame_id for x in selected]
         selected_scores = [x.score for x in selected]
-        _log(
-            f"第{k}轮: 使用top-{k}帧, frame_ids={selected_ids}, "
-            f"clip_scores={[round(s, 6) for s in selected_scores]}"
-        )
+        frame_score_pairs = [(x.frame_id, round(x.score, 6)) for x in selected]
+        _log(f"第{round_idx}轮选帧(frame_id, clip_score): {frame_score_pairs}")
 
         build_start = time.perf_counter()
         model_inputs = _build_prompt_inputs(processor, selected_frames, prompt, model.device)
@@ -403,14 +465,11 @@ def iterative_inference_with_cache(
         for frame in selected:
             if frame.frame_id in visual_cache:
                 cache_hits += 1
-                _log(f"视觉缓存命中: frame_id={frame.frame_id}")
                 image_chunks.append(visual_cache[frame.frame_id])
             else:
                 cache_misses += 1
-                _log(f"视觉缓存未命中，开始编码: frame_id={frame.frame_id}")
                 embed = _extract_single_frame_embed(model, processor, frame.image)
                 visual_cache[frame.frame_id] = embed
-                _log(f"视觉编码完成并写入缓存: frame_id={frame.frame_id}, shape={tuple(embed.shape)}")
                 image_chunks.append(embed)
 
         image_embeds = torch.cat(image_chunks, dim=0).to(model.device)
@@ -430,11 +489,6 @@ def iterative_inference_with_cache(
         fused_embeds = token_embeds.masked_scatter(image_mask, image_embeds)
         build_time = time.perf_counter() - build_start
         total_build_time += build_time
-        _log(
-            f"第{k}轮 embedding构建完成: build_time={build_time:.4f}s, "
-            f"cache_size={len(visual_cache)}, hit={cache_hits}, miss={cache_misses}, "
-            f"image_mask_shape={tuple(image_mask.shape)}, image_embeds_shape={tuple(image_embeds.shape)}"
-        )
 
         infer_start = time.perf_counter()
         with torch.no_grad():
@@ -454,10 +508,14 @@ def iterative_inference_with_cache(
         generated_token_count = int(len(outputs.scores))
         hit_max_tokens = generated_token_count >= max_new_tokens
         response = _decode_response(processor, model_inputs["input_ids"], generated_ids)
-        think_text, answer_text = _split_thinking_and_answer_text(response)
+        think_text, answer_text = _split_thinking_and_answer_text(
+            response=response,
+            model_mode=model_mode,
+        )
         has_think_end = "</think>" in response
-        if has_think_end:
-            pred_answer = extract_answer_fn(response, has_options=has_options)
+        pred_answer = extract_answer_fn(response, has_options=has_options)
+        should_compute_confidence = (model_mode == "instruct") or has_think_end
+        if should_compute_confidence:
             try:
                 avg_logprob, answer_prob, token_lps = _answer_confidence_from_scores(
                     processor=processor,
@@ -471,28 +529,44 @@ def iterative_inference_with_cache(
                 s, _ = _find_subsequence_last([int(x) for x in gen_token_ids[0].tolist()], answer_ids)
                 option_probs = _option_probs_from_step_logits(processor, outputs.scores[s][0])
             except RuntimeError as e:
-                _log(f"第{k}轮答案概率计算失败，降级为默认值: {e}")
+                _ = e
                 avg_logprob = float("-inf")
                 answer_prob = 0.0
                 token_lps = []
                 option_probs = {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0}
         else:
-            # 即使没有 </think>，也尽量提取最终答案，避免整轮结果被置空。
-            pred_answer = extract_answer_fn(response, has_options=has_options)
             avg_logprob = float("-inf")
             answer_prob = 0.0
             token_lps = []
             option_probs = {"A": 0.0, "B": 0.0, "C": 0.0, "D": 0.0}
-            _log("第{k}轮未检测到 </think> 结束符，跳过概率计算，仅保留答案文本。".format(k=k))
         _log(
-            f"第{k}轮结果: infer_time={infer_time:.4f}s, pred_answer={pred_answer}, "
+            f"第{round_idx}轮结果: infer_time={infer_time:.4f}s, pred_answer={pred_answer}, "
             f"answer_avg_logprob={avg_logprob:.6f}, answer_prob={answer_prob:.6f}, "
             f"option_probs(A/B/C/D)={[round(option_probs[x], 6) for x in ('A', 'B', 'C', 'D')]}, "
             f"answer_token_logprobs={[round(x, 6) for x in token_lps]}, "
             f"generated_tokens={generated_token_count}, limit={max_new_tokens}, hit_limit={hit_max_tokens}"
         )
-        _log(f"第{k}轮思维链输出:\n{think_text}")
-        _log(f"第{k}轮最终回复输出:\n{answer_text}")
+
+        pred_answer_str = str(pred_answer).strip().upper() if pred_answer is not None else ""
+        selected_option_prob = (
+            float(option_probs.get(pred_answer_str, 0.0))
+            if (has_options and pred_answer_str in {"A", "B", "C", "D"})
+            else 0.0
+        )
+        if (
+            enable_early_stop
+            and has_options
+            and pred_answer_str in {"A", "B", "C", "D"}
+            and selected_option_prob > early_stop_conf_threshold
+        ):
+            if pred_answer_str == stable_answer_for_early_stop:
+                stable_round_count += 1
+            else:
+                stable_answer_for_early_stop = pred_answer_str
+                stable_round_count = 1
+        else:
+            stable_answer_for_early_stop = None
+            stable_round_count = 0
 
         if pred_answer is not None:
             final_answer = pred_answer
@@ -503,7 +577,8 @@ def iterative_inference_with_cache(
         final_hit_max_tokens = hit_max_tokens
         round_details.append(
             {
-                "round_idx": k,
+                "round_idx": round_idx,
+                "frame_count": frame_count,
                 "selected_frame_ids": selected_ids,
                 "selected_clip_scores": selected_scores,
                 "embedding_build_time": build_time,
@@ -516,15 +591,20 @@ def iterative_inference_with_cache(
                 "generated_token_count": generated_token_count,
                 "hit_max_tokens": hit_max_tokens,
                 "has_think_end": has_think_end,
+                "selected_option_prob": selected_option_prob,
             }
         )
-        _log(f"第{k}轮结束：不启用早停，继续下一轮。")
+        if enable_early_stop and stable_round_count >= early_stop_window:
+            _log(
+                f"第{round_idx}轮触发早停: 连续{stable_round_count}轮答案={stable_answer_for_early_stop}，"
+                f"且所选选项概率>{early_stop_conf_threshold}"
+            )
+            break
 
     if final_answer is None:
         final_answer = extract_answer_fn(final_response, has_options=has_options)
         if final_answer is None:
             final_answer = ""
-        _log("所有轮次均未得到稳定答案，已使用最终输出做兜底提取。")
 
     return {
         "response": final_response,

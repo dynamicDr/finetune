@@ -74,7 +74,7 @@ def main(cfg: DictConfig) -> None:
         cfg.task_filter,
     ]
     dataset_shared: list[str] = []
-    if script_key in ("vqa_train.py", "vqa_eval.py", "vqa_eval_emb.py"):
+    if script_key in ("vqa_train.py", "vqa_eval.py", "vqa_eval_emb.py", "vqa_eval_ours.py"):
         dataset_shared += ["--model_name", str(cfg.model.name)]
         dataset_shared += ["--dataset", str(OmegaConf.select(cfg, "dataset", default="vsibench"))]
         frame_sampling_method = OmegaConf.select(cfg, "frame_sampling_method", default=None)
@@ -100,7 +100,7 @@ def main(cfg: DictConfig) -> None:
             dataset_shared += ["--dataset_config", str(dataset_config)]
         if OmegaConf.select(cfg, "dataset_no_config", default=False):
             dataset_shared.append("--no_dataset_config")
-        if script_key == "vqa_eval.py":
+        if script_key in ("vqa_eval.py", "vqa_eval_ours.py"):
             use_preprocessed_clip_frames = OmegaConf.select(cfg, "use_preprocessed_clip_frames", default=False)
             if bool(use_preprocessed_clip_frames):
                 dataset_shared.append("--use_preprocessed_clip_frames")
@@ -110,6 +110,22 @@ def main(cfg: DictConfig) -> None:
             preprocessed_clip_dir = OmegaConf.select(cfg, "preprocessed_clip_dir", default=None)
             if preprocessed_clip_dir is not None and str(preprocessed_clip_dir).strip() not in ("", "null", "None"):
                 dataset_shared += ["--preprocessed_clip_dir", str(preprocessed_clip_dir)]
+        if script_key == "vqa_eval_ours.py":
+            enable_early_stop = OmegaConf.select(cfg, "enable_early_stop", default=None)
+            if enable_early_stop is not None:
+                dataset_shared += ["--enable_early_stop" if bool(enable_early_stop) else "--no-enable_early_stop"]
+            early_stop_window = OmegaConf.select(cfg, "early_stop_window", default=None)
+            if early_stop_window is not None and str(early_stop_window).strip() not in ("", "null", "None"):
+                dataset_shared += ["--early_stop_window", str(int(early_stop_window))]
+            early_stop_conf_threshold = OmegaConf.select(cfg, "early_stop_conf_threshold", default=None)
+            if (
+                early_stop_conf_threshold is not None
+                and str(early_stop_conf_threshold).strip() not in ("", "null", "None")
+            ):
+                dataset_shared += ["--early_stop_conf_threshold", str(float(early_stop_conf_threshold))]
+            frame_increment = OmegaConf.select(cfg, "frame_increment", default=None)
+            if frame_increment is not None and str(frame_increment).strip() not in ("", "null", "None"):
+                dataset_shared += ["--frame_increment", str(int(frame_increment))]
     model_snapshot = resolve_model_path(cfg.model.path)
 
     if script_key in ("train_vsibench.py", "vqa_train.py"):
