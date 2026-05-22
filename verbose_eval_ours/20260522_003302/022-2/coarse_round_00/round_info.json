@@ -1,0 +1,192 @@
+{
+  "sample_id": "022-2",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What detail does the caption provide about the term \"synovial\" at the beginning of the video?",
+  "options": [
+    "A. It is derived from the Latin word for 'egg'.",
+    "B. It is a term used to describe a type of joint movement.",
+    "C. It refers to a type of bone tissue.",
+    "D. It indicates a condition related to the joints."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a text caption on screen",
+    "the word 'synovial"
+  ],
+  "focus_keywords": [
+    "a text caption on screen",
+    "the word 'synovial"
+  ],
+  "selected_count": 9,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 144,
+      "file": "00_frame_144.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 288,
+      "file": "01_frame_288.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 432,
+      "file": "02_frame_432.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 719,
+      "file": "03_frame_719.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1007,
+      "file": "04_frame_1007.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1295,
+      "file": "05_frame_1295.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1582,
+      "file": "06_frame_1582.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1870,
+      "file": "07_frame_1870.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2158,
+      "file": "08_frame_2158.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 144
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 288
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 432
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 719
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1007
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1295
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1582
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1870
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2158
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 144,
+      "keyword_scores": {
+        "a text caption on screen": 0.26563581824302673,
+        "the word 'synovial": 0.22809721529483795
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 288,
+      "keyword_scores": {
+        "a text caption on screen": 0.22439642250537872,
+        "the word 'synovial": 0.2649349570274353
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 432,
+      "keyword_scores": {
+        "a text caption on screen": 0.18899214267730713,
+        "the word 'synovial": 0.21860632300376892
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 719,
+      "keyword_scores": {
+        "a text caption on screen": 0.1888096034526825,
+        "the word 'synovial": 0.2082085758447647
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1007,
+      "keyword_scores": {
+        "a text caption on screen": 0.21334843337535858,
+        "the word 'synovial": 0.22178301215171814
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1295,
+      "keyword_scores": {
+        "a text caption on screen": 0.22960315644741058,
+        "the word 'synovial": 0.21618004143238068
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1582,
+      "keyword_scores": {
+        "a text caption on screen": 0.282620370388031,
+        "the word 'synovial": 0.2206491380929947
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1870,
+      "keyword_scores": {
+        "a text caption on screen": 0.22124522924423218,
+        "the word 'synovial": 0.22576864063739777
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2158,
+      "keyword_scores": {
+        "a text caption on screen": 0.24631331861019135,
+        "the word 'synovial": 0.21908466517925262
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "entropy": 0.45432353019714355,
+  "option_probs": {
+    "A": 2.375313397002205e-19,
+    "B": 1.872537822940037e-20,
+    "C": 4.567922090643483e-21,
+    "D": 6.763398253790432e-21
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.15199205605313182
+}

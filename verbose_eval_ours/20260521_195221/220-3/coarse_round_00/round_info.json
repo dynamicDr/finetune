@@ -1,0 +1,347 @@
+{
+  "sample_id": "220-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is this video mainly about?",
+  "options": [
+    "A. A male and a female player are competing in a synchronized swimming routine.",
+    "B. A male and a female player are collaborating on a painting in an art studio.",
+    "C. A male and a female player are practicing partner acrobatics.",
+    "D. A male and a female player are rehearsing a romantic dance routine."
+  ],
+  "gt_answer": "C",
+  "all_keywords": [
+    "a male and a female player",
+    "synchronized swimming routine",
+    "art studio",
+    "partner acrobatics"
+  ],
+  "focus_keywords": [
+    "a male and a female player",
+    "synchronized swimming routine",
+    "art studio",
+    "partner acrobatics"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 10,
+      "frame_id": 360,
+      "file": "00_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 420,
+      "file": "01_frame_420.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 450,
+      "file": "02_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 779,
+      "file": "03_frame_779.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 809,
+      "file": "04_frame_809.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 839,
+      "file": "05_frame_839.jpg"
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 929,
+      "file": "06_frame_929.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 959,
+      "file": "07_frame_959.jpg"
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 1199,
+      "file": "08_frame_1199.jpg"
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1588,
+      "file": "09_frame_1588.jpg"
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1678,
+      "file": "10_frame_1678.jpg"
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1708,
+      "file": "11_frame_1708.jpg"
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1738,
+      "file": "12_frame_1738.jpg"
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1828,
+      "file": "13_frame_1828.jpg"
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1858,
+      "file": "14_frame_1858.jpg"
+    },
+    {
+      "index_in_pool": 54,
+      "frame_id": 2008,
+      "file": "15_frame_2008.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 10,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 420
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 450
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 779
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 809
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 839
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 929
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 959
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 1199
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1588
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1678
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1708
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1738
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1828
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1858
+    },
+    {
+      "index_in_pool": 54,
+      "frame_id": 2008
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 10,
+      "frame_id": 360,
+      "keyword_scores": {
+        "a male and a female player": 0.26828455924987793,
+        "synchronized swimming routine": 0.25636667013168335,
+        "art studio": 0.2347634732723236,
+        "partner acrobatics": 0.26356756687164307
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 420,
+      "keyword_scores": {
+        "a male and a female player": 0.27462461590766907,
+        "synchronized swimming routine": 0.2839807868003845,
+        "art studio": 0.22154709696769714,
+        "partner acrobatics": 0.2895597517490387
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 450,
+      "keyword_scores": {
+        "a male and a female player": 0.25939229130744934,
+        "synchronized swimming routine": 0.26176348328590393,
+        "art studio": 0.22578676044940948,
+        "partner acrobatics": 0.262472927570343
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 779,
+      "keyword_scores": {
+        "a male and a female player": 0.2533217668533325,
+        "synchronized swimming routine": 0.22963933646678925,
+        "art studio": 0.1977044641971588,
+        "partner acrobatics": 0.28614377975463867
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 809,
+      "keyword_scores": {
+        "a male and a female player": 0.25251367688179016,
+        "synchronized swimming routine": 0.2416372448205948,
+        "art studio": 0.20486977696418762,
+        "partner acrobatics": 0.2949901521205902
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 839,
+      "keyword_scores": {
+        "a male and a female player": 0.2604970932006836,
+        "synchronized swimming routine": 0.23546741902828217,
+        "art studio": 0.1957995891571045,
+        "partner acrobatics": 0.29593992233276367
+      }
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 929,
+      "keyword_scores": {
+        "a male and a female player": 0.25309470295906067,
+        "synchronized swimming routine": 0.2640605866909027,
+        "art studio": 0.2092442810535431,
+        "partner acrobatics": 0.28522059321403503
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 959,
+      "keyword_scores": {
+        "a male and a female player": 0.25931990146636963,
+        "synchronized swimming routine": 0.25208425521850586,
+        "art studio": 0.19989818334579468,
+        "partner acrobatics": 0.29394665360450745
+      }
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 1199,
+      "keyword_scores": {
+        "a male and a female player": 0.2548483908176422,
+        "synchronized swimming routine": 0.24595500528812408,
+        "art studio": 0.2032833993434906,
+        "partner acrobatics": 0.28764164447784424
+      }
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1588,
+      "keyword_scores": {
+        "a male and a female player": 0.2525116801261902,
+        "synchronized swimming routine": 0.24386398494243622,
+        "art studio": 0.19209235906600952,
+        "partner acrobatics": 0.2929941415786743
+      }
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1678,
+      "keyword_scores": {
+        "a male and a female player": 0.24979104101657867,
+        "synchronized swimming routine": 0.25592663884162903,
+        "art studio": 0.2031838297843933,
+        "partner acrobatics": 0.2988738715648651
+      }
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1708,
+      "keyword_scores": {
+        "a male and a female player": 0.24506829679012299,
+        "synchronized swimming routine": 0.28115329146385193,
+        "art studio": 0.21792276203632355,
+        "partner acrobatics": 0.28593841195106506
+      }
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1738,
+      "keyword_scores": {
+        "a male and a female player": 0.241281196475029,
+        "synchronized swimming routine": 0.2600858807563782,
+        "art studio": 0.21849051117897034,
+        "partner acrobatics": 0.2904474437236786
+      }
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1828,
+      "keyword_scores": {
+        "a male and a female player": 0.26029837131500244,
+        "synchronized swimming routine": 0.2478100210428238,
+        "art studio": 0.217317134141922,
+        "partner acrobatics": 0.2785121500492096
+      }
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1858,
+      "keyword_scores": {
+        "a male and a female player": 0.25985121726989746,
+        "synchronized swimming routine": 0.23647534847259521,
+        "art studio": 0.20219390094280243,
+        "partner acrobatics": 0.26337987184524536
+      }
+    },
+    {
+      "index_in_pool": 54,
+      "frame_id": 2008,
+      "keyword_scores": {
+        "a male and a female player": 0.26536881923675537,
+        "synchronized swimming routine": 0.2606220543384552,
+        "art studio": 0.22836193442344666,
+        "partner acrobatics": 0.2760206460952759
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.6692702770233154,
+  "option_probs": {
+    "A": 2.1740286690731837e-18,
+    "B": 9.428846275028829e-20,
+    "C": 2.0391868587247918e-19,
+    "D": 1.904398488767615e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.21736113913357258
+}

@@ -1,0 +1,293 @@
+{
+  "sample_id": "061-1",
+  "stage": "coarse",
+  "round": 0,
+  "question": "How many red flags appear in the video?",
+  "options": [
+    "A. 7.",
+    "B. 6.",
+    "C. 8.",
+    "D. 5."
+  ],
+  "gt_answer": "B",
+  "all_keywords": [
+    "red flags"
+  ],
+  "focus_keywords": [
+    "red flags"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 17,
+      "frame_id": 425,
+      "file": "00_frame_425.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "file": "01_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "file": "02_frame_475.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "file": "03_frame_500.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 525,
+      "file": "04_frame_525.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 550,
+      "file": "05_frame_550.jpg"
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 725,
+      "file": "06_frame_725.jpg"
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 825,
+      "file": "07_frame_825.jpg"
+    },
+    {
+      "index_in_pool": 37,
+      "frame_id": 925,
+      "file": "08_frame_925.jpg"
+    },
+    {
+      "index_in_pool": 40,
+      "frame_id": 1000,
+      "file": "09_frame_1000.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "file": "10_frame_1025.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1050,
+      "file": "11_frame_1050.jpg"
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1075,
+      "file": "12_frame_1075.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1100,
+      "file": "13_frame_1100.jpg"
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1200,
+      "file": "14_frame_1200.jpg"
+    },
+    {
+      "index_in_pool": 80,
+      "frame_id": 2000,
+      "file": "15_frame_2000.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 17,
+      "frame_id": 425
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 525
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 550
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 725
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 825
+    },
+    {
+      "index_in_pool": 37,
+      "frame_id": 925
+    },
+    {
+      "index_in_pool": 40,
+      "frame_id": 1000
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1050
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1075
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1100
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1200
+    },
+    {
+      "index_in_pool": 80,
+      "frame_id": 2000
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 17,
+      "frame_id": 425,
+      "keyword_scores": {
+        "red flags": 0.22440436482429504
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "keyword_scores": {
+        "red flags": 0.25150853395462036
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "keyword_scores": {
+        "red flags": 0.2532367408275604
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "keyword_scores": {
+        "red flags": 0.2417152374982834
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 525,
+      "keyword_scores": {
+        "red flags": 0.2400265485048294
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 550,
+      "keyword_scores": {
+        "red flags": 0.2453753650188446
+      }
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 725,
+      "keyword_scores": {
+        "red flags": 0.2293308973312378
+      }
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 825,
+      "keyword_scores": {
+        "red flags": 0.22541113197803497
+      }
+    },
+    {
+      "index_in_pool": 37,
+      "frame_id": 925,
+      "keyword_scores": {
+        "red flags": 0.23229341208934784
+      }
+    },
+    {
+      "index_in_pool": 40,
+      "frame_id": 1000,
+      "keyword_scores": {
+        "red flags": 0.22975336015224457
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "keyword_scores": {
+        "red flags": 0.22586843371391296
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1050,
+      "keyword_scores": {
+        "red flags": 0.24247753620147705
+      }
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1075,
+      "keyword_scores": {
+        "red flags": 0.23671966791152954
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1100,
+      "keyword_scores": {
+        "red flags": 0.22558096051216125
+      }
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1200,
+      "keyword_scores": {
+        "red flags": 0.22804021835327148
+      }
+    },
+    {
+      "index_in_pool": 80,
+      "frame_id": 2000,
+      "keyword_scores": {
+        "red flags": 0.23151333630084991
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.6617534756660461,
+  "option_probs": {
+    "A": 1.6181889306072838e-18,
+    "B": 1.6194813648416896e-19,
+    "C": 9.855900925184427e-20,
+    "D": 9.340441896109414e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B. 6.",
+  "inference_time": 0.30366140906699
+}

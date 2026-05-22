@@ -1,0 +1,107 @@
+{
+  "sample_id": "228-3",
+  "stage": "refine",
+  "round": 1,
+  "question": "What is the function of the scissors that are used in the video?",
+  "options": [
+    "A. Making the paper look more like a heart.",
+    "B. Destroying the paper.",
+    "C. Cutting the paper into pieces.",
+    "D. None of the above."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a pair of scissors",
+    "a piece of paper"
+  ],
+  "focus_keywords": [
+    "a pair of scissors",
+    "a piece of paper"
+  ],
+  "selected_count": 4,
+  "selected_images": [
+    {
+      "index_in_pool": 5,
+      "frame_id": 240,
+      "file": "00_frame_240.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 480,
+      "file": "01_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 510,
+      "file": "02_frame_510.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 750,
+      "file": "03_frame_750.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 5,
+      "frame_id": 240
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 480
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 510
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 750
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 5,
+      "frame_id": 240,
+      "keyword_scores": {
+        "a pair of scissors": 0.2864082157611847,
+        "a piece of paper": 0.24560800194740295
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a pair of scissors": 0.2727340757846832,
+        "a piece of paper": 0.268257200717926
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 510,
+      "keyword_scores": {
+        "a pair of scissors": 0.27946949005126953,
+        "a piece of paper": 0.2638123631477356
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 750,
+      "keyword_scores": {
+        "a pair of scissors": 0.28302431106567383,
+        "a piece of paper": 0.2677280306816101
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.38551682233810425,
+  "option_probs": {
+    "A": 9.094539021016831e-15,
+    "B": 8.764295358814905e-16,
+    "C": 2.5758093569319595e-15,
+    "D": 1.191258712746392e-13
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.6777664630208164
+}

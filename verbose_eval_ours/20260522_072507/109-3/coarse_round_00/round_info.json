@@ -1,0 +1,311 @@
+{
+  "sample_id": "109-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is the attitude of the man who sits at the table when others speak to him?",
+  "options": [
+    "A. Interested.",
+    "B. Excited.",
+    "C. Careless.",
+    "D. Angry."
+  ],
+  "gt_answer": "C",
+  "all_keywords": [
+    "a man sitting at a table",
+    "other people speaking to him"
+  ],
+  "focus_keywords": [
+    "a man sitting at a table",
+    "other people speaking to him"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 96,
+      "file": "00_frame_96.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 144,
+      "file": "01_frame_144.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 240,
+      "file": "02_frame_240.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384,
+      "file": "03_frame_384.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 408,
+      "file": "04_frame_408.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432,
+      "file": "05_frame_432.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 456,
+      "file": "06_frame_456.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 480,
+      "file": "07_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 503,
+      "file": "08_frame_503.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 527,
+      "file": "09_frame_527.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 551,
+      "file": "10_frame_551.jpg"
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 719,
+      "file": "11_frame_719.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1007,
+      "file": "12_frame_1007.jpg"
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1031,
+      "file": "13_frame_1031.jpg"
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103,
+      "file": "14_frame_1103.jpg"
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1127,
+      "file": "15_frame_1127.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 96
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 144
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 240
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 408
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 456
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 480
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 503
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 527
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 551
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 719
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1007
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1031
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1127
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 96,
+      "keyword_scores": {
+        "a man sitting at a table": 0.2392779141664505,
+        "other people speaking to him": 0.24786962568759918
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 144,
+      "keyword_scores": {
+        "a man sitting at a table": 0.2519237697124481,
+        "other people speaking to him": 0.23071560263633728
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 240,
+      "keyword_scores": {
+        "a man sitting at a table": 0.24663811922073364,
+        "other people speaking to him": 0.21636304259300232
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384,
+      "keyword_scores": {
+        "a man sitting at a table": 0.23031891882419586,
+        "other people speaking to him": 0.2534247040748596
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 408,
+      "keyword_scores": {
+        "a man sitting at a table": 0.22561527788639069,
+        "other people speaking to him": 0.24321989715099335
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432,
+      "keyword_scores": {
+        "a man sitting at a table": 0.26058971881866455,
+        "other people speaking to him": 0.23335179686546326
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 456,
+      "keyword_scores": {
+        "a man sitting at a table": 0.25344744324684143,
+        "other people speaking to him": 0.22524230182170868
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a man sitting at a table": 0.2425815612077713,
+        "other people speaking to him": 0.2557011544704437
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 503,
+      "keyword_scores": {
+        "a man sitting at a table": 0.23657114803791046,
+        "other people speaking to him": 0.25843679904937744
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 527,
+      "keyword_scores": {
+        "a man sitting at a table": 0.2496190071105957,
+        "other people speaking to him": 0.2332538515329361
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 551,
+      "keyword_scores": {
+        "a man sitting at a table": 0.263696551322937,
+        "other people speaking to him": 0.2248106151819229
+      }
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 719,
+      "keyword_scores": {
+        "a man sitting at a table": 0.24530035257339478,
+        "other people speaking to him": 0.21688467264175415
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1007,
+      "keyword_scores": {
+        "a man sitting at a table": 0.24660058319568634,
+        "other people speaking to him": 0.23440122604370117
+      }
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1031,
+      "keyword_scores": {
+        "a man sitting at a table": 0.24411888420581818,
+        "other people speaking to him": 0.25154778361320496
+      }
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103,
+      "keyword_scores": {
+        "a man sitting at a table": 0.24157913029193878,
+        "other people speaking to him": 0.24669696390628815
+      }
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1127,
+      "keyword_scores": {
+        "a man sitting at a table": 0.2177877575159073,
+        "other people speaking to him": 0.25134050846099854
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.3195173740386963,
+  "option_probs": {
+    "A": 3.1721342709513376e-18,
+    "B": 1.2063678092091554e-19,
+    "C": 5.3218379906373255e-17,
+    "D": 1.0702829635955917e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.21500785206444561
+}

@@ -1,0 +1,112 @@
+{
+  "sample_id": "191-3",
+  "stage": "refine",
+  "round": 1,
+  "question": "Which sentence best describes the first rubber band trick shown in the video?",
+  "options": [
+    "A. A rubber band mysteriously jumps from being wrapped around the wrist to a smart phone.",
+    "B. A rubber band jumps from being wrapped around the pinkie and ring fingers to the first and middle fingers of the same hand and then back again.",
+    "C. A rubber band seems to switch places between the fingers, and the second rubber band appears to block it.",
+    "D. A thumb gets rid of being wrapped by a rubber band."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a rubber band wrapped around a wrist",
+    "a smartphone",
+    "a rubber band on first and middle fingers"
+  ],
+  "focus_keywords": [
+    "a rubber band wrapped around a wrist",
+    "a rubber band on first and middle fingers"
+  ],
+  "selected_count": 4,
+  "selected_images": [
+    {
+      "index_in_pool": 21,
+      "frame_id": 1050,
+      "file": "00_frame_1050.jpg"
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 1500,
+      "file": "01_frame_1500.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 2070,
+      "file": "02_frame_2070.jpg"
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 2220,
+      "file": "03_frame_2220.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 21,
+      "frame_id": 1050
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 1500
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 2070
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 2220
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 21,
+      "frame_id": 1050,
+      "keyword_scores": {
+        "a rubber band wrapped around a wrist": 0.3217548727989197,
+        "a smartphone": 0.24002403020858765,
+        "a rubber band on first and middle fingers": 0.3219591975212097
+      }
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 1500,
+      "keyword_scores": {
+        "a rubber band wrapped around a wrist": 0.31827113032341003,
+        "a smartphone": 0.22066977620124817,
+        "a rubber band on first and middle fingers": 0.32469576597213745
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 2070,
+      "keyword_scores": {
+        "a rubber band wrapped around a wrist": 0.3303857445716858,
+        "a smartphone": 0.21494926512241364,
+        "a rubber band on first and middle fingers": 0.32939067482948303
+      }
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 2220,
+      "keyword_scores": {
+        "a rubber band wrapped around a wrist": 0.31591224670410156,
+        "a smartphone": 0.21071195602416992,
+        "a rubber band on first and middle fingers": 0.3275242745876312
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 1.1383235454559326,
+  "option_probs": {
+    "A": 4.60193506083593e-19,
+    "B": 3.621966660508314e-19,
+    "C": 3.241972343530691e-20,
+    "D": 1.7630797096278844e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.6747896978631616
+}

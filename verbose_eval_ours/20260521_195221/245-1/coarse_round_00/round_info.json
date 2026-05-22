@@ -1,0 +1,383 @@
+{
+  "sample_id": "245-1",
+  "stage": "coarse",
+  "round": 0,
+  "question": "Which outfit is the male protagonist wearing on the train in the video?",
+  "options": [
+    "A. A double-breasted beige coat.",
+    "B. A red and white varsity-style jacket.",
+    "C. A denim shirt with sparkles on the shoulders.",
+    "D. An open, red plaid shirt with a relaxed fit."
+  ],
+  "gt_answer": "C",
+  "all_keywords": [
+    "a male protagonist",
+    "a train",
+    "a double-breasted beige coat",
+    "a red and white varsity-style jacket",
+    "a denim shirt with sparkles on the shoulders",
+    "an open red plaid shirt with a relaxed fit"
+  ],
+  "focus_keywords": [
+    "a male protagonist",
+    "a train",
+    "a double-breasted beige coat",
+    "a red and white varsity-style jacket",
+    "a denim shirt with sparkles on the shoulders",
+    "an open red plaid shirt with a relaxed fit"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 27,
+      "frame_id": 935,
+      "file": "00_frame_935.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 959,
+      "file": "01_frame_959.jpg"
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 983,
+      "file": "02_frame_983.jpg"
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 1175,
+      "file": "03_frame_1175.jpg"
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 1343,
+      "file": "04_frame_1343.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1415,
+      "file": "05_frame_1415.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1439,
+      "file": "06_frame_1439.jpg"
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1463,
+      "file": "07_frame_1463.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1510,
+      "file": "08_frame_1510.jpg"
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1534,
+      "file": "09_frame_1534.jpg"
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1582,
+      "file": "10_frame_1582.jpg"
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1606,
+      "file": "11_frame_1606.jpg"
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1654,
+      "file": "12_frame_1654.jpg"
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1678,
+      "file": "13_frame_1678.jpg"
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1702,
+      "file": "14_frame_1702.jpg"
+    },
+    {
+      "index_in_pool": 54,
+      "frame_id": 1846,
+      "file": "15_frame_1846.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 27,
+      "frame_id": 935
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 959
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 983
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 1175
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 1343
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1415
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1439
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1463
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1510
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1534
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1582
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1606
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1654
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1678
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1702
+    },
+    {
+      "index_in_pool": 54,
+      "frame_id": 1846
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 27,
+      "frame_id": 935,
+      "keyword_scores": {
+        "a male protagonist": 0.2115831822156906,
+        "a train": 0.22010324895381927,
+        "a double-breasted beige coat": 0.2224259376525879,
+        "a red and white varsity-style jacket": 0.21029020845890045,
+        "a denim shirt with sparkles on the shoulders": 0.19704553484916687,
+        "an open red plaid shirt with a relaxed fit": 0.16328953206539154
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 959,
+      "keyword_scores": {
+        "a male protagonist": 0.20834150910377502,
+        "a train": 0.2132451981306076,
+        "a double-breasted beige coat": 0.2188044935464859,
+        "a red and white varsity-style jacket": 0.2516908049583435,
+        "a denim shirt with sparkles on the shoulders": 0.1993352174758911,
+        "an open red plaid shirt with a relaxed fit": 0.21068894863128662
+      }
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 983,
+      "keyword_scores": {
+        "a male protagonist": 0.22708265483379364,
+        "a train": 0.22997847199440002,
+        "a double-breasted beige coat": 0.217757448554039,
+        "a red and white varsity-style jacket": 0.22538945078849792,
+        "a denim shirt with sparkles on the shoulders": 0.23345817625522614,
+        "an open red plaid shirt with a relaxed fit": 0.2640690803527832
+      }
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 1175,
+      "keyword_scores": {
+        "a male protagonist": 0.20586301386356354,
+        "a train": 0.18878957629203796,
+        "a double-breasted beige coat": 0.19814446568489075,
+        "a red and white varsity-style jacket": 0.21010629832744598,
+        "a denim shirt with sparkles on the shoulders": 0.2019195258617401,
+        "an open red plaid shirt with a relaxed fit": 0.22868292033672333
+      }
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 1343,
+      "keyword_scores": {
+        "a male protagonist": 0.23107454180717468,
+        "a train": 0.22197562456130981,
+        "a double-breasted beige coat": 0.20595227181911469,
+        "a red and white varsity-style jacket": 0.22451531887054443,
+        "a denim shirt with sparkles on the shoulders": 0.2252371460199356,
+        "an open red plaid shirt with a relaxed fit": 0.24708043038845062
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1415,
+      "keyword_scores": {
+        "a male protagonist": 0.2117285281419754,
+        "a train": 0.2525540292263031,
+        "a double-breasted beige coat": 0.2559540867805481,
+        "a red and white varsity-style jacket": 0.22294646501541138,
+        "a denim shirt with sparkles on the shoulders": 0.25003185868263245,
+        "an open red plaid shirt with a relaxed fit": 0.18328137695789337
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1439,
+      "keyword_scores": {
+        "a male protagonist": 0.2170206606388092,
+        "a train": 0.24708972871303558,
+        "a double-breasted beige coat": 0.23188886046409607,
+        "a red and white varsity-style jacket": 0.21292074024677277,
+        "a denim shirt with sparkles on the shoulders": 0.21609370410442352,
+        "an open red plaid shirt with a relaxed fit": 0.1747184544801712
+      }
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1463,
+      "keyword_scores": {
+        "a male protagonist": 0.21583981812000275,
+        "a train": 0.245396226644516,
+        "a double-breasted beige coat": 0.23540110886096954,
+        "a red and white varsity-style jacket": 0.21606115996837616,
+        "a denim shirt with sparkles on the shoulders": 0.23554405570030212,
+        "an open red plaid shirt with a relaxed fit": 0.1674117147922516
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1510,
+      "keyword_scores": {
+        "a male protagonist": 0.21840690076351166,
+        "a train": 0.23964083194732666,
+        "a double-breasted beige coat": 0.22003266215324402,
+        "a red and white varsity-style jacket": 0.2020619809627533,
+        "a denim shirt with sparkles on the shoulders": 0.21702061593532562,
+        "an open red plaid shirt with a relaxed fit": 0.17502976953983307
+      }
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1534,
+      "keyword_scores": {
+        "a male protagonist": 0.21148692071437836,
+        "a train": 0.2519973814487457,
+        "a double-breasted beige coat": 0.22230494022369385,
+        "a red and white varsity-style jacket": 0.19538462162017822,
+        "a denim shirt with sparkles on the shoulders": 0.21810851991176605,
+        "an open red plaid shirt with a relaxed fit": 0.18669362366199493
+      }
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1582,
+      "keyword_scores": {
+        "a male protagonist": 0.213491752743721,
+        "a train": 0.25198325514793396,
+        "a double-breasted beige coat": 0.22832657396793365,
+        "a red and white varsity-style jacket": 0.19485361874103546,
+        "a denim shirt with sparkles on the shoulders": 0.21933597326278687,
+        "an open red plaid shirt with a relaxed fit": 0.19145028293132782
+      }
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1606,
+      "keyword_scores": {
+        "a male protagonist": 0.21199031174182892,
+        "a train": 0.24298758804798126,
+        "a double-breasted beige coat": 0.21307823061943054,
+        "a red and white varsity-style jacket": 0.1760638952255249,
+        "a denim shirt with sparkles on the shoulders": 0.2157270759344101,
+        "an open red plaid shirt with a relaxed fit": 0.17780835926532745
+      }
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1654,
+      "keyword_scores": {
+        "a male protagonist": 0.20588095486164093,
+        "a train": 0.2341746687889099,
+        "a double-breasted beige coat": 0.23871368169784546,
+        "a red and white varsity-style jacket": 0.20692706108093262,
+        "a denim shirt with sparkles on the shoulders": 0.236466184258461,
+        "an open red plaid shirt with a relaxed fit": 0.18509548902511597
+      }
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1678,
+      "keyword_scores": {
+        "a male protagonist": 0.20365312695503235,
+        "a train": 0.23402586579322815,
+        "a double-breasted beige coat": 0.24432626366615295,
+        "a red and white varsity-style jacket": 0.2176545411348343,
+        "a denim shirt with sparkles on the shoulders": 0.24999003112316132,
+        "an open red plaid shirt with a relaxed fit": 0.16171099245548248
+      }
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1702,
+      "keyword_scores": {
+        "a male protagonist": 0.20287205278873444,
+        "a train": 0.2529780864715576,
+        "a double-breasted beige coat": 0.19987666606903076,
+        "a red and white varsity-style jacket": 0.14755044877529144,
+        "a denim shirt with sparkles on the shoulders": 0.17243386805057526,
+        "an open red plaid shirt with a relaxed fit": 0.155185729265213
+      }
+    },
+    {
+      "index_in_pool": 54,
+      "frame_id": 1846,
+      "keyword_scores": {
+        "a male protagonist": 0.21176670491695404,
+        "a train": 0.21099764108657837,
+        "a double-breasted beige coat": 0.2702208459377289,
+        "a red and white varsity-style jacket": 0.23089687526226044,
+        "a denim shirt with sparkles on the shoulders": 0.20846228301525116,
+        "an open red plaid shirt with a relaxed fit": 0.15723484754562378
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.703922688961029,
+  "option_probs": {
+    "A": 2.979236138035426e-16,
+    "B": 6.957317378612163e-18,
+    "C": 7.259265313873856e-16,
+    "D": 1.457444252503149e-17
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.2206022758036852
+}

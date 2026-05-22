@@ -1,0 +1,119 @@
+{
+  "sample_id": "023-3",
+  "stage": "refine",
+  "round": 1,
+  "question": "Which cell shown in the video is of the same type as the white cell scrolling at the beginning?",
+  "options": [
+    "A. The green cells in the middle of the video, devour a red cell.",
+    "B. The devoured green cells at the beginning of the video.",
+    "C. Tiny dense cells in blue at the beginning of the video.",
+    "D. It is impossible to extrapolate."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a white cell scrolling",
+    "green cells in the middle",
+    "a red cell",
+    "tiny dense cells in blue at the beginning"
+  ],
+  "focus_keywords": [
+    "a white cell scrolling",
+    "green cells in the middle",
+    "a red cell",
+    "tiny dense cells in blue at the beginning"
+  ],
+  "selected_count": 4,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 200,
+      "file": "01_frame_200.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 675,
+      "file": "02_frame_675.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1250,
+      "file": "03_frame_1250.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 200
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 675
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1250
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "a white cell scrolling": 0.25379958748817444,
+        "green cells in the middle": 0.24662834405899048,
+        "a red cell": 0.250837504863739,
+        "tiny dense cells in blue at the beginning": 0.2790111005306244
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 200,
+      "keyword_scores": {
+        "a white cell scrolling": 0.24725230038166046,
+        "green cells in the middle": 0.24703222513198853,
+        "a red cell": 0.2263128161430359,
+        "tiny dense cells in blue at the beginning": 0.2736799716949463
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 675,
+      "keyword_scores": {
+        "a white cell scrolling": 0.2650202512741089,
+        "green cells in the middle": 0.25371110439300537,
+        "a red cell": 0.25842997431755066,
+        "tiny dense cells in blue at the beginning": 0.26473259925842285
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1250,
+      "keyword_scores": {
+        "a white cell scrolling": 0.24275045096874237,
+        "green cells in the middle": 0.2593997120857239,
+        "a red cell": 0.2592335045337677,
+        "tiny dense cells in blue at the beginning": 0.24323716759681702
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.22066888213157654,
+  "option_probs": {
+    "A": 3.3863804987679163e-16,
+    "B": 3.475991431769193e-17,
+    "C": 1.411588643508735e-17,
+    "D": 7.389510630890241e-15
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.6688283199910074
+}

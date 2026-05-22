@@ -1,0 +1,119 @@
+{
+  "sample_id": "048-1",
+  "stage": "refine",
+  "round": 1,
+  "question": "Which galaxies are depicted in the video?",
+  "options": [
+    "A. The Sombrero Galaxy and the Triangulum Galaxy.",
+    "B. The Milky Way and the Whirlpool Galaxy.",
+    "C. The Triangulum Galaxy and the Whirlpool Galaxy.",
+    "D. The Andromeda Galaxy and the Milky Way."
+  ],
+  "gt_answer": "D",
+  "all_keywords": [
+    "text on screen: the sombrero galaxy and the triangulum galaxy",
+    "text on screen: the milky way and the whirlpool galaxy",
+    "text on screen: the triangulum galaxy and the whirlpool galaxy",
+    "text on screen: the andromeda galaxy and the milky way"
+  ],
+  "focus_keywords": [
+    "text on screen: the sombrero galaxy and the triangulum galaxy",
+    "text on screen: the milky way and the whirlpool galaxy",
+    "text on screen: the triangulum galaxy and the whirlpool galaxy",
+    "text on screen: the andromeda galaxy and the milky way"
+  ],
+  "selected_count": 4,
+  "selected_images": [
+    {
+      "index_in_pool": 3,
+      "frame_id": 180,
+      "file": "00_frame_180.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1590,
+      "file": "01_frame_1590.jpg"
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 2850,
+      "file": "02_frame_2850.jpg"
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 3210,
+      "file": "03_frame_3210.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 3,
+      "frame_id": 180
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1590
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 2850
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 3210
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 3,
+      "frame_id": 180,
+      "keyword_scores": {
+        "text on screen: the sombrero galaxy and the triangulum galaxy": 0.2977648973464966,
+        "text on screen: the milky way and the whirlpool galaxy": 0.2935298979282379,
+        "text on screen: the triangulum galaxy and the whirlpool galaxy": 0.27277180552482605,
+        "text on screen: the andromeda galaxy and the milky way": 0.3188488781452179
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1590,
+      "keyword_scores": {
+        "text on screen: the sombrero galaxy and the triangulum galaxy": 0.3155789077281952,
+        "text on screen: the milky way and the whirlpool galaxy": 0.31252622604370117,
+        "text on screen: the triangulum galaxy and the whirlpool galaxy": 0.281820684671402,
+        "text on screen: the andromeda galaxy and the milky way": 0.3364757299423218
+      }
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 2850,
+      "keyword_scores": {
+        "text on screen: the sombrero galaxy and the triangulum galaxy": 0.3045641779899597,
+        "text on screen: the milky way and the whirlpool galaxy": 0.2908276617527008,
+        "text on screen: the triangulum galaxy and the whirlpool galaxy": 0.25947561860084534,
+        "text on screen: the andromeda galaxy and the milky way": 0.3156479299068451
+      }
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 3210,
+      "keyword_scores": {
+        "text on screen: the sombrero galaxy and the triangulum galaxy": 0.3000427484512329,
+        "text on screen: the milky way and the whirlpool galaxy": 0.29720526933670044,
+        "text on screen: the triangulum galaxy and the whirlpool galaxy": 0.26878592371940613,
+        "text on screen: the andromeda galaxy and the milky way": 0.30773040652275085
+      }
+    }
+  ],
+  "pred_answer": "D",
+  "entropy": 0.9017223715782166,
+  "option_probs": {
+    "A": 2.7519881382676862e-18,
+    "B": 3.090986804545784e-19,
+    "C": 9.353079928700663e-20,
+    "D": 1.0612089522190112e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "D",
+  "inference_time": 0.17410103301517665
+}

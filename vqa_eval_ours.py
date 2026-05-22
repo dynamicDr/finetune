@@ -2,38 +2,43 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
+import math
 import os
+import re
 import time
-import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import cv2
+import torch
+from PIL import Image
 from tqdm import tqdm
+from transformers import AutoModel, AutoProcessor
 
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
-from data_loaders.ours import iterative_inference_with_cache, rank_frames_by_clip
-from frame_samplers import sample_video_frames
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
-from vl_common import generate_response_with_split_embedding, load_model_and_processor
+from utils import dump_verbose_round, init_verbose_run_dir, normalize_sample_id
+from vl_common import load_model_and_processor
 
-MODE_MAX_NEW_TOKENS = {
-    "thinking": 4086,
-    "instruct": 128,
-}
-PREPROCESSED_CLIP_COMPATIBLE_METHODS = {
-    "ours",
-}
+MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
+PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"ours"}
+_CLIP_CACHE: dict[str, tuple[Any, Any, str]] = {}
+VERBOSE = True
+VERBOSE_OUTPUT_DIR = Path(__file__).resolve().parent / "verbose_eval_ours"
+_VERBOSE_RUN_DIR: Path | None = None
+
+
+# ==================== 基础工具与通用统计 ====================
+def _log(msg: str) -> None:
+    print(f"[vqa_eval_ours] {msg}", flush=True)
 
 
 def build_user_text(question: str, options: list[str] | None) -> str:
     if options:
-        return (
-            f"{question}\n\nOptions:\n"
-            + "\n".join(options)
-            + "\n\nDirectly answer with the option letter only. Do not explain."
-        )
+        return f"{question}\n\nOptions:\n" + "\n".join(options) + "\n\nDirectly answer with the option letter only. Do not explain."
     return f"{question}\n\nPlease provide the numerical answer directly."
 
 
@@ -50,41 +55,12 @@ def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[flo
     elif task_filter == "numeric" and results["mra_count"] > 0:
         avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
     elif task_filter == "all":
-        total_score = 0.0
-        total_count = 0
-        if results["total"] > 0:
-            total_score += results["correct"]
-            total_count += results["total"]
-        if results["mra_count"] > 0:
-            total_score += results["mra_sum"]
-            total_count += results["mra_count"]
+        total_score = results["correct"] + results["mra_sum"]
+        total_count = results["total"] + results["mra_count"]
         if total_count > 0:
             avg_accuracy = total_score / total_count * 100
-    avg_inference_time = (
-        sum(results["inference_times"]) / len(results["inference_times"]) if results["inference_times"] else 0.0
-    )
+    avg_inference_time = sum(results["inference_times"]) / len(results["inference_times"]) if results["inference_times"] else 0.0
     return avg_accuracy, avg_inference_time
-
-
-def _compute_avg_frame_sampling_time(results: dict) -> float:
-    times = results.get("frame_sampling_times", [])
-    if not times:
-        return 0.0
-    return sum(times) / len(times)
-
-
-def _compute_avg_embedding_build_time(results: dict) -> float:
-    times = results.get("embedding_build_times", [])
-    if not times:
-        return 0.0
-    return sum(times) / len(times)
-
-
-def _compute_avg_selected_frame_count(results: dict) -> float:
-    counts = results.get("selected_frame_counts", [])
-    if not counts:
-        return 0.0
-    return float(sum(counts) / len(counts))
 
 
 def _compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int, float]:
@@ -92,482 +68,770 @@ def _compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int,
         return int(results["total"]), float(results["correct"])
     if task_filter == "numeric":
         return int(results["mra_count"]), float(results["mra_sum"])
-    # all: 汇总离散正确数与数值题MRA分数
     return int(results["total"] + results["mra_count"]), float(results["correct"] + results["mra_sum"])
 
 
-def log_to_csv(
-    log_file: str,
-    dataset: str,
-    seed: int,
-    task_filter: str,
-    num_samples: int,
-    evaluated_samples: int,
-    correct_count: float,
-    accuracy_percent: float,
-    num_frames: int,
-    avg_accuracy: float,
-    avg_inference_time: float,
-    frame_sampling_method: str,
-    avg_frame_sampling_time: float,
-    avg_embedding_build_time: float,
-    avg_selected_frame_count: float,
-    avg_total_time_hours: float,
-    over_max_tokens_count: int,
-    model_name: str,
-    lora_path: str,
-    train_ratio: float,
-    use_train_split: bool,
-    ours_clip_model_id: str,
-    ours_clip_batch_size: int,
-    use_preprocessed_clip_frames: bool,
-    preprocessed_clip_fps: float,
-    enable_early_stop: bool,
-    early_stop_window: int,
-    early_stop_conf_threshold: float,
-    frame_increment: int,
-):
-    Path(log_file).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
-    file_exists = os.path.exists(log_file)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    split_name = "train" if use_train_split else "test"
-    row_data = [
-        timestamp,
-        dataset,
-        seed,
-        task_filter,
-        num_samples,
-        evaluated_samples,
-        f"{correct_count:.6f}",
-        f"{accuracy_percent:.2f}",
-        num_frames,
-        f"{avg_accuracy:.2f}",
-        f"{avg_inference_time:.3f}",
-        frame_sampling_method,
-        f"{avg_frame_sampling_time:.6f}",
-        f"{avg_embedding_build_time:.6f}",
-        f"{avg_selected_frame_count:.6f}",
-        f"{avg_total_time_hours:.6f}",
-        over_max_tokens_count,
-        model_name,
-        lora_path,
-        train_ratio,
-        split_name,
-        ours_clip_model_id,
-        ours_clip_batch_size,
-        use_preprocessed_clip_frames,
-        preprocessed_clip_fps,
-        enable_early_stop,
-        early_stop_window,
-        early_stop_conf_threshold,
-        frame_increment,
-    ]
-    with open(log_file, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(
-                [
-                    "timestamp",
-                    "dataset",
-                    "seed",
-                    "task_filter",
-                    "num_samples",
-                    "evaluated_samples",
-                    "correct_count",
-                    "accuracy_percent",
-                    "num_frames",
-                    "avg_accuracy",
-                    "avg_inference_time",
-                    "frame_sampling_method",
-                    "avg_frame_sampling_time",
-                    "avg_embedding_build_time",
-                    "avg_selected_frame_count",
-                    "avg_total_time_hours",
-                    "over_max_tokens_count",
-                    "model_name",
-                    "lora_path",
-                    "train_ratio",
-                    "eval_split",
-                    "ours_clip_model_id",
-                    "ours_clip_batch_size",
-                    "use_preprocessed_clip_frames",
-                    "preprocessed_clip_fps",
-                    "enable_early_stop",
-                    "early_stop_window",
-                    "early_stop_conf_threshold",
-                    "frame_increment",
-                ]
-            )
-        writer.writerow(row_data)
+def _avg(xs: list[float]) -> float:
+    return sum(xs) / len(xs) if xs else 0.0
 
 
-def evaluate_vqa(
-    model,
-    processor,
-    samples: list[VQASample],
-    num_frames: int,
-    task_filter: str,
-    frame_sampling_method: str = "uniform",
-    seed: int = 42,
-    focus_blip_model_name: str = "Salesforce/blip-itm-base-coco",
-    focus_blip_device: str | None = None,
-    focus_blip_batch_size: int = 16,
-    max_new_tokens: int = 2048,
-    ours_clip_model_id: str = "openai/clip-vit-base-patch32",
-    ours_clip_device: str | None = None,
-    ours_clip_batch_size: int = 16,
-    model_mode: str = "thinking",
-    require_think_end_for_scoring: bool = True,
-    use_preprocessed_clip_frames: bool = False,
-    preprocessed_clip_dir: str | None = None,
-    enable_early_stop: bool = True,
-    early_stop_window: int = 3,
-    early_stop_conf_threshold: float = 0.9,
-    frame_increment: int = 1,
-) -> dict[str, Any]:
-    results = {
-        "correct": 0,
-        "total": 0,
-        "mra_sum": 0.0,
-        "mra_count": 0,
-        "inference_times": [],
-        "frame_sampling_times": [],
-        "embedding_build_times": [],
-        "selected_frame_counts": [],
-        "over_max_tokens_count": 0,
-        "missing_think_end_count": 0,
-    }
+# ==================== 候选帧读取与采样 ====================
+def _load_preprocessed_candidate_frames(preprocessed_clip_dir: str, sample_id: str) -> tuple[list[int], list[Image.Image]]:
+    sample_dir = Path(preprocessed_clip_dir).expanduser().resolve() / normalize_sample_id(sample_id)
+    if not sample_dir.is_dir():
+        raise FileNotFoundError(f"预处理帧目录不存在: {sample_dir}")
+    meta_path = sample_dir / "metadata.json"
+    frame_ids: list[int] = []
+    image_paths: list[Path] = []
+    if meta_path.is_file():
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        ids = meta.get("frame_ids", [])
+        files = meta.get("files", [])
+        if isinstance(ids, list) and isinstance(files, list) and len(ids) == len(files):
+            for fid, rel_name in zip(ids, files):
+                p = sample_dir / str(rel_name)
+                if p.is_file():
+                    frame_ids.append(int(fid))
+                    image_paths.append(p)
+    if not image_paths:
+        for p in sorted(sample_dir.glob("frame_*.jpg")):
+            m = re.match(r"frame_(\d+)\.jpg$", p.name)
+            if m:
+                frame_ids.append(int(m.group(1)))
+                image_paths.append(p)
+    if not image_paths:
+        raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
+    images = [Image.open(p).convert("RGB") for p in image_paths]
+    return frame_ids, images
 
-    pbar = tqdm(samples, desc="评估进度(embedding 分开输入)")
-    for i, sample in enumerate(pbar):
-        if task_filter != "all" and sample.task_type != task_filter:
+
+def _sample_uniform_positions(total: int, target: int) -> list[int]:
+    if target >= total:
+        return list(range(total))
+    return sorted(set(int(x) for x in torch.linspace(0, total - 1, target).round().tolist()))
+
+
+def _collect_video_frames_uniform(video_path: str, target_frames: int) -> tuple[list[int], list[Image.Image]]:
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"无法打开视频: {video_path}")
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if frame_count <= 0:
+        cap.release()
+        raise RuntimeError(f"视频帧数无效: {video_path}")
+    idxs = _sample_uniform_positions(frame_count, target_frames)
+    frame_ids, images = [], []
+    try:
+        for fid in idxs:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(fid))
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_ids.append(int(fid))
+            images.append(Image.fromarray(rgb))
+    finally:
+        cap.release()
+    if not images:
+        raise RuntimeError(f"视频无可用候选帧: {video_path}")
+    return frame_ids, images
+
+
+def _to_feature_tensor(features: Any) -> torch.Tensor:
+    if isinstance(features, torch.Tensor):
+        return features
+    for attr in ("image_embeds", "text_embeds", "pooler_output", "last_hidden_state"):
+        v = getattr(features, attr, None)
+        if isinstance(v, torch.Tensor):
+            return v[:, 0, :] if attr == "last_hidden_state" and v.ndim >= 2 else v
+    if isinstance(features, (tuple, list)) and features and isinstance(features[0], torch.Tensor):
+        return features[0]
+    raise TypeError(f"无法转换特征类型: {type(features)!r}")
+
+
+def _norm(x: torch.Tensor) -> torch.Tensor:
+    return x / x.norm(dim=-1, keepdim=True).clamp(min=1e-12)
+
+
+# ==================== CLIP 编码 ====================
+def _load_clip(model_id: str, device: str | None) -> tuple[Any, Any, str]:
+    d = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    key = f"{model_id}::{d}"
+    if key not in _CLIP_CACHE:
+        _CLIP_CACHE[key] = (AutoProcessor.from_pretrained(model_id), AutoModel.from_pretrained(model_id).to(d).eval(), d)
+    return _CLIP_CACHE[key]
+
+
+def _encode_images(images: list[Image.Image], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    outs = []
+    for i in range(0, len(images), bs):
+        inputs = proc(images=images[i:i + bs], return_tensors="pt").to(device)
+        with torch.no_grad():
+            feats = _to_feature_tensor(model.get_image_features(**inputs))
+        outs.append(_norm(feats))
+    return torch.cat(outs, dim=0)
+
+
+def _encode_texts(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    outs = []
+    for i in range(0, len(texts), bs):
+        inputs = proc(text=texts[i:i + bs], padding=True, truncation=True, return_tensors="pt").to(device)
+        with torch.no_grad():
+            feats = _to_feature_tensor(model.get_text_features(**inputs))
+        outs.append(_norm(feats))
+    return torch.cat(outs, dim=0)
+
+
+# ==================== 关键词抽取（仅 LLM） ====================
+def _parse_visual_keyword_phrases(raw_text: str) -> list[str]:
+    text = (raw_text or "").strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            out = []
+            for x in parsed:
+                s = str(x).strip().strip('"').strip("'")
+                if s:
+                    out.append(s)
+            if out:
+                return out
+    except Exception:
+        pass
+
+    quoted = re.findall(r'"([^"\n]{2,120})"', text)
+    if quoted:
+        return [q.strip() for q in quoted if q.strip()]
+
+    out = []
+    for line in text.splitlines():
+        s = re.sub(r"^\s*[-*0-9.)]+\s*", "", line).strip().strip('"').strip("'")
+        if s:
+            out.append(s)
+    return out
+
+
+def _extract_keywords_with_llm_text(
+    model: Any,
+    proc: Any,
+    question: str,
+    options: list[str] | None,
+    max_new_tokens: int,
+) -> list[str]:
+    options_text = "\n".join(options or [])
+    prompt = (
+        "You are a visual element extractor for video question answering.\n"
+        "Task: From the question and options, extract all VISUALLY OBSERVABLE elements "
+        "that could appear in video frames.\n\n"
+        "Rules:\n"
+        "- Extract ONLY things that can be SEEN in a video frame: objects, scenes, "
+        "actions, or on-screen text.\n"
+        "- Do NOT extract abstract concepts such as reasons, causes, meanings, "
+        "intentions, or feelings.\n"
+        "- Each element must be a short DECLARATIVE phrase, e.g. \"a red cat\", "
+        "\"a railway under construction\", \"an ancient tomb being excavated\".\n"
+        "- Do NOT output single bare words (e.g. \"cat\") or questions.\n"
+        "- Output STRICTLY a JSON array of strings. No explanation, no markdown, "
+        "no extra text.\n\n"
+        f"Question:\n{question}\n\n"
+        f"Options:\n{options_text}"
+    )
+    content = [{"type": "text", "text": prompt}]
+    text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
+    inputs = proc(text=[text], padding=True, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1)
+    seq = out[0][len(inputs.input_ids[0]):]
+    resp = proc.decode(seq, skip_special_tokens=True, clean_up_tokenization_spaces=False).strip()
+
+    kws = _parse_visual_keyword_phrases(resp)
+    out_kws, seen = [], set()
+    for kw in kws:
+        s = kw.strip().lower()
+        if len(s) < 2:
             continue
+        if s in seen:
+            continue
+        seen.add(s)
+        out_kws.append(s)
+    return out_kws
 
-        sample_total_start = time.perf_counter()
-        step_times: dict[str, float] = {
-            "prompt_build": 0.0,
-            "frame_sampling": 0.0,
-            "model_call": 0.0,
-            "answer_extract": 0.0,
-            "score_update": 0.0,
-            "progress_update": 0.0,
+
+# ==================== 信息量计算与预算分配 ====================
+def _merge_keywords(kws: list[str], emb: torch.Tensor, th: float) -> tuple[list[str], torch.Tensor]:
+    reps = []
+    for i in range(len(kws)):
+        if not any(float((emb[i] * emb[r]).sum().item()) >= th for r in reps):
+            reps.append(i)
+    ids = torch.tensor(reps, device=emb.device, dtype=torch.long)
+    return [kws[i] for i in reps], emb[ids]
+
+
+def _allocate_counts_by_weights(weights: torch.Tensor, total: int) -> torch.Tensor:
+    if total <= 0 or weights.numel() == 0:
+        return torch.zeros((weights.numel(),), dtype=torch.long, device=weights.device)
+    w = weights.float().clamp(min=0.0)
+    s = float(w.sum().item())
+    if s <= 1e-12:
+        w = torch.ones_like(w) / max(1, w.numel())
+    else:
+        w = w / s
+    raw = w * float(total)
+    base = torch.floor(raw).to(torch.long)
+    remain = int(total - int(base.sum().item()))
+    if remain > 0:
+        frac = raw - base.float()
+        order = torch.argsort(frac, descending=True)
+        base[order[:remain]] += 1
+    return base
+
+
+def _compute_keyword_information(
+    kws_rep: list[str],
+    kw_emb_rep: torch.Tensor,
+    img_emb: torch.Tensor,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    m = int(kw_emb_rep.shape[0])
+    n = int(img_emb.shape[0])
+    if m == 0 or n == 0:
+        return {
+            "kws_use": [],
+            "kw_emb_use": kw_emb_rep[:0],
+            "kw_weights": torch.empty((0,), device=img_emb.device),
+            "rows": [],
+            "keep_ids": [],
+            "info_threshold": float(args.keyword_keep_info_min),
+            "info_quantile_value": float(args.keyword_keep_info_min),
         }
 
-        print(f"问题: {sample.question}", flush=True)
-        print(f"选项: {sample.options if sample.options is not None else '无'}", flush=True)
-        print(f"正确答案: {sample.answer}", flush=True)
+    sims = kw_emb_rep @ img_emb.T  # (M, N)
+    peak = sims.max(dim=1).values
+    mean = sims.mean(dim=1)
+    std = sims.std(dim=1, unbiased=False).clamp(min=1e-6)
+    prominence_z = (peak - mean) / std
 
-        t_step = time.perf_counter()
-        prompt = build_user_text(sample.question, sample.options)
-        step_times["prompt_build"] += time.perf_counter() - t_step
+    denom = max(1e-6, args.info_peak_ceiling - args.info_peak_floor)
+    peak_term = ((peak - args.info_peak_floor) / denom).clamp(min=0.0, max=1.0)
 
-        response = ""
-        pred_answer = None
-        inference_time = 0.0
-        embedding_build_time = 0.0
-        generated_token_count = 0
-        hit_max_tokens = False
+    z_scale = max(1e-6, float(args.info_prominence_scale))
+    prominence_term = torch.sigmoid((prominence_z - args.info_prominence_center) / z_scale)
 
-        if frame_sampling_method == "ours":
-            t_step = time.perf_counter()
-            ranked_frames = rank_frames_by_clip(
-                video_path=sample.video_path,
-                sample_id=sample.sample_id,
-                question=sample.question,
-                options=sample.options,
-                answer=str(sample.answer),
-                clip_model_id=ours_clip_model_id,
-                clip_device=ours_clip_device,
-                clip_batch_size=ours_clip_batch_size,
-                max_frames=num_frames,
-                use_preprocessed_clip_frames=use_preprocessed_clip_frames,
-                preprocessed_clip_dir=preprocessed_clip_dir,
-            )
-            frame_sampling_time = time.perf_counter() - t_step
-            results["frame_sampling_times"].append(frame_sampling_time)
-            step_times["frame_sampling"] += frame_sampling_time
+    if n <= 1:
+        concentration_term = torch.ones_like(peak)
+    else:
+        temp = max(1e-3, float(args.info_entropy_temperature))
+        logits = (sims - mean.unsqueeze(1)) / temp
+        p = torch.softmax(logits, dim=1).clamp(min=1e-12)
+        ent = -(p * torch.log(p)).sum(dim=1)
+        concentration_term = (1.0 - ent / math.log(float(n))).clamp(min=0.0, max=1.0)
 
-            t_step = time.perf_counter()
-            iterative_out = iterative_inference_with_cache(
-                model=model,
-                processor=processor,
-                prompt=prompt,
-                ranked_frames=ranked_frames,
-                extract_answer_fn=lambda x, has_options: parse_response_by_mode(
-                    response=x,
-                    has_options=has_options,
-                    model_mode=model_mode,
-                )[2],
-                has_options=bool(sample.options),
-                max_new_tokens=max_new_tokens,
-                model_mode=model_mode,
-                enable_early_stop=enable_early_stop,
-                early_stop_window=early_stop_window,
-                early_stop_conf_threshold=early_stop_conf_threshold,
-                frame_increment=frame_increment,
-            )
-            step_times["model_call"] += time.perf_counter() - t_step
+    mix = float(args.info_mix_prominence)
+    mix = min(1.0, max(0.0, mix))
+    shape_term = mix * prominence_term + (1.0 - mix) * concentration_term
+    info = (peak_term * shape_term).clamp(min=0.0)
 
-            response = iterative_out["response"]
-            pred_answer = iterative_out["pred_answer"]
-            inference_time = iterative_out["inference_time"]
-            embedding_build_time = iterative_out["embedding_build_time"]
-            generated_token_count = int(iterative_out["generated_token_count"])
-            hit_max_tokens = bool(iterative_out["hit_max_tokens"])
-            round_details = iterative_out.get("round_details", [])
-            if round_details:
-                results["selected_frame_counts"].append(int(round_details[-1].get("frame_count", 0)))
-            else:
-                results["selected_frame_counts"].append(int(iterative_out.get("rounds_used", 0)))
-        else:
-            random_seed = (seed + i) if frame_sampling_method == "random" else None
-            t_step = time.perf_counter()
-            frames = sample_video_frames(
-                video_path=sample.video_path,
-                num_frames=num_frames,
-                method=frame_sampling_method,
-                random_seed=random_seed,
-                question=sample.question,
-                options=sample.options,
-                answer=str(sample.answer),
-                focus_blip_model_name=focus_blip_model_name,
-                focus_blip_device=focus_blip_device,
-                focus_blip_batch_size=focus_blip_batch_size,
-            )
-            frame_sampling_time = time.perf_counter() - t_step
-            results["frame_sampling_times"].append(frame_sampling_time)
-            step_times["frame_sampling"] += frame_sampling_time
-            if not frames:
-                warnings.warn(
-                    f"样本无可用帧，已跳过: sample_id={sample.sample_id}, video_path={sample.video_path}",
-                    RuntimeWarning,
-                    stacklevel=1,
-                )
+    if m > 1:
+        q = min(0.95, max(0.0, float(args.keyword_keep_info_quantile)))
+        qv = float(torch.quantile(info, q).item()) if q > 0.0 else float(info.min().item())
+    else:
+        qv = float(info[0].item())
+    info_th = max(float(args.keyword_keep_info_min), qv)
+    keep_mask = (peak >= float(args.keyword_keep_peak_min)) & (info >= info_th)
+
+    min_keep = max(1, int(args.keyword_keep_min_keywords))
+    min_keep = min(min_keep, m)
+    keep_ids = torch.nonzero(keep_mask).squeeze(1).tolist()
+    if len(keep_ids) < min_keep:
+        topk = torch.argsort(info, descending=True)[:min_keep].tolist()
+        keep_ids = sorted(set(keep_ids + [int(i) for i in topk]))
+
+    keep_tensor = torch.tensor(keep_ids, device=kw_emb_rep.device, dtype=torch.long)
+    kws_use = [kws_rep[i] for i in keep_ids]
+    kw_emb_use = kw_emb_rep[keep_tensor]
+    kw_info = info[keep_tensor]
+    if kw_info.numel() == 0:
+        kw_weights = torch.empty((0,), device=kw_emb_rep.device)
+    else:
+        s = float(kw_info.sum().item())
+        kw_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
+
+    rows = []
+    for i, kw in enumerate(kws_rep):
+        rows.append(
+            {
+                "keyword": kw,
+                "peak": float(peak[i].item()),
+                "mean": float(mean[i].item()),
+                "std": float(std[i].item()),
+                "prominence_z": float(prominence_z[i].item()),
+                "peak_term": float(peak_term[i].item()),
+                "prominence_term": float(prominence_term[i].item()),
+                "concentration_term": float(concentration_term[i].item()),
+                "info": float(info[i].item()),
+                "kept": bool(i in keep_ids),
+            }
+        )
+
+    return {
+        "kws_use": kws_use,
+        "kw_emb_use": kw_emb_use,
+        "kw_weights": kw_weights,
+        "rows": rows,
+        "keep_ids": keep_ids,
+        "info_threshold": float(info_th),
+        "info_quantile_value": float(qv),
+    }
+
+
+def _init_frames_uniform_plus_elements(
+    frame_emb: torch.Tensor,
+    elem_emb: torch.Tensor,
+    elem_w: torch.Tensor,
+    k0: int,
+    uniform_ratio: float,
+) -> list[int]:
+    n = int(frame_emb.shape[0])
+    if n <= 0 or k0 <= 0:
+        return []
+    k0 = min(int(k0), n)
+    ur = min(1.0, max(0.0, float(uniform_ratio)))
+    ku = int(round(k0 * ur))
+    ke = k0 - ku
+
+    # Step 2: uniform mid-point sampling over [0, N)
+    su: set[int] = set()
+    if ku > 0:
+        for i in range(ku):
+            idx = int(math.floor(n * (i + 0.5) / ku))
+            idx = max(0, min(n - 1, idx))
+            su.add(idx)
+
+    # Step 3: element-guided sampling with per-element weighted quotas
+    te: list[int] = []
+    if ke > 0 and elem_emb.shape[0] > 0:
+        sims = elem_emb @ frame_emb.T  # (M, N)
+        if elem_w.numel() != elem_emb.shape[0]:
+            elem_w = torch.ones((elem_emb.shape[0],), device=elem_emb.device)
+        elem_w = elem_w.float().clamp(min=0.0)
+        quotas = _allocate_counts_by_weights(elem_w, ke)
+        picked: set[int] = set()
+        for j in range(int(elem_emb.shape[0])):
+            q = int(quotas[j].item())
+            if q <= 0:
                 continue
-            results["selected_frame_counts"].append(len(frames))
+            for idx in torch.argsort(sims[j], descending=True).tolist():
+                if idx in picked:
+                    continue
+                picked.add(int(idx))
+                q -= 1
+                if q <= 0:
+                    break
+        te = sorted(picked)
+        if len(te) < ke:
+            agg = (sims * elem_w.unsqueeze(1)).sum(dim=0)
+            for idx in torch.argsort(agg, descending=True).tolist():
+                if idx in picked:
+                    continue
+                picked.add(int(idx))
+                te.append(int(idx))
+                if len(te) >= ke:
+                    break
+
+    # Step 4: merge without forced backfill
+    f0 = sorted(set(su).union(te))
+    return f0
+
+
+# ==================== VLM 单轮推理与打分 ====================
+def _option_probs(proc: Any, logits: torch.Tensor) -> dict[str, float]:
+    p = torch.softmax(logits, dim=-1)
+    out = {}
+    for o in ("A", "B", "C", "D"):
+        # 选项首 token 可能有前导空格或大小写差异，统一做聚合。
+        ids = set()
+        for t in {o, o.lower(), f" {o}", f" {o.lower()}"}:
+            toks = proc.tokenizer(t, add_special_tokens=False)["input_ids"]
+            if toks:
+                ids.add(int(toks[0]))
+        out[o] = float(sum(float(p[i].item()) for i in ids)) if ids else 0.0
+    return out
+
+
+def _resize_lowres(frames: list[Image.Image], size: int) -> list[Image.Image]:
+    out = []
+    for im in frames:
+        w, h = im.size
+        scale = size / max(w, h)
+        out.append(im.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.BICUBIC))
+    return out
+
+
+def _run_vlm_once(model: Any, proc: Any, frames: list[Image.Image], prompt: str, max_new_tokens: int, model_mode: str) -> dict[str, Any]:
+    content = [{"type": "image", "image": f} for f in frames] + [{"type": "text", "text": prompt}]
+    text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
+    inputs = proc(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+    t0 = time.perf_counter()
+    with torch.no_grad():
+        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, return_dict_in_generate=True, output_scores=True)
+    infer_t = time.perf_counter() - t0
+    seq = out.sequences
+    trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, seq)]
+    resp = proc.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0].strip()
+    _, _, pred = parse_response_by_mode(response=resp, has_options=True, model_mode=model_mode)
+    logits = out.scores[-1][0] if out.scores else torch.zeros((model.config.vocab_size,), device=model.device)
+    probs = _option_probs(proc, logits)
+    pred_u = str(pred).strip().upper()
+    if pred_u not in {"A", "B", "C", "D"}:
+        pred_u = max(probs.items(), key=lambda x: x[1])[0]
+    # 本脚本只在 instruct 模式下使用该 entropy 信号（main 中已阻止 thinking）。
+    v = torch.tensor([probs["A"], probs["B"], probs["C"], probs["D"]], dtype=torch.float32)
+    s = float(v.sum().item())
+    entropy = math.log(4.0) if s <= 0 else float((-torch.sum((v / s) * torch.log((v / s).clamp(min=1e-12)))).item())
+    return {"pred_answer": pred_u, "response": resp, "option_probs": probs, "entropy": entropy, "inference_time": infer_t, "hit_max_tokens": int(len(out.scores) >= max_new_tokens)}
+
+
+def _pick_new_frames(kw_emb: torch.Tensor, kw_w: torch.Tensor, img_emb: torch.Tensor, selected: list[int], add_n: int) -> list[int]:
+    if kw_emb.shape[0] == 0:
+        return []
+    s = set(selected)
+    score = (kw_emb @ img_emb.T * kw_w.unsqueeze(1)).sum(dim=0)
+    out = []
+    for i in torch.argsort(score, descending=True).tolist():
+        if i in s:
+            continue
+        out.append(int(i))
+        if len(out) >= add_n:
+            break
+    return out
+
+
+def _pick_new_frames_from_cached_sims(
+    kw_sims: torch.Tensor,
+    kw_w: torch.Tensor,
+    selected: list[int],
+    add_n: int,
+) -> list[int]:
+    """基于关键词-帧相似度缓存做增量选帧，不重复计算 CLIP 相似度。"""
+    if kw_sims.ndim != 2 or kw_sims.shape[0] == 0 or add_n <= 0:
+        return []
+    s = set(selected)
+    m = int(kw_sims.shape[0])
+    if kw_w.numel() != m:
+        kw_w = torch.ones((m,), device=kw_sims.device)
+    kw_w = kw_w.float().clamp(min=0.0)
+    quotas = _allocate_counts_by_weights(kw_w, add_n)
+
+    picked: set[int] = set()
+    for j in range(m):
+        q = int(quotas[j].item())
+        if q <= 0:
+            continue
+        for idx in torch.argsort(kw_sims[j], descending=True).tolist():
+            if idx in s or idx in picked:
+                continue
+            picked.add(int(idx))
+            q -= 1
+            if q <= 0:
+                break
+
+    out = sorted(picked)
+    if len(out) >= add_n:
+        return out[:add_n]
+
+    agg = (kw_sims * kw_w.unsqueeze(1)).sum(dim=0)
+    for idx in torch.argsort(agg, descending=True).tolist():
+        if idx in s or idx in picked:
+            continue
+        picked.add(int(idx))
+        out.append(int(idx))
+        if len(out) >= add_n:
+            break
+    return sorted(out)
+
+
+def _build_image_keyword_scores(
+    selected_idx: list[int],
+    frame_ids: list[int],
+    kws_rep: list[str],
+    kw_emb_rep: torch.Tensor,
+    img_emb: torch.Tensor,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not selected_idx:
+        return out
+    if not kws_rep or kw_emb_rep.shape[0] == 0:
+        for idx in selected_idx:
+            out.append({"index_in_pool": int(idx), "frame_id": int(frame_ids[idx]), "keyword_scores": {}})
+        return out
+
+    sel_tensor = torch.tensor(selected_idx, device=img_emb.device, dtype=torch.long)
+    sims = kw_emb_rep @ img_emb[sel_tensor].T
+    sims_cpu = sims.detach().cpu().tolist()
+    for j, idx in enumerate(selected_idx):
+        kw_scores = {kw: float(sims_cpu[i][j]) for i, kw in enumerate(kws_rep)}
+        out.append({"index_in_pool": int(idx), "frame_id": int(frame_ids[idx]), "keyword_scores": kw_scores})
+    return out
+
+
+# ==================== 单样本评估主流程 ====================
+def _eval_one_sample(
+    model: Any,
+    proc: Any,
+    clip_proc: Any,
+    clip_model: Any,
+    clip_device: str,
+    sample: VQASample,
+    prompt: str,
+    args: argparse.Namespace,
+    max_new_tokens: int,
+    model_mode: str,
+    budget: int,
+    pool_size: int,
+    preprocessed_clip_dir: str | None,
+) -> dict[str, Any]:
+    t0 = time.perf_counter()
+    if args.use_preprocessed_clip_frames:
+        frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+        if len(imgs) > pool_size:
+            keep = _sample_uniform_positions(len(imgs), pool_size)
+            frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
+    else:
+        frame_ids, imgs = _collect_video_frames_uniform(sample.video_path, pool_size)
+    frame_sampling_time = time.perf_counter() - t0
+
+    t1 = time.perf_counter()
+    img_emb = _encode_images(imgs, clip_proc, clip_model, clip_device, args.ours_clip_batch_size)
+    base_round_frames = max(1, int(args.num_frames))
+    total_rounds = max(1, int(args.max_refine_rounds) + 1)
+
+    kws = _extract_keywords_with_llm_text(
+        model=model,
+        proc=proc,
+        question=sample.question,
+        options=sample.options,
+        max_new_tokens=128,
+    )
+    if not kws:
+        raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
+    kw_emb = _encode_texts(kws, clip_proc, clip_model, clip_device, 32)
+    kws_rep, kw_emb_rep = _merge_keywords(kws, kw_emb, args.keyword_sim_merge_threshold)
+    info_pack = _compute_keyword_information(kws_rep, kw_emb_rep, img_emb, args)
+    kws_use: list[str] = info_pack["kws_use"]
+    kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
+    kw_weights: torch.Tensor = info_pack["kw_weights"]
+    kw_frame_sims = (kw_emb_use @ img_emb.T) if kw_emb_use.shape[0] > 0 else torch.empty((0, img_emb.shape[0]), device=img_emb.device)
+
+    if VERBOSE:
+        keep_weight_map: dict[str, float] = {}
+        for i, kw in enumerate(kws_use):
+            keep_weight_map[kw] = float(kw_weights[i].item()) if kw_weights.numel() > i else 0.0
+        _log(
+            "sample={} info_threshold={:.4f} (quantile={:.4f}, min={:.4f})".format(
+                sample.sample_id,
+                float(info_pack["info_threshold"]),
+                float(info_pack["info_quantile_value"]),
+                float(args.keyword_keep_info_min),
+            )
+        )
+        for r in info_pack["rows"]:
+            _log(
+                "sample={} kw='{}' kept={} info={:.4f} weight={:.4f} peak={:.4f} prom_z={:.3f} conc={:.3f}".format(
+                    sample.sample_id,
+                    r["keyword"],
+                    r["kept"],
+                    r["info"],
+                    keep_weight_map.get(r["keyword"], 0.0),
+                    r["peak"],
+                    r["prominence_z"],
+                    r["concentration_term"],
+                )
+            )
+    _log(f"sample={sample.sample_id} 关键词过滤: merged={len(kws_rep)} -> kept={len(kws_use)}")
+
+    emb_time = time.perf_counter() - t1
+    _log(
+        f"sample={sample.sample_id} 候选={len(imgs)}, 关键词={len(kws_use)}/{len(kws_rep)}, "
+        f"rounds={total_rounds}, round_base={base_round_frames}, budget={budget}"
+    )
+
+    selected_history: list[int] = []
+    hist: list[tuple[float, str, str, list[int]]] = []
+    infer_t = 0.0
+    over_limit = 0
+    round_ents: list[float] = []
+    last_entropy: float | None = None
+
+    for ridx in range(total_rounds):
+        if kw_emb_use.shape[0] == 0 or len(selected_history) >= budget:
+            break
+        remain = budget - len(selected_history)
+        rounds_left = max(1, total_rounds - ridx)
+        base_add = max(1, int(math.ceil(remain / rounds_left)))
+        if last_entropy is None:
+            add_n = min(remain, max(base_round_frames, base_add))
+        else:
+            ent_norm = max(0.0, min(1.0, last_entropy / math.log(4.0)))
+            adaptive = max(1, int(round(base_add * (0.6 + 0.4 * ent_norm))))
+            add_n = min(remain, adaptive)
+        new_idx = _pick_new_frames_from_cached_sims(kw_frame_sims, kw_weights, selected_history, add_n)
+        if not new_idx:
+            _log(f"sample={sample.sample_id} round={ridx} stop: no informative keyword-guided frames left")
+            break
+
+        current_round_idx = sorted(new_idx, key=lambda x: frame_ids[x])
+        selected_history = sorted(set(selected_history + current_round_idx), key=lambda x: frame_ids[x])
+        round_frames = _resize_lowres([imgs[i] for i in selected_history], args.lowres_size)
+        round_out = _run_vlm_once(model, proc, round_frames, prompt, max_new_tokens, model_mode)
+        round_kw_scores = _build_image_keyword_scores(selected_history, frame_ids, kws_use, kw_emb_use, img_emb)
+        dump_verbose_round(
+            verbose=VERBOSE,
+            verbose_run_dir=_VERBOSE_RUN_DIR,
+            sample_id=sample.sample_id,
+            stage="iterative",
+            round_id=ridx,
+            question=sample.question,
+            options=sample.options,
+            gt_answer=sample.answer,
+            all_keywords=kws_use,
+            focus_keywords=kws_use,
+            frame_ids=frame_ids,
+            selected_idx=selected_history,
+            added_idx=current_round_idx,
+            imgs=imgs,
+            image_keyword_scores=round_kw_scores,
+            vlm_out=round_out,
+        )
+
+        infer_t += float(round_out["inference_time"])
+        over_limit += int(round_out["hit_max_tokens"])
+        last_entropy = float(round_out["entropy"])
+        round_ents.append(last_entropy)
+        hist.append((last_entropy, str(round_out["pred_answer"]), str(round_out["response"]), selected_history.copy()))
+        _log(
+            f"sample={sample.sample_id} round={ridx} add={len(current_round_idx)}, total={len(selected_history)}, "
+            f"entropy={round_out['entropy']:.4f}, pred={round_out['pred_answer']}"
+        )
+
+        if last_entropy < args.entropy_stop_threshold:
+            _log(f"sample={sample.sample_id} round={ridx} stop: entropy below threshold")
+            break
+        if len(round_ents) >= 3:
+            d1 = round_ents[-3] - round_ents[-2]
+            d2 = round_ents[-2] - round_ents[-1]
+            if d1 < args.convergence_delta_threshold and d2 < args.convergence_delta_threshold:
+                _log(f"sample={sample.sample_id} round={ridx} stop: entropy converged")
+                break
+
+    if not hist:
+        raise RuntimeError(f"样本未能进入任何有效采样轮次: sample={sample.sample_id}")
+
+    best_entropy, best_pred, best_resp, best_sel = min(hist, key=lambda x: x[0])
+    _log(f"sample={sample.sample_id} best_entropy={best_entropy:.4f}, best_pred={best_pred}, best_frames={len(best_sel)}")
+    return {"pred_answer": best_pred, "response": best_resp, "inference_time": infer_t, "frame_sampling_time": frame_sampling_time, "embedding_build_time": emb_time, "selected_frame_count": len(best_sel), "over_limit_count": int(over_limit)}
+
+
+# ==================== 数据集级评估 ====================
+def evaluate_vqa(model: Any, proc: Any, samples: list[VQASample], args: argparse.Namespace, max_new_tokens: int, model_mode: str, budget: int, pool_size: int, preprocessed_clip_dir: str | None) -> dict[str, Any]:
+    clip_proc, clip_model, clip_device = _load_clip(args.ours_clip_model_id, args.ours_clip_device)
+
+    res = {"correct": 0, "total": 0, "mra_sum": 0.0, "mra_count": 0, "inference_times": [], "frame_sampling_times": [], "embedding_build_times": [], "selected_frame_counts": [], "over_max_tokens_count": 0}
+    pbar = tqdm(samples, desc="评估进度(ours semantic refinement)")
+    for s in pbar:
+        if args.task_filter != "all" and s.task_type != args.task_filter:
+            continue
+        out = _eval_one_sample(model, proc, clip_proc, clip_model, clip_device, s, build_user_text(s.question, s.options), args, max_new_tokens, model_mode, budget, pool_size, preprocessed_clip_dir)
+        pred = out["pred_answer"]
+        res["inference_times"].append(float(out["inference_time"]))
+        res["frame_sampling_times"].append(float(out["frame_sampling_time"]))
+        res["embedding_build_times"].append(float(out["embedding_build_time"]))
+        res["selected_frame_counts"].append(int(out["selected_frame_count"]))
+        res["over_max_tokens_count"] += int(out["over_limit_count"])
+        if s.options is not None:
+            res["total"] += 1
+            if str(s.answer).strip().upper() == str(pred).strip().upper():
+                res["correct"] += 1
+        else:
             try:
-                t_step = time.perf_counter()
-                response, inference_time, embedding_build_time, generated_token_count, hit_max_tokens = (
-                    generate_response_with_split_embedding(
-                        model=model,
-                        processor=processor,
-                        frames=frames,
-                        prompt=prompt,
-                        max_new_tokens=max_new_tokens,
-                    )
-                )
-                step_times["model_call"] += time.perf_counter() - t_step
-            except RuntimeError as e:
-                warnings.warn(
-                    f"embedding 分开输入失败，样本已跳过: sample_id={sample.sample_id}, error={e}",
-                    RuntimeWarning,
-                    stacklevel=1,
-                )
-                continue
-
-        t_step = time.perf_counter()
-        cot_text, ans_text, parsed_pred_answer = parse_response_by_mode(
-            response=response,
-            has_options=bool(sample.options),
-            model_mode=model_mode,
-        )
-        pred_answer = parsed_pred_answer
-        step_times["answer_extract"] += time.perf_counter() - t_step
-
-        t_step = time.perf_counter()
-        if hit_max_tokens:
-            results["over_max_tokens_count"] += 1
-        has_think_end = "</think>" in response
-        if not has_think_end:
-            results["missing_think_end_count"] += 1
-        answer_usable = has_think_end or (not require_think_end_for_scoring)
-        if not answer_usable:
-            pred_answer = None
-
-        results["inference_times"].append(inference_time)
-        results["embedding_build_times"].append(embedding_build_time)
-
-        if sample.options is not None:
-            is_correct = answer_usable and (
-                str(sample.answer).strip().upper() == str(pred_answer).strip().upper()
-            )
-            results["total"] += 1
-            if is_correct:
-                results["correct"] += 1
-        else:
-            if answer_usable:
-                try:
-                    pred_num = float(pred_answer) if pred_answer else 0.0
-                    gt_num = float(sample.answer)
-                    results["mra_sum"] += calculate_mra(pred_num, gt_num)
-                    results["mra_count"] += 1
-                except (ValueError, TypeError):
-                    pass
-            else:
-                results["mra_count"] += 1
-        step_times["score_update"] += time.perf_counter() - t_step
-
-        t_step = time.perf_counter()
-        partial_acc, partial_time = _compute_accuracy_from_results(results, task_filter)
-        avg_embed_time = _compute_avg_embedding_build_time(results)
-        pbar.set_postfix(
-            Acc=f"{partial_acc:.2f}%",
-            AvgTime=f"{partial_time:.2f}s",
-            AvgEmbed=f"{avg_embed_time:.2f}s",
-            n=i + 1,
-        )
-        step_times["progress_update"] += time.perf_counter() - t_step
-
-        _ = sample_total_start
-        _ = cot_text
-        _ = ans_text
-
-    return results
+                res["mra_sum"] += calculate_mra(float(pred) if pred else 0.0, float(s.answer))
+            except (ValueError, TypeError):
+                pass
+            res["mra_count"] += 1
+        acc, t = _compute_accuracy_from_results(res, args.task_filter)
+        pbar.set_postfix(Acc=f"{acc:.2f}%", AvgTime=f"{t:.2f}s")
+    return res
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="通用 VQA 评估脚本（embedding 分开输入）")
+    # ==================== 命令行参数 ====================
+    p = argparse.ArgumentParser(description="VQA ours: 粗看+关键词驱动精看")
     p.add_argument("--dataset", type=str, default="vsibench", choices=list_supported_datasets())
     p.add_argument("--dataset_split", type=str, default="test")
     p.add_argument("--dataset_name", type=str, default="nyu-visionx/VSI-Bench")
     p.add_argument("--dataset_config", type=str, default="full")
     p.add_argument("--no_dataset_config", action="store_true")
-
     p.add_argument("--model_path", type=str, default="Qwen/Qwen3-VL-4B-Thinking")
-    p.add_argument("--model_name", type=str, default=None, help="模型名称（可选，优先用于日志）")
+    p.add_argument("--model_name", type=str, default=None)
     p.add_argument("--use_lora", action="store_true")
     p.add_argument("--base_model", type=str, default=None)
     p.add_argument("--merge_lora", action="store_true")
-
     p.add_argument("--video_dir", type=str, default="~/dataset/vsi_bench")
     p.add_argument("--num_samples", type=str, default="10")
-    p.add_argument("--num_frames", type=int, default=8)
-    p.add_argument(
-        "--frame_sampling_method",
-        type=str,
-        default="uniform",
-        choices=[
-            "uniform",
-            "random",
-            "focus",
-            "sevila",
-            "videoagent",
-            "clip",
-            "siglip2",
-            "aks",
-            "aks-blip",
-            "aks-clip",
-            "ours",
-        ],
-    )
-    p.add_argument("--focus_blip_model_name", type=str, default="Salesforce/blip-itm-base-coco")
-    p.add_argument("--focus_blip_device", type=str, default=None)
-    p.add_argument("--focus_blip_batch_size", type=int, default=16)
+    p.add_argument("--num_frames", type=int, default=16, help="每轮基础新增帧数（默认16）")
+    p.add_argument("--frame_sampling_method", type=str, default="ours", choices=["ours"])
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument(
-        "--task_filter",
-        type=str,
-        default="all",
-        choices=["all", "mcq", "numeric", "short", "medium", "long"],
-    )
+    p.add_argument("--task_filter", type=str, default="all", choices=["all", "mcq", "numeric", "short", "medium", "long"])
     p.add_argument("--max_new_tokens", type=int, default=2048)
     p.add_argument("--ours_clip_model_id", type=str, default="openai/clip-vit-base-patch32")
     p.add_argument("--ours_clip_device", type=str, default=None)
     p.add_argument("--ours_clip_batch_size", type=int, default=16)
-    p.add_argument(
-        "--enable_early_stop",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="是否启用 ours 迭代早停机制（默认启用）。",
-    )
-    p.add_argument(
-        "--early_stop_window",
-        type=int,
-        default=3,
-        help="连续满足条件多少轮后触发早停。",
-    )
-    p.add_argument(
-        "--early_stop_conf_threshold",
-        type=float,
-        default=0.9,
-        help="早停置信度阈值：所选答案的 option_prob 必须大于该值。",
-    )
-    p.add_argument(
-        "--frame_increment",
-        type=int,
-        default=1,
-        help="ours 迭代时每轮新增帧数（默认1，即 top-1, top-2, ...）。",
-    )
-    p.add_argument(
-        "--model_mode_config",
-        type=str,
-        default="config/model_response_modes.json",
-        help="模型响应模式配置文件(JSON): 通过规则自动判断 thinking/instruct。",
-    )
+    p.add_argument("--model_mode_config", type=str, default="config/model_response_modes.json")
     p.add_argument("--log_file", type=str, default="vqa_embedding_evaluation_log.csv")
     p.add_argument("--train_ratio", type=float, default=0.8)
     p.add_argument("--use_train_split", action="store_true")
-    p.add_argument(
-        "--use_preprocessed_clip_frames",
-        action="store_true",
-        help="启用后，ours 在 CLIP 排序阶段优先读取离线预处理帧。",
-    )
-    p.add_argument(
-        "--preprocessed_clip_fps",
-        type=float,
-        default=1.0,
-        help="预处理目录命名中的 fps（默认对应 /userhome/cs3/duanty/dataset_preposcess/{dataset}/clip_1）。",
-    )
-    p.add_argument(
-        "--preprocessed_clip_dir",
-        type=str,
-        default="",
-        help="预处理帧根目录；为空时自动使用 /userhome/cs3/duanty/dataset_preposcess/{dataset}/clip_{fps}。",
-    )
+    p.add_argument("--use_preprocessed_clip_frames", action="store_true")
+    p.add_argument("--preprocessed_clip_fps", type=float, default=1.0)
+    p.add_argument("--preprocessed_clip_dir", type=str, default="")
+    p.add_argument("--candidate_pool_size", type=int, default=128)
+    p.add_argument("--max_refine_rounds", type=int, default=1)
+    p.add_argument("--entropy_stop_threshold", type=float, default=0.8)
+    p.add_argument("--convergence_delta_threshold", type=float, default=0.02)
+    p.add_argument("--keyword_sim_merge_threshold", type=float, default=0.85)
+    p.add_argument("--info_peak_floor", type=float, default=0.20, help="信息量计算: 峰值项下限")
+    p.add_argument("--info_peak_ceiling", type=float, default=0.60, help="信息量计算: 峰值项上限")
+    p.add_argument("--info_prominence_center", type=float, default=1.5, help="信息量计算: 峰值突出度(sigmoid中心, z-score)")
+    p.add_argument("--info_prominence_scale", type=float, default=0.7, help="信息量计算: 峰值突出度(sigmoid斜率)")
+    p.add_argument("--info_entropy_temperature", type=float, default=0.08, help="信息量计算: 分布集中度温度")
+    p.add_argument("--info_mix_prominence", type=float, default=0.6, help="信息量计算: 突出度与集中度融合权重")
+    p.add_argument("--keyword_keep_peak_min", type=float, default=0.18, help="关键词保留: 峰值硬阈值")
+    p.add_argument("--keyword_keep_info_min", type=float, default=0.08, help="关键词保留: 信息量最小阈值")
+    p.add_argument("--keyword_keep_info_quantile", type=float, default=0.35, help="关键词保留: 信息量分位阈值")
+    p.add_argument("--keyword_keep_min_keywords", type=int, default=2, help="关键词保留: 最少保留词数")
+    p.add_argument("--coarse_uniform_ratio", type=float, default=0.0, help="coarse选帧中均匀抽样占比，其余预算按关键词信息量分配")
+    p.add_argument("--lowres_size", type=int, default=336)
     return p.parse_args()
 
 
 def main():
-    experiment_start_time = time.perf_counter()
+    # ==================== 主入口与实验记录 ====================
+    exp_t0 = time.perf_counter()
     args = parse_args()
+    global _VERBOSE_RUN_DIR
+    _VERBOSE_RUN_DIR = init_verbose_run_dir(verbose=VERBOSE, output_dir=VERBOSE_OUTPUT_DIR, log_fn=_log)
     video_dir = os.path.expanduser(args.video_dir)
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
-    default_preprocessed_dir = (
-        Path("/userhome/cs3/duanty/dataset_preposcess")
-        / args.dataset
-        / f"clip_{args.preprocessed_clip_fps:g}"
-    )
-    preprocessed_clip_dir = (
-        os.path.expanduser(args.preprocessed_clip_dir)
-        if args.preprocessed_clip_dir.strip()
-        else str(default_preprocessed_dir)
-    )
-    if args.use_preprocessed_clip_frames:
-        if args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
-            raise ValueError(
-                "use_preprocessed_clip_frames 仅支持 ours，"
-                f"当前 frame_sampling_method={args.frame_sampling_method}"
-            )
-        _ = preprocessed_clip_dir
+    default_pre = Path("/userhome/cs3/duanty/dataset_preposcess") / args.dataset / f"clip_{args.preprocessed_clip_fps:g}"
+    preprocessed_clip_dir = os.path.expanduser(args.preprocessed_clip_dir) if args.preprocessed_clip_dir.strip() else str(default_pre)
+    if args.use_preprocessed_clip_frames and args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
+        raise ValueError("use_preprocessed_clip_frames 仅支持 ours。")
 
     sample_count = None if args.num_samples.lower() == "all" else int(args.num_samples)
-    loader = get_data_loader(
-        args.dataset,
-        video_dir=video_dir,
-        seed=args.seed,
-        train_ratio=args.train_ratio,
-        task_filter=args.task_filter,
-        dataset_name=args.dataset_name,
-        dataset_config=args.dataset_config,
-        no_dataset_config=args.no_dataset_config,
-    )
-    samples = loader.get_split_samples(
-        split=args.dataset_split,
-        use_train_split=args.use_train_split,
-        sample_count=sample_count,
-    )
+    loader = get_data_loader(args.dataset, video_dir=video_dir, seed=args.seed, train_ratio=args.train_ratio, task_filter=args.task_filter, dataset_name=args.dataset_name, dataset_config=args.dataset_config, no_dataset_config=args.no_dataset_config)
+    samples = loader.get_split_samples(split=args.dataset_split, use_train_split=args.use_train_split, sample_count=sample_count)
 
     resolved_model_path = os.path.expanduser(args.model_path)
     lora_path = ""
@@ -578,104 +842,54 @@ def main():
         lora_path = resolved_model_path
     else:
         model_name = os.path.basename(resolved_model_path.rstrip("/"))
-        lora_path = ""
 
-    mode_config = load_model_response_mode_config(args.model_mode_config)
-    model_identifier_candidates = [resolved_model_path]
-    if model_name:
-        model_identifier_candidates.append(model_name)
-    if args.base_model:
-        model_identifier_candidates.append(os.path.expanduser(args.base_model))
-
-    last_error: Exception | None = None
-    model_mode = ""
-    require_think_end_for_scoring = True
-    matched_rule = ""
-    for candidate in model_identifier_candidates:
+    mode_cfg = load_model_response_mode_config(args.model_mode_config)
+    candidates = [resolved_model_path] + ([model_name] if model_name else []) + ([os.path.expanduser(args.base_model)] if args.base_model else [])
+    model_mode, last_err = "", None
+    for c in candidates:
         try:
-            model_mode, require_think_end_for_scoring, matched_rule = resolve_model_mode(
-                model_identifier=candidate,
-                config=mode_config,
-            )
+            model_mode, _, _ = resolve_model_mode(model_identifier=c, config=mode_cfg)
             break
         except (KeyError, ValueError) as e:
-            last_error = e
+            last_err = e
     if not model_mode:
+        raise RuntimeError(f"模型模式识别失败: {candidates}") from last_err
+    if model_mode == "thinking":
         raise RuntimeError(
-            "模型模式识别失败，请在 model_response_modes.json 中添加精确键。"
-            f" tried={model_identifier_candidates}"
-        ) from last_error
-    _ = matched_rule
+            "thinking 模式下 entropy 信号不可靠（out.scores[-1] 不对应答案 token），"
+            "本脚本仅支持 instruct 模式。请改用 instruct 模型或扩展实现。"
+        )
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
 
-    model, processor = load_model_and_processor(
-        resolved_model_path,
-        use_lora=args.use_lora,
-        base_model=args.base_model,
-        merge_lora=args.merge_lora,
+    pool_size = args.candidate_pool_size
+    base_round_frames = max(1, int(args.num_frames))
+    total_rounds = max(1, int(args.max_refine_rounds) + 1)
+    per_extra_round = max(1, base_round_frames // 4)
+    default_budget = base_round_frames + per_extra_round * max(0, total_rounds - 1)
+    budget = default_budget
+    _log(
+        f"配置: pool_size={pool_size}, rounds={total_rounds}, "
+        f"round_base={base_round_frames}, budget={budget}"
     )
-    results = evaluate_vqa(
-        model=model,
-        processor=processor,
-        samples=samples,
-        num_frames=args.num_frames,
-        task_filter=args.task_filter,
-        frame_sampling_method=args.frame_sampling_method,
-        seed=args.seed,
-        focus_blip_model_name=args.focus_blip_model_name,
-        focus_blip_device=args.focus_blip_device,
-        focus_blip_batch_size=args.focus_blip_batch_size,
-        max_new_tokens=effective_max_new_tokens,
-        ours_clip_model_id=args.ours_clip_model_id,
-        ours_clip_device=args.ours_clip_device,
-        ours_clip_batch_size=args.ours_clip_batch_size,
-        model_mode=model_mode,
-        require_think_end_for_scoring=require_think_end_for_scoring,
-        use_preprocessed_clip_frames=args.use_preprocessed_clip_frames,
-        preprocessed_clip_dir=preprocessed_clip_dir,
-        enable_early_stop=args.enable_early_stop,
-        early_stop_window=args.early_stop_window,
-        early_stop_conf_threshold=args.early_stop_conf_threshold,
-        frame_increment=args.frame_increment,
-    )
-    avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
-    evaluated_samples, correct_count = _compute_score_counts_for_csv(results, args.task_filter)
-    avg_frame_sampling_time = _compute_avg_frame_sampling_time(results)
-    avg_embedding_build_time = _compute_avg_embedding_build_time(results)
-    avg_selected_frame_count = _compute_avg_selected_frame_count(results)
-    # 保留历史字段名 avg_total_time_hours，但语义改为整次实验总耗时（wall-clock）
-    avg_total_time_hours = (time.perf_counter() - experiment_start_time) / 3600.0
-    log_to_csv(
-        log_file=log_file,
-        dataset=args.dataset,
-        seed=args.seed,
-        task_filter=args.task_filter,
-        num_samples=len(samples),
-        evaluated_samples=evaluated_samples,
-        correct_count=correct_count,
-        accuracy_percent=avg_accuracy,
-        num_frames=args.num_frames,
-        avg_accuracy=avg_accuracy,
-        avg_inference_time=avg_inference_time,
-        frame_sampling_method=args.frame_sampling_method,
-        avg_frame_sampling_time=avg_frame_sampling_time,
-        avg_embedding_build_time=avg_embedding_build_time,
-        avg_selected_frame_count=avg_selected_frame_count,
-        avg_total_time_hours=avg_total_time_hours,
-        over_max_tokens_count=results["over_max_tokens_count"],
-        model_name=model_name,
-        lora_path=lora_path,
-        train_ratio=args.train_ratio,
-        use_train_split=args.use_train_split,
-        ours_clip_model_id=args.ours_clip_model_id,
-        ours_clip_batch_size=args.ours_clip_batch_size,
-        use_preprocessed_clip_frames=args.use_preprocessed_clip_frames,
-        preprocessed_clip_fps=args.preprocessed_clip_fps,
-        enable_early_stop=args.enable_early_stop,
-        early_stop_window=args.early_stop_window,
-        early_stop_conf_threshold=args.early_stop_conf_threshold,
-        frame_increment=args.frame_increment,
-    )
+
+    model, proc = load_model_and_processor(resolved_model_path, use_lora=args.use_lora, base_model=args.base_model, merge_lora=args.merge_lora)
+    results = evaluate_vqa(model, proc, samples, args, effective_max_new_tokens, model_mode, budget, pool_size, preprocessed_clip_dir)
+
+    avg_acc, avg_time = _compute_accuracy_from_results(results, args.task_filter)
+    eval_n, correct = _compute_score_counts_for_csv(results, args.task_filter)
+    avg_fs = _avg(results["frame_sampling_times"])
+    avg_emb = _avg(results["embedding_build_times"])
+    avg_sel = _avg(results["selected_frame_counts"])
+    avg_total_h = (time.perf_counter() - exp_t0) / 3600.0
+
+    Path(log_file).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+    file_exists = os.path.exists(log_file)
+    with open(log_file, "a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if not file_exists:
+            w.writerow(["timestamp", "dataset", "seed", "task_filter", "num_samples", "evaluated_samples", "correct_count", "accuracy_percent", "num_frames", "avg_accuracy", "avg_inference_time", "frame_sampling_method", "avg_frame_sampling_time", "avg_embedding_build_time", "avg_selected_frame_count", "avg_total_time_hours", "over_max_tokens_count", "model_name", "lora_path", "train_ratio", "eval_split", "ours_clip_model_id", "ours_clip_batch_size", "use_preprocessed_clip_frames", "preprocessed_clip_fps", "entropy_stop_threshold"])
+        w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.dataset, args.seed, args.task_filter, len(samples), eval_n, f"{correct:.6f}", f"{avg_acc:.2f}", args.num_frames, f"{avg_acc:.2f}", f"{avg_time:.3f}", args.frame_sampling_method, f"{avg_fs:.6f}", f"{avg_emb:.6f}", f"{avg_sel:.6f}", f"{avg_total_h:.6f}", results["over_max_tokens_count"], model_name, lora_path, args.train_ratio, "train" if args.use_train_split else "test", args.ours_clip_model_id, args.ours_clip_batch_size, args.use_preprocessed_clip_frames, args.preprocessed_clip_fps, args.entropy_stop_threshold])
+    _log(f"评估完成: samples={len(samples)}, acc={avg_acc:.2f}%, avg_infer={avg_time:.3f}s")
 
 
 if __name__ == "__main__":

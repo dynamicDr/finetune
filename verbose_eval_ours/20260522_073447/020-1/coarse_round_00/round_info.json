@@ -1,0 +1,347 @@
+{
+  "sample_id": "020-1",
+  "stage": "coarse",
+  "round": 0,
+  "question": "Based on the video, which of the following statements provides the most accurate explanation for why the Statue of Liberty is green in color?",
+  "options": [
+    "A. Because the copper is rusty.",
+    "B. Because she was painted green.",
+    "C. Because people didn't like her original color.",
+    "D. Because she is not the origin one any more."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "the statue of liberty",
+    "copper material",
+    "a statue standing on a pedestal",
+    "a statue with seven rays"
+  ],
+  "focus_keywords": [
+    "the statue of liberty",
+    "copper material",
+    "a statue standing on a pedestal",
+    "a statue with seven rays"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 6,
+      "frame_id": 144,
+      "file": "00_frame_144.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 264,
+      "file": "01_frame_264.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 288,
+      "file": "02_frame_288.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 312,
+      "file": "03_frame_312.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 336,
+      "file": "04_frame_336.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 360,
+      "file": "05_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432,
+      "file": "06_frame_432.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 456,
+      "file": "07_frame_456.jpg"
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 791,
+      "file": "08_frame_791.jpg"
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 815,
+      "file": "09_frame_815.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1007,
+      "file": "10_frame_1007.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1055,
+      "file": "11_frame_1055.jpg"
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1079,
+      "file": "12_frame_1079.jpg"
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103,
+      "file": "13_frame_1103.jpg"
+    },
+    {
+      "index_in_pool": 74,
+      "frame_id": 1774,
+      "file": "14_frame_1774.jpg"
+    },
+    {
+      "index_in_pool": 78,
+      "frame_id": 1870,
+      "file": "15_frame_1870.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 6,
+      "frame_id": 144
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 264
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 288
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 312
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 336
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 456
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 791
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 815
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1007
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1055
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1079
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103
+    },
+    {
+      "index_in_pool": 74,
+      "frame_id": 1774
+    },
+    {
+      "index_in_pool": 78,
+      "frame_id": 1870
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 6,
+      "frame_id": 144,
+      "keyword_scores": {
+        "the statue of liberty": 0.22237221896648407,
+        "copper material": 0.19352787733078003,
+        "a statue standing on a pedestal": 0.2754957973957062,
+        "a statue with seven rays": 0.24700719118118286
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 264,
+      "keyword_scores": {
+        "the statue of liberty": 0.3200559616088867,
+        "copper material": 0.19458328187465668,
+        "a statue standing on a pedestal": 0.23737071454524994,
+        "a statue with seven rays": 0.2421509325504303
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 288,
+      "keyword_scores": {
+        "the statue of liberty": 0.31672078371047974,
+        "copper material": 0.18904781341552734,
+        "a statue standing on a pedestal": 0.2619410753250122,
+        "a statue with seven rays": 0.23082977533340454
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 312,
+      "keyword_scores": {
+        "the statue of liberty": 0.3231709897518158,
+        "copper material": 0.18695704638957977,
+        "a statue standing on a pedestal": 0.2594640552997589,
+        "a statue with seven rays": 0.2322462797164917
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 336,
+      "keyword_scores": {
+        "the statue of liberty": 0.18142004311084747,
+        "copper material": 0.2643676698207855,
+        "a statue standing on a pedestal": 0.16862381994724274,
+        "a statue with seven rays": 0.16390135884284973
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 360,
+      "keyword_scores": {
+        "the statue of liberty": 0.1955791711807251,
+        "copper material": 0.2495475560426712,
+        "a statue standing on a pedestal": 0.17628172039985657,
+        "a statue with seven rays": 0.17305853962898254
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432,
+      "keyword_scores": {
+        "the statue of liberty": 0.30466657876968384,
+        "copper material": 0.2350994050502777,
+        "a statue standing on a pedestal": 0.2683413326740265,
+        "a statue with seven rays": 0.2796745002269745
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 456,
+      "keyword_scores": {
+        "the statue of liberty": 0.29552289843559265,
+        "copper material": 0.22036178410053253,
+        "a statue standing on a pedestal": 0.25810497999191284,
+        "a statue with seven rays": 0.26321765780448914
+      }
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 791,
+      "keyword_scores": {
+        "the statue of liberty": 0.31512701511383057,
+        "copper material": 0.22371040284633636,
+        "a statue standing on a pedestal": 0.2822428047657013,
+        "a statue with seven rays": 0.2697610557079315
+      }
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 815,
+      "keyword_scores": {
+        "the statue of liberty": 0.3102762997150421,
+        "copper material": 0.2218526005744934,
+        "a statue standing on a pedestal": 0.2690909504890442,
+        "a statue with seven rays": 0.2622586190700531
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1007,
+      "keyword_scores": {
+        "the statue of liberty": 0.3098520040512085,
+        "copper material": 0.21241958439350128,
+        "a statue standing on a pedestal": 0.2690863311290741,
+        "a statue with seven rays": 0.26387205719947815
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1055,
+      "keyword_scores": {
+        "the statue of liberty": 0.3108300566673279,
+        "copper material": 0.2177707850933075,
+        "a statue standing on a pedestal": 0.29630035161972046,
+        "a statue with seven rays": 0.2755861282348633
+      }
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1079,
+      "keyword_scores": {
+        "the statue of liberty": 0.31008002161979675,
+        "copper material": 0.2145187258720398,
+        "a statue standing on a pedestal": 0.29676559567451477,
+        "a statue with seven rays": 0.2787570059299469
+      }
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103,
+      "keyword_scores": {
+        "the statue of liberty": 0.3113107681274414,
+        "copper material": 0.21154260635375977,
+        "a statue standing on a pedestal": 0.27056315541267395,
+        "a statue with seven rays": 0.25258487462997437
+      }
+    },
+    {
+      "index_in_pool": 74,
+      "frame_id": 1774,
+      "keyword_scores": {
+        "the statue of liberty": 0.19593922793865204,
+        "copper material": 0.24865444004535675,
+        "a statue standing on a pedestal": 0.22748307883739471,
+        "a statue with seven rays": 0.21191726624965668
+      }
+    },
+    {
+      "index_in_pool": 78,
+      "frame_id": 1870,
+      "keyword_scores": {
+        "the statue of liberty": 0.2723709046840668,
+        "copper material": 0.20704154670238495,
+        "a statue standing on a pedestal": 0.29654425382614136,
+        "a statue with seven rays": 0.2483084797859192
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "entropy": 0.9441222548484802,
+  "option_probs": {
+    "A": 3.644555452463167e-19,
+    "B": 2.8192864513270107e-19,
+    "C": 1.677443021300316e-20,
+    "D": 3.4650191963062856e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.22046206495724618
+}

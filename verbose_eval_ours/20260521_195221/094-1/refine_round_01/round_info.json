@@ -1,0 +1,101 @@
+{
+  "sample_id": "094-1",
+  "stage": "refine",
+  "round": 1,
+  "question": "What color is the monkey depicted in the video?",
+  "options": [
+    "A. Yellow.",
+    "B. Green.",
+    "C. Red.",
+    "D. Blue."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a monkey"
+  ],
+  "focus_keywords": [
+    "a monkey"
+  ],
+  "selected_count": 4,
+  "selected_images": [
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "file": "00_frame_390.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420,
+      "file": "01_frame_420.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 510,
+      "file": "02_frame_510.jpg"
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 870,
+      "file": "03_frame_870.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 13,
+      "frame_id": 390
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 510
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 870
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "keyword_scores": {
+        "a monkey": 0.2608208954334259
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420,
+      "keyword_scores": {
+        "a monkey": 0.2660706043243408
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 510,
+      "keyword_scores": {
+        "a monkey": 0.26104938983917236
+      }
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 870,
+      "keyword_scores": {
+        "a monkey": 0.26152846217155457
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.7666345834732056,
+  "option_probs": {
+    "A": 1.2586302824147137e-13,
+    "B": 8.160902475443012e-13,
+    "C": 5.547732459993231e-14,
+    "D": 5.795542150165535e-14
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.6550273089669645
+}

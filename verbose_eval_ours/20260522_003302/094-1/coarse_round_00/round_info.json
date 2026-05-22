@@ -1,0 +1,165 @@
+{
+  "sample_id": "094-1",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What color is the monkey depicted in the video?",
+  "options": [
+    "A. Yellow.",
+    "B. Green.",
+    "C. Red.",
+    "D. Blue."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a monkey"
+  ],
+  "focus_keywords": [
+    "a monkey"
+  ],
+  "selected_count": 8,
+  "selected_images": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 60,
+      "file": "00_frame_60.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 240,
+      "file": "01_frame_240.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420,
+      "file": "02_frame_420.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 600,
+      "file": "03_frame_600.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 780,
+      "file": "04_frame_780.jpg"
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 960,
+      "file": "05_frame_960.jpg"
+    },
+    {
+      "index_in_pool": 38,
+      "frame_id": 1140,
+      "file": "06_frame_1140.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1320,
+      "file": "07_frame_1320.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 60
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 240
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 600
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 780
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 960
+    },
+    {
+      "index_in_pool": 38,
+      "frame_id": 1140
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1320
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 60,
+      "keyword_scores": {
+        "a monkey": 0.21200795471668243
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 240,
+      "keyword_scores": {
+        "a monkey": 0.2572263181209564
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420,
+      "keyword_scores": {
+        "a monkey": 0.2660706043243408
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 600,
+      "keyword_scores": {
+        "a monkey": 0.2489178329706192
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 780,
+      "keyword_scores": {
+        "a monkey": 0.253342866897583
+      }
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 960,
+      "keyword_scores": {
+        "a monkey": 0.24723424017429352
+      }
+    },
+    {
+      "index_in_pool": 38,
+      "frame_id": 1140,
+      "keyword_scores": {
+        "a monkey": 0.3031989336013794
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1320,
+      "keyword_scores": {
+        "a monkey": 0.20243650674819946
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "entropy": 0.8597806096076965,
+  "option_probs": {
+    "A": 6.293821549303542e-18,
+    "B": 7.473855268742228e-18,
+    "C": 1.8669609849069646e-19,
+    "D": 4.1176614038128713e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.1355751259252429
+}

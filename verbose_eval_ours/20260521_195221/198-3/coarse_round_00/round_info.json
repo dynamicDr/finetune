@@ -1,0 +1,365 @@
+{
+  "sample_id": "198-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is this video mainly about?",
+  "options": [
+    "A. The man in black performs a mind-reading act with a volunteer from the audience.",
+    "B. The man in black showcases his skills in playing the guitar to a live audience.",
+    "C. The man in black teaches a group of students how to solve complex math problems.",
+    "D. The man in black performs a money magic to another man in blue in public."
+  ],
+  "gt_answer": "D",
+  "all_keywords": [
+    "a man in black",
+    "a volunteer from the audience",
+    "a man in blue",
+    "a guitar",
+    "math problems"
+  ],
+  "focus_keywords": [
+    "a man in black",
+    "a volunteer from the audience",
+    "a man in blue",
+    "a guitar",
+    "math problems"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 30,
+      "file": "00_frame_30.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "file": "01_frame_390.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 569,
+      "file": "02_frame_569.jpg"
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 749,
+      "file": "03_frame_749.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 869,
+      "file": "04_frame_869.jpg"
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 899,
+      "file": "05_frame_899.jpg"
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 929,
+      "file": "06_frame_929.jpg"
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 959,
+      "file": "07_frame_959.jpg"
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 1019,
+      "file": "08_frame_1019.jpg"
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 1079,
+      "file": "09_frame_1079.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1109,
+      "file": "10_frame_1109.jpg"
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 1199,
+      "file": "11_frame_1199.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1259,
+      "file": "12_frame_1259.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1289,
+      "file": "13_frame_1289.jpg"
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1319,
+      "file": "14_frame_1319.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1349,
+      "file": "15_frame_1349.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 30
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 569
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 749
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 869
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 899
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 929
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 959
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 1019
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 1079
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1109
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 1199
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1259
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1289
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1319
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1349
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 30,
+      "keyword_scores": {
+        "a man in black": 0.18616710603237152,
+        "a volunteer from the audience": 0.1883257031440735,
+        "a man in blue": 0.19806918501853943,
+        "a guitar": 0.16352172195911407,
+        "math problems": 0.16777658462524414
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "keyword_scores": {
+        "a man in black": 0.19430525600910187,
+        "a volunteer from the audience": 0.19596409797668457,
+        "a man in blue": 0.2077227532863617,
+        "a guitar": 0.17038054764270782,
+        "math problems": 0.18120451271533966
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 569,
+      "keyword_scores": {
+        "a man in black": 0.17940916121006012,
+        "a volunteer from the audience": 0.18018509447574615,
+        "a man in blue": 0.1942977011203766,
+        "a guitar": 0.1721223145723343,
+        "math problems": 0.1981997787952423
+      }
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 749,
+      "keyword_scores": {
+        "a man in black": 0.1741776168346405,
+        "a volunteer from the audience": 0.17061857879161835,
+        "a man in blue": 0.18137328326702118,
+        "a guitar": 0.16055633127689362,
+        "math problems": 0.18533162772655487
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 869,
+      "keyword_scores": {
+        "a man in black": 0.1856268048286438,
+        "a volunteer from the audience": 0.1968715935945511,
+        "a man in blue": 0.20406289398670197,
+        "a guitar": 0.1785697191953659,
+        "math problems": 0.17611785233020782
+      }
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 899,
+      "keyword_scores": {
+        "a man in black": 0.1863584816455841,
+        "a volunteer from the audience": 0.20947003364562988,
+        "a man in blue": 0.17330658435821533,
+        "a guitar": 0.16752955317497253,
+        "math problems": 0.17681555449962616
+      }
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 929,
+      "keyword_scores": {
+        "a man in black": 0.18200628459453583,
+        "a volunteer from the audience": 0.21628212928771973,
+        "a man in blue": 0.20015592873096466,
+        "a guitar": 0.17516815662384033,
+        "math problems": 0.18631857633590698
+      }
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 959,
+      "keyword_scores": {
+        "a man in black": 0.20480531454086304,
+        "a volunteer from the audience": 0.2241356372833252,
+        "a man in blue": 0.19491609930992126,
+        "a guitar": 0.172294482588768,
+        "math problems": 0.18137528002262115
+      }
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 1019,
+      "keyword_scores": {
+        "a man in black": 0.19969749450683594,
+        "a volunteer from the audience": 0.21060584485530853,
+        "a man in blue": 0.19218532741069794,
+        "a guitar": 0.1745748519897461,
+        "math problems": 0.183930903673172
+      }
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 1079,
+      "keyword_scores": {
+        "a man in black": 0.2052661031484604,
+        "a volunteer from the audience": 0.2232639193534851,
+        "a man in blue": 0.20347647368907928,
+        "a guitar": 0.1993846446275711,
+        "math problems": 0.19335529208183289
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1109,
+      "keyword_scores": {
+        "a man in black": 0.2080531120300293,
+        "a volunteer from the audience": 0.21352526545524597,
+        "a man in blue": 0.19334515929222107,
+        "a guitar": 0.1808653175830841,
+        "math problems": 0.18463671207427979
+      }
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 1199,
+      "keyword_scores": {
+        "a man in black": 0.2081182301044464,
+        "a volunteer from the audience": 0.21692320704460144,
+        "a man in blue": 0.20834431052207947,
+        "a guitar": 0.2124955952167511,
+        "math problems": 0.20354098081588745
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1259,
+      "keyword_scores": {
+        "a man in black": 0.20023342967033386,
+        "a volunteer from the audience": 0.1991358995437622,
+        "a man in blue": 0.18837450444698334,
+        "a guitar": 0.1896553337574005,
+        "math problems": 0.19591514766216278
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1289,
+      "keyword_scores": {
+        "a man in black": 0.21654899418354034,
+        "a volunteer from the audience": 0.19396895170211792,
+        "a man in blue": 0.19093021750450134,
+        "a guitar": 0.1940954327583313,
+        "math problems": 0.18696439266204834
+      }
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1319,
+      "keyword_scores": {
+        "a man in black": 0.2381945252418518,
+        "a volunteer from the audience": 0.20895037055015564,
+        "a man in blue": 0.20580466091632843,
+        "a guitar": 0.20925667881965637,
+        "math problems": 0.20390011370182037
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1349,
+      "keyword_scores": {
+        "a man in black": 0.18748606741428375,
+        "a volunteer from the audience": 0.21685996651649475,
+        "a man in blue": 0.19465811550617218,
+        "a guitar": 0.1850774884223938,
+        "math problems": 0.18165865540504456
+      }
+    }
+  ],
+  "pred_answer": "D",
+  "entropy": 0.8545498847961426,
+  "option_probs": {
+    "A": 6.357121888183635e-19,
+    "B": 2.5705499577039012e-20,
+    "C": 2.33552898619459e-20,
+    "D": 6.039080143425723e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "D",
+  "inference_time": 0.21657627588137984
+}

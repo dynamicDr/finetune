@@ -1,0 +1,209 @@
+{
+  "sample_id": "099-1",
+  "stage": "coarse",
+  "round": 0,
+  "question": "How many Spider-Men are visible in the video?",
+  "options": [
+    "A. 2.",
+    "B. 3.",
+    "C. 4.",
+    "D. 5."
+  ],
+  "gt_answer": "B",
+  "all_keywords": [
+    "spider-man",
+    "a video frame"
+  ],
+  "focus_keywords": [
+    "spider-man",
+    "a video frame"
+  ],
+  "selected_count": 10,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 120,
+      "file": "00_frame_120.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 384,
+      "file": "01_frame_384.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 503,
+      "file": "02_frame_503.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 623,
+      "file": "03_frame_623.jpg"
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 767,
+      "file": "04_frame_767.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 887,
+      "file": "05_frame_887.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1127,
+      "file": "06_frame_1127.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1391,
+      "file": "07_frame_1391.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1654,
+      "file": "08_frame_1654.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1894,
+      "file": "09_frame_1894.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 120
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 384
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 503
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 623
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 767
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 887
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1127
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1391
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1654
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1894
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 120,
+      "keyword_scores": {
+        "spider-man": 0.25023379921913147,
+        "a video frame": 0.24370047450065613
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 384,
+      "keyword_scores": {
+        "spider-man": 0.25612354278564453,
+        "a video frame": 0.23347631096839905
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 503,
+      "keyword_scores": {
+        "spider-man": 0.2886366546154022,
+        "a video frame": 0.24531567096710205
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 623,
+      "keyword_scores": {
+        "spider-man": 0.22852344810962677,
+        "a video frame": 0.24988803267478943
+      }
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 767,
+      "keyword_scores": {
+        "spider-man": 0.2771010100841522,
+        "a video frame": 0.26749375462532043
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 887,
+      "keyword_scores": {
+        "spider-man": 0.20555585622787476,
+        "a video frame": 0.235553577542305
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1127,
+      "keyword_scores": {
+        "spider-man": 0.18109478056430817,
+        "a video frame": 0.23841920495033264
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1391,
+      "keyword_scores": {
+        "spider-man": 0.2493390589952469,
+        "a video frame": 0.23231160640716553
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1654,
+      "keyword_scores": {
+        "spider-man": 0.20735296607017517,
+        "a video frame": 0.23584339022636414
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1894,
+      "keyword_scores": {
+        "spider-man": 0.2667803168296814,
+        "a video frame": 0.24348926544189453
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.6197890043258667,
+  "option_probs": {
+    "A": 1.107660071790444e-18,
+    "B": 7.602981825563587e-20,
+    "C": 1.3319915711442888e-19,
+    "D": 2.314304960272024e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B. 3.",
+  "inference_time": 0.2670187058392912
+}

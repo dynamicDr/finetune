@@ -1,0 +1,285 @@
+{
+  "sample_id": "195-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What are the colors of the fan?",
+  "options": [
+    "A. Orange, white and green.",
+    "B. Pink, white and green.",
+    "C. White, pink and green.",
+    "D. Green, orange and pink."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a fan",
+    "the color orange",
+    "the color white",
+    "the color green",
+    "the color pink"
+  ],
+  "focus_keywords": [
+    "a fan",
+    "the color orange",
+    "the color white",
+    "the color green",
+    "the color pink"
+  ],
+  "selected_count": 12,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "file": "01_frame_75.jpg"
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "file": "02_frame_225.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "file": "03_frame_275.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "file": "04_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "file": "05_frame_650.jpg"
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 825,
+      "file": "06_frame_825.jpg"
+    },
+    {
+      "index_in_pool": 37,
+      "frame_id": 925,
+      "file": "07_frame_925.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "file": "08_frame_1025.jpg"
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1200,
+      "file": "09_frame_1200.jpg"
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1250,
+      "file": "10_frame_1250.jpg"
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1400,
+      "file": "11_frame_1400.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 825
+    },
+    {
+      "index_in_pool": 37,
+      "frame_id": 925
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1200
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1250
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1400
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "a fan": 0.20917947590351105,
+        "the color orange": 0.23906555771827698,
+        "the color white": 0.19039493799209595,
+        "the color green": 0.19520190358161926,
+        "the color pink": 0.19243215024471283
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "keyword_scores": {
+        "a fan": 0.21798303723335266,
+        "the color orange": 0.22305573523044586,
+        "the color white": 0.19860108196735382,
+        "the color green": 0.17885273694992065,
+        "the color pink": 0.19578208029270172
+      }
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "keyword_scores": {
+        "a fan": 0.21967077255249023,
+        "the color orange": 0.21394741535186768,
+        "the color white": 0.22874611616134644,
+        "the color green": 0.20040878653526306,
+        "the color pink": 0.20824073255062103
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "keyword_scores": {
+        "a fan": 0.21657875180244446,
+        "the color orange": 0.20167380571365356,
+        "the color white": 0.21649689972400665,
+        "the color green": 0.17488618195056915,
+        "the color pink": 0.1862669289112091
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "keyword_scores": {
+        "a fan": 0.21905304491519928,
+        "the color orange": 0.21525762975215912,
+        "the color white": 0.19284534454345703,
+        "the color green": 0.22428745031356812,
+        "the color pink": 0.20506758987903595
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "keyword_scores": {
+        "a fan": 0.1999071091413498,
+        "the color orange": 0.21269291639328003,
+        "the color white": 0.1875334084033966,
+        "the color green": 0.17376773059368134,
+        "the color pink": 0.18156243860721588
+      }
+    },
+    {
+      "index_in_pool": 33,
+      "frame_id": 825,
+      "keyword_scores": {
+        "a fan": 0.2015237808227539,
+        "the color orange": 0.20286768674850464,
+        "the color white": 0.17391623556613922,
+        "the color green": 0.17314453423023224,
+        "the color pink": 0.18632090091705322
+      }
+    },
+    {
+      "index_in_pool": 37,
+      "frame_id": 925,
+      "keyword_scores": {
+        "a fan": 0.19886115193367004,
+        "the color orange": 0.22333037853240967,
+        "the color white": 0.21271517872810364,
+        "the color green": 0.20218391716480255,
+        "the color pink": 0.2272249013185501
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "keyword_scores": {
+        "a fan": 0.21161425113677979,
+        "the color orange": 0.21038155257701874,
+        "the color white": 0.19596460461616516,
+        "the color green": 0.19522593915462494,
+        "the color pink": 0.19639210402965546
+      }
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1200,
+      "keyword_scores": {
+        "a fan": 0.20571909844875336,
+        "the color orange": 0.19083042442798615,
+        "the color white": 0.20649060606956482,
+        "the color green": 0.22489222884178162,
+        "the color pink": 0.18751002848148346
+      }
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1250,
+      "keyword_scores": {
+        "a fan": 0.24567529559135437,
+        "the color orange": 0.21902143955230713,
+        "the color white": 0.22850948572158813,
+        "the color green": 0.23548288643360138,
+        "the color pink": 0.20915378630161285
+      }
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1400,
+      "keyword_scores": {
+        "a fan": 0.21910613775253296,
+        "the color orange": 0.19733500480651855,
+        "the color white": 0.20334021747112274,
+        "the color green": 0.18990133702754974,
+        "the color pink": 0.17137518525123596
+      }
+    }
+  ],
+  "pred_answer": "D",
+  "entropy": 0.8304111957550049,
+  "option_probs": {
+    "A": 2.8396721819493663e-16,
+    "B": 1.4890665052437566e-17,
+    "C": 1.754489900216648e-17,
+    "D": 4.82235808468248e-16
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "D",
+  "inference_time": 0.17861874820664525
+}

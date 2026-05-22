@@ -931,3 +931,27 @@ python run.py --multirun \
     early_stop_conf_threshold=0.9 \
     early_stop_window=2,3,4,5 \
     frame_increment=1,2,4
+
+
+
+5/20：
+Spatio-Temporal Layered Compression 运行脚本：
+
+主方法（Video-MME，20样本，小子集跑通）
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=vqa_eval_ours.py \
+  dataset=videomme \
+  dataset_name=lmms-lab/Video-MME \
+  dataset_no_config=true \
+  dataset_split=test \
+  video_dir=~/dataset/Video-MME \
+  frame_sampling_method=ours \
+  num_frames=16 \
+  num_samples=20 \
+  model=qwen3_8b_instruct \
+  task_filter=short \
+  use_preprocessed_clip_frames=true \
+  train_ratio=0 \
+  seed=24 \
+  slurm=default_4090

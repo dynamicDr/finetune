@@ -1,0 +1,181 @@
+{
+  "sample_id": "246-1",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is the emotion of the video?",
+  "options": [
+    "A. Solemn.",
+    "B. Enjoyable.",
+    "C. Heartbroken.",
+    "D. Anxious."
+  ],
+  "gt_answer": "B",
+  "all_keywords": [
+    "[]"
+  ],
+  "focus_keywords": [
+    "[]"
+  ],
+  "selected_count": 9,
+  "selected_images": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 50,
+      "file": "00_frame_50.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "file": "01_frame_75.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "file": "02_frame_275.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "file": "03_frame_475.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "file": "04_frame_650.jpg"
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 850,
+      "file": "05_frame_850.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "file": "06_frame_1025.jpg"
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1225,
+      "file": "07_frame_1225.jpg"
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1425,
+      "file": "08_frame_1425.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 50
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 850
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1225
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1425
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 50,
+      "keyword_scores": {
+        "[]": 0.2526451051235199
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "keyword_scores": {
+        "[]": 0.2363854944705963
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "keyword_scores": {
+        "[]": 0.24008525907993317
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "keyword_scores": {
+        "[]": 0.24165943264961243
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "keyword_scores": {
+        "[]": 0.22883601486682892
+      }
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 850,
+      "keyword_scores": {
+        "[]": 0.22528088092803955
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "keyword_scores": {
+        "[]": 0.2478645294904709
+      }
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1225,
+      "keyword_scores": {
+        "[]": 0.23952481150627136
+      }
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1425,
+      "keyword_scores": {
+        "[]": 0.24036076664924622
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.09930542856454849,
+  "option_probs": {
+    "A": 1.4966761694448096e-18,
+    "B": 8.717094701153222e-17,
+    "C": 6.888765099174632e-20,
+    "D": 8.347939841226561e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.15118977101519704
+}

@@ -1,0 +1,329 @@
+{
+  "sample_id": "007-2",
+  "stage": "iterative",
+  "round": 0,
+  "question": "What kind of communication is listed before Semaphore?",
+  "options": [
+    "A. Telephone.",
+    "B. Homing pigeon.",
+    "C. Telegraph.",
+    "D. Pony express."
+  ],
+  "gt_answer": "D",
+  "all_keywords": [
+    "a telephone",
+    "a homing pigeon",
+    "a pony express"
+  ],
+  "focus_keywords": [
+    "a telephone",
+    "a homing pigeon",
+    "a pony express"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "file": "00_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539,
+      "file": "01_frame_539.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569,
+      "file": "02_frame_569.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 599,
+      "file": "03_frame_599.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629,
+      "file": "04_frame_629.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 689,
+      "file": "05_frame_689.jpg"
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 719,
+      "file": "06_frame_719.jpg"
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 749,
+      "file": "07_frame_749.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 779,
+      "file": "08_frame_779.jpg"
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 809,
+      "file": "09_frame_809.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 839,
+      "file": "10_frame_839.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1259,
+      "file": "11_frame_1259.jpg"
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1289,
+      "file": "12_frame_1289.jpg"
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1678,
+      "file": "13_frame_1678.jpg"
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1708,
+      "file": "14_frame_1708.jpg"
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1978,
+      "file": "15_frame_1978.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 12,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 599
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 689
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 719
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 749
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 779
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 809
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 839
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1259
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1289
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1678
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1708
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1978
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "keyword_scores": {
+        "a telephone": 0.2301807999610901,
+        "a homing pigeon": 0.25671178102493286,
+        "a pony express": 0.21333037316799164
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539,
+      "keyword_scores": {
+        "a telephone": 0.18670041859149933,
+        "a homing pigeon": 0.32641443610191345,
+        "a pony express": 0.19434595108032227
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569,
+      "keyword_scores": {
+        "a telephone": 0.19375905394554138,
+        "a homing pigeon": 0.3326732814311981,
+        "a pony express": 0.20427143573760986
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 599,
+      "keyword_scores": {
+        "a telephone": 0.18259304761886597,
+        "a homing pigeon": 0.3250773251056671,
+        "a pony express": 0.19726508855819702
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629,
+      "keyword_scores": {
+        "a telephone": 0.18861757218837738,
+        "a homing pigeon": 0.3387736678123474,
+        "a pony express": 0.21393483877182007
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 689,
+      "keyword_scores": {
+        "a telephone": 0.2273426055908203,
+        "a homing pigeon": 0.20685899257659912,
+        "a pony express": 0.2874331772327423
+      }
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 719,
+      "keyword_scores": {
+        "a telephone": 0.2208564281463623,
+        "a homing pigeon": 0.18421483039855957,
+        "a pony express": 0.35583341121673584
+      }
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 749,
+      "keyword_scores": {
+        "a telephone": 0.2083396017551422,
+        "a homing pigeon": 0.17834779620170593,
+        "a pony express": 0.35327911376953125
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 779,
+      "keyword_scores": {
+        "a telephone": 0.2092338651418686,
+        "a homing pigeon": 0.17628072202205658,
+        "a pony express": 0.35575366020202637
+      }
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 809,
+      "keyword_scores": {
+        "a telephone": 0.21812903881072998,
+        "a homing pigeon": 0.17810466885566711,
+        "a pony express": 0.36472320556640625
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 839,
+      "keyword_scores": {
+        "a telephone": 0.22342634201049805,
+        "a homing pigeon": 0.22674185037612915,
+        "a pony express": 0.29725977778434753
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1259,
+      "keyword_scores": {
+        "a telephone": 0.3190723657608032,
+        "a homing pigeon": 0.18365012109279633,
+        "a pony express": 0.22002167999744415
+      }
+    },
+    {
+      "index_in_pool": 43,
+      "frame_id": 1289,
+      "keyword_scores": {
+        "a telephone": 0.3191525936126709,
+        "a homing pigeon": 0.1905110627412796,
+        "a pony express": 0.21846972405910492
+      }
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1678,
+      "keyword_scores": {
+        "a telephone": 0.27215585112571716,
+        "a homing pigeon": 0.1786741018295288,
+        "a pony express": 0.18431086838245392
+      }
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1708,
+      "keyword_scores": {
+        "a telephone": 0.27995535731315613,
+        "a homing pigeon": 0.1834447979927063,
+        "a pony express": 0.18858465552330017
+      }
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1978,
+      "keyword_scores": {
+        "a telephone": 0.264680951833725,
+        "a homing pigeon": 0.21023401618003845,
+        "a pony express": 0.21063360571861267
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.17291182279586792,
+  "option_probs": {
+    "A": 1.4939348524922058e-15,
+    "B": 2.2564227124122136e-15,
+    "C": 2.474733053475266e-16,
+    "D": 1.1765594954150385e-13
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.2196110598742962
+}

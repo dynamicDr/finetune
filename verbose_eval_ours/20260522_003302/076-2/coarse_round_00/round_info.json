@@ -1,0 +1,181 @@
+{
+  "sample_id": "076-2",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is the color of rope to the dog of white?",
+  "options": [
+    "A. White.",
+    "B. Black.",
+    "C. Red.",
+    "D. Green."
+  ],
+  "gt_answer": "B",
+  "all_keywords": [
+    "a dog"
+  ],
+  "focus_keywords": [
+    "a dog"
+  ],
+  "selected_count": 9,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 120,
+      "file": "00_frame_120.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 288,
+      "file": "01_frame_288.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 336,
+      "file": "02_frame_336.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 575,
+      "file": "03_frame_575.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 815,
+      "file": "04_frame_815.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1031,
+      "file": "05_frame_1031.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1271,
+      "file": "06_frame_1271.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1510,
+      "file": "07_frame_1510.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1726,
+      "file": "08_frame_1726.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 120
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 288
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 336
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 575
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 815
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1031
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1271
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1510
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1726
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 120,
+      "keyword_scores": {
+        "a dog": 0.22177495062351227
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 288,
+      "keyword_scores": {
+        "a dog": 0.2682059705257416
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 336,
+      "keyword_scores": {
+        "a dog": 0.25068598985671997
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 575,
+      "keyword_scores": {
+        "a dog": 0.1871926635503769
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 815,
+      "keyword_scores": {
+        "a dog": 0.21656854450702667
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1031,
+      "keyword_scores": {
+        "a dog": 0.2381376028060913
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1271,
+      "keyword_scores": {
+        "a dog": 0.23067547380924225
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1510,
+      "keyword_scores": {
+        "a dog": 0.22148744761943817
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1726,
+      "keyword_scores": {
+        "a dog": 0.2521109879016876
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.6709105968475342,
+  "option_probs": {
+    "A": 2.837257769954319e-17,
+    "B": 6.182729920278127e-17,
+    "C": 5.241268920573499e-16,
+    "D": 2.93938831003523e-17
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.15261535183526576
+}

@@ -1,0 +1,311 @@
+{
+  "sample_id": "012-2",
+  "stage": "iterative",
+  "round": 0,
+  "question": "What did the student do after eating the banana in the video?",
+  "options": [
+    "A. He ate a banana in exhibition again in 2019.",
+    "B. He throwed the skin of banana.",
+    "C. He reattached the skin of banana using the same tape.",
+    "D. The action of eating a banana was considered art."
+  ],
+  "gt_answer": "C",
+  "all_keywords": [
+    "banana skin",
+    "an exhibition in 2019"
+  ],
+  "focus_keywords": [
+    "banana skin",
+    "an exhibition in 2019"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 50,
+      "file": "00_frame_50.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "file": "01_frame_75.jpg"
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "file": "02_frame_100.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "file": "03_frame_125.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "file": "04_frame_250.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "file": "05_frame_275.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "file": "06_frame_300.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "file": "07_frame_325.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "file": "08_frame_350.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "file": "09_frame_375.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 575,
+      "file": "10_frame_575.jpg"
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 600,
+      "file": "11_frame_600.jpg"
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 625,
+      "file": "12_frame_625.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "file": "13_frame_650.jpg"
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 675,
+      "file": "14_frame_675.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700,
+      "file": "15_frame_700.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 50
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 575
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 600
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 625
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 675
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 2,
+      "frame_id": 50,
+      "keyword_scores": {
+        "banana skin": 0.2579967975616455,
+        "an exhibition in 2019": 0.289503276348114
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "keyword_scores": {
+        "banana skin": 0.27107226848602295,
+        "an exhibition in 2019": 0.28606128692626953
+      }
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "keyword_scores": {
+        "banana skin": 0.2710261642932892,
+        "an exhibition in 2019": 0.2835213541984558
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "keyword_scores": {
+        "banana skin": 0.26645272970199585,
+        "an exhibition in 2019": 0.28496718406677246
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "keyword_scores": {
+        "banana skin": 0.20349977910518646,
+        "an exhibition in 2019": 0.2947824001312256
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "keyword_scores": {
+        "banana skin": 0.21135130524635315,
+        "an exhibition in 2019": 0.29358524084091187
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "keyword_scores": {
+        "banana skin": 0.20222456753253937,
+        "an exhibition in 2019": 0.2957582473754883
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "keyword_scores": {
+        "banana skin": 0.2098609060049057,
+        "an exhibition in 2019": 0.3041476309299469
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "keyword_scores": {
+        "banana skin": 0.2320832908153534,
+        "an exhibition in 2019": 0.29642221331596375
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "keyword_scores": {
+        "banana skin": 0.29600587487220764,
+        "an exhibition in 2019": 0.23945565521717072
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 575,
+      "keyword_scores": {
+        "banana skin": 0.30391815304756165,
+        "an exhibition in 2019": 0.24336561560630798
+      }
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 600,
+      "keyword_scores": {
+        "banana skin": 0.29537123441696167,
+        "an exhibition in 2019": 0.2509850561618805
+      }
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 625,
+      "keyword_scores": {
+        "banana skin": 0.29383379220962524,
+        "an exhibition in 2019": 0.25171762704849243
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "keyword_scores": {
+        "banana skin": 0.2938491106033325,
+        "an exhibition in 2019": 0.25189152359962463
+      }
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 675,
+      "keyword_scores": {
+        "banana skin": 0.2938160300254822,
+        "an exhibition in 2019": 0.2517932951450348
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700,
+      "keyword_scores": {
+        "banana skin": 0.3030669093132019,
+        "an exhibition in 2019": 0.2529993951320648
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 1.057863473892212,
+  "option_probs": {
+    "A": 4.079766329325192e-19,
+    "B": 1.3822246310493883e-20,
+    "C": 1.512031995673658e-19,
+    "D": 1.5847546924667668e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.221233261981979
+}

@@ -1,0 +1,209 @@
+{
+  "sample_id": "002-2",
+  "stage": "coarse",
+  "round": 0,
+  "question": "Which of the following reasons motivated the archaeologists to excavate the tomb?",
+  "options": [
+    "A. Because it's from Ming Dynasty and of specific archaeological significance.",
+    "B. Because a new railway line will be built nearby.",
+    "C. Because there were treasures inside the tomb.",
+    "D. Highway realignment."
+  ],
+  "gt_answer": "D",
+  "all_keywords": [
+    "a tomb being excavated",
+    "a railway under construction"
+  ],
+  "focus_keywords": [
+    "a tomb being excavated",
+    "a railway under construction"
+  ],
+  "selected_count": 10,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 150,
+      "file": "00_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 480,
+      "file": "01_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 810,
+      "file": "02_frame_810.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1140,
+      "file": "03_frame_1140.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1470,
+      "file": "04_frame_1470.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1680,
+      "file": "05_frame_1680.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1800,
+      "file": "06_frame_1800.jpg"
+    },
+    {
+      "index_in_pool": 51,
+      "frame_id": 2100,
+      "file": "07_frame_2100.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 2130,
+      "file": "08_frame_2130.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2460,
+      "file": "09_frame_2460.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 150
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 480
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 810
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1140
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1470
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1680
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1800
+    },
+    {
+      "index_in_pool": 51,
+      "frame_id": 2100
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 2130
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2460
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 150,
+      "keyword_scores": {
+        "a tomb being excavated": 0.28171539306640625,
+        "a railway under construction": 0.19120310246944427
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a tomb being excavated": 0.24656642973423004,
+        "a railway under construction": 0.17916350066661835
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 810,
+      "keyword_scores": {
+        "a tomb being excavated": 0.23465263843536377,
+        "a railway under construction": 0.16276134550571442
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1140,
+      "keyword_scores": {
+        "a tomb being excavated": 0.2571031451225281,
+        "a railway under construction": 0.1815212517976761
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1470,
+      "keyword_scores": {
+        "a tomb being excavated": 0.2684139311313629,
+        "a railway under construction": 0.17356915771961212
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1680,
+      "keyword_scores": {
+        "a tomb being excavated": 0.26599597930908203,
+        "a railway under construction": 0.19349341094493866
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1800,
+      "keyword_scores": {
+        "a tomb being excavated": 0.26599597930908203,
+        "a railway under construction": 0.19349341094493866
+      }
+    },
+    {
+      "index_in_pool": 51,
+      "frame_id": 2100,
+      "keyword_scores": {
+        "a tomb being excavated": 0.28730839490890503,
+        "a railway under construction": 0.17359602451324463
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 2130,
+      "keyword_scores": {
+        "a tomb being excavated": 0.28730839490890503,
+        "a railway under construction": 0.17359602451324463
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2460,
+      "keyword_scores": {
+        "a tomb being excavated": 0.28730839490890503,
+        "a railway under construction": 0.17359602451324463
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "entropy": 0.7232642769813538,
+  "option_probs": {
+    "A": 1.5558863657983525e-17,
+    "B": 1.6000893726593216e-17,
+    "C": 5.1496832496467803e-20,
+    "D": 1.0106099247926433e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.15453892201185226
+}

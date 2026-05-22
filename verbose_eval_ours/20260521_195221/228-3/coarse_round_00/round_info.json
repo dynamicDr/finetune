@@ -1,0 +1,311 @@
+{
+  "sample_id": "228-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is the function of the scissors that are used in the video?",
+  "options": [
+    "A. Making the paper look more like a heart.",
+    "B. Destroying the paper.",
+    "C. Cutting the paper into pieces.",
+    "D. None of the above."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a pair of scissors",
+    "a piece of paper"
+  ],
+  "focus_keywords": [
+    "a pair of scissors",
+    "a piece of paper"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 3,
+      "frame_id": 150,
+      "file": "00_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 180,
+      "file": "01_frame_180.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 240,
+      "file": "02_frame_240.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 330,
+      "file": "03_frame_330.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 480,
+      "file": "04_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 510,
+      "file": "05_frame_510.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 570,
+      "file": "06_frame_570.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 630,
+      "file": "07_frame_630.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 660,
+      "file": "08_frame_660.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 720,
+      "file": "09_frame_720.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 750,
+      "file": "10_frame_750.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 810,
+      "file": "11_frame_810.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 900,
+      "file": "12_frame_900.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 960,
+      "file": "13_frame_960.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 990,
+      "file": "14_frame_990.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 1050,
+      "file": "15_frame_1050.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 3,
+      "frame_id": 150
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 180
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 240
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 330
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 480
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 510
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 570
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 630
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 660
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 720
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 750
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 810
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 900
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 960
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 990
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 1050
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 3,
+      "frame_id": 150,
+      "keyword_scores": {
+        "a pair of scissors": 0.2817603051662445,
+        "a piece of paper": 0.2466280609369278
+      }
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 180,
+      "keyword_scores": {
+        "a pair of scissors": 0.274306982755661,
+        "a piece of paper": 0.2617887854576111
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 240,
+      "keyword_scores": {
+        "a pair of scissors": 0.2864082157611847,
+        "a piece of paper": 0.24560800194740295
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 330,
+      "keyword_scores": {
+        "a pair of scissors": 0.2643122971057892,
+        "a piece of paper": 0.2631376385688782
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a pair of scissors": 0.2727340757846832,
+        "a piece of paper": 0.268257200717926
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 510,
+      "keyword_scores": {
+        "a pair of scissors": 0.27946949005126953,
+        "a piece of paper": 0.2638123631477356
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 570,
+      "keyword_scores": {
+        "a pair of scissors": 0.27006790041923523,
+        "a piece of paper": 0.25796961784362793
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 630,
+      "keyword_scores": {
+        "a pair of scissors": 0.26552850008010864,
+        "a piece of paper": 0.2651861310005188
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 660,
+      "keyword_scores": {
+        "a pair of scissors": 0.264731764793396,
+        "a piece of paper": 0.26179301738739014
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 720,
+      "keyword_scores": {
+        "a pair of scissors": 0.29160788655281067,
+        "a piece of paper": 0.2705810070037842
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 750,
+      "keyword_scores": {
+        "a pair of scissors": 0.28302431106567383,
+        "a piece of paper": 0.2677280306816101
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 810,
+      "keyword_scores": {
+        "a pair of scissors": 0.27121394872665405,
+        "a piece of paper": 0.2701258063316345
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 900,
+      "keyword_scores": {
+        "a pair of scissors": 0.27599912881851196,
+        "a piece of paper": 0.25659725069999695
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 960,
+      "keyword_scores": {
+        "a pair of scissors": 0.2603616416454315,
+        "a piece of paper": 0.2583500146865845
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 990,
+      "keyword_scores": {
+        "a pair of scissors": 0.2624235153198242,
+        "a piece of paper": 0.261422723531723
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 1050,
+      "keyword_scores": {
+        "a pair of scissors": 0.2672371566295624,
+        "a piece of paper": 0.26828375458717346
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.6762382984161377,
+  "option_probs": {
+    "A": 6.542397466968858e-16,
+    "B": 5.2248393230206636e-17,
+    "C": 2.7011068282840777e-16,
+    "D": 3.690989263032201e-15
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.21720522781834006
+}

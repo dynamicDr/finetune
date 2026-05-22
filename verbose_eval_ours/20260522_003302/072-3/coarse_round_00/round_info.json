@@ -1,0 +1,291 @@
+{
+  "sample_id": "072-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "What is the sequence of steps introduced in this video?\n(a) Walk and practice using the brakes.\n(b) Glide to practice balancing.\n(c) Find a good space and safety considerations.\n(d) Start to pedal.\n(e) Adjust the seat.",
+  "options": [
+    "A. (c)(a)(d)(e)(b).",
+    "B. (c)(e)(a)(b)(d).",
+    "C. (a)(c)(e)(b)(d).",
+    "D. (a)(e)(b)(c)(d)."
+  ],
+  "gt_answer": "B",
+  "all_keywords": [
+    "a person walking and practicing using brakes",
+    "a person gliding to practice balancing",
+    "a person finding a good space and considering safety",
+    "a person starting to pedal",
+    "a person adjusting the seat",
+    "a sequence of steps displayed on screen",
+    "text options a, b, c, d on screen"
+  ],
+  "focus_keywords": [
+    "a person walking and practicing using brakes",
+    "a person gliding to practice balancing",
+    "a person finding a good space and considering safety",
+    "a person starting to pedal",
+    "a person adjusting the seat",
+    "a sequence of steps displayed on screen",
+    "text options a, b, c, d on screen"
+  ],
+  "selected_count": 11,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 168,
+      "file": "00_frame_168.jpg"
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 360,
+      "file": "01_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 480,
+      "file": "02_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 600,
+      "file": "03_frame_600.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 793,
+      "file": "04_frame_793.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1129,
+      "file": "05_frame_1129.jpg"
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1441,
+      "file": "06_frame_1441.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1753,
+      "file": "07_frame_1753.jpg"
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1994,
+      "file": "08_frame_1994.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 2090,
+      "file": "09_frame_2090.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2402,
+      "file": "10_frame_2402.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 168
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 480
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 600
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 793
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1129
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1441
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1753
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1994
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 2090
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2402
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 168,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.2101028561592102,
+        "a person gliding to practice balancing": 0.20249441266059875,
+        "a person finding a good space and considering safety": 0.23082903027534485,
+        "a person starting to pedal": 0.21993856132030487,
+        "a person adjusting the seat": 0.2013162225484848,
+        "a sequence of steps displayed on screen": 0.20519857108592987,
+        "text options a, b, c, d on screen": 0.21601040661334991
+      }
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 360,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.2778165638446808,
+        "a person gliding to practice balancing": 0.2595326602458954,
+        "a person finding a good space and considering safety": 0.24233075976371765,
+        "a person starting to pedal": 0.2469792515039444,
+        "a person adjusting the seat": 0.22474883496761322,
+        "a sequence of steps displayed on screen": 0.21485492587089539,
+        "text options a, b, c, d on screen": 0.2000666707754135
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.268229216337204,
+        "a person gliding to practice balancing": 0.3047643303871155,
+        "a person finding a good space and considering safety": 0.23736386001110077,
+        "a person starting to pedal": 0.2557912766933441,
+        "a person adjusting the seat": 0.25654953718185425,
+        "a sequence of steps displayed on screen": 0.2552451491355896,
+        "text options a, b, c, d on screen": 0.23227205872535706
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 600,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.24151508510112762,
+        "a person gliding to practice balancing": 0.24720539152622223,
+        "a person finding a good space and considering safety": 0.24561983346939087,
+        "a person starting to pedal": 0.2482120245695114,
+        "a person adjusting the seat": 0.23212482035160065,
+        "a sequence of steps displayed on screen": 0.24488195776939392,
+        "text options a, b, c, d on screen": 0.24650385975837708
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 793,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.24205075204372406,
+        "a person gliding to practice balancing": 0.2147674858570099,
+        "a person finding a good space and considering safety": 0.23570208251476288,
+        "a person starting to pedal": 0.26209113001823425,
+        "a person adjusting the seat": 0.21939297020435333,
+        "a sequence of steps displayed on screen": 0.18483567237854004,
+        "text options a, b, c, d on screen": 0.19642046093940735
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 1129,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.2509682774543762,
+        "a person gliding to practice balancing": 0.1938081830739975,
+        "a person finding a good space and considering safety": 0.22690823674201965,
+        "a person starting to pedal": 0.27278798818588257,
+        "a person adjusting the seat": 0.2055068016052246,
+        "a sequence of steps displayed on screen": 0.20964327454566956,
+        "text options a, b, c, d on screen": 0.1909783035516739
+      }
+    },
+    {
+      "index_in_pool": 36,
+      "frame_id": 1441,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.23770712316036224,
+        "a person gliding to practice balancing": 0.20757275819778442,
+        "a person finding a good space and considering safety": 0.2347334623336792,
+        "a person starting to pedal": 0.27804577350616455,
+        "a person adjusting the seat": 0.20199397206306458,
+        "a sequence of steps displayed on screen": 0.1910678893327713,
+        "text options a, b, c, d on screen": 0.20898093283176422
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1753,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.2523120045661926,
+        "a person gliding to practice balancing": 0.2211550921201706,
+        "a person finding a good space and considering safety": 0.24646195769309998,
+        "a person starting to pedal": 0.2905769944190979,
+        "a person adjusting the seat": 0.21945902705192566,
+        "a sequence of steps displayed on screen": 0.20495890080928802,
+        "text options a, b, c, d on screen": 0.22001676261425018
+      }
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1994,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.25453445315361023,
+        "a person gliding to practice balancing": 0.23009666800498962,
+        "a person finding a good space and considering safety": 0.2627543807029724,
+        "a person starting to pedal": 0.2965206503868103,
+        "a person adjusting the seat": 0.2346648871898651,
+        "a sequence of steps displayed on screen": 0.21890971064567566,
+        "text options a, b, c, d on screen": 0.23908153176307678
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 2090,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.21841780841350555,
+        "a person gliding to practice balancing": 0.20207728445529938,
+        "a person finding a good space and considering safety": 0.23816488683223724,
+        "a person starting to pedal": 0.2620360851287842,
+        "a person adjusting the seat": 0.19854959845542908,
+        "a sequence of steps displayed on screen": 0.19482865929603577,
+        "text options a, b, c, d on screen": 0.21185344457626343
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 2402,
+      "keyword_scores": {
+        "a person walking and practicing using brakes": 0.23551610112190247,
+        "a person gliding to practice balancing": 0.21385444700717926,
+        "a person finding a good space and considering safety": 0.24466179311275482,
+        "a person starting to pedal": 0.27424976229667664,
+        "a person adjusting the seat": 0.21910960972309113,
+        "a sequence of steps displayed on screen": 0.19621220231056213,
+        "text options a, b, c, d on screen": 0.20055782794952393
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.3375003933906555,
+  "option_probs": {
+    "A": 6.20991373090875e-18,
+    "B": 1.0579344710395027e-16,
+    "C": 1.4365486991006334e-18,
+    "D": 1.2778588443695408e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.177133581135422
+}

@@ -20,6 +20,7 @@ frame_sampling_method: uniform
 use_preprocessed_clip_frames: false
 preprocessed_clip_fps: 1.0
 preprocessed_clip_dir: ""
+max_refine_rounds: 1
 focus_blip_model_name: Salesforce/blip-itm-base-coco
 focus_blip_device: null
 focus_blip_batch_size: 16
@@ -28,6 +29,17 @@ enable_early_stop: true
 early_stop_window: 3
 early_stop_conf_threshold: 0.9
 frame_increment: 1
+layered_candidate_frames: 64
+layered_pool_h: 2
+layered_pool_w: 2
+layered_enable_layer0: true
+layered_enable_layer1: true
+layered_topk1: 12
+layered_topk2: 48
+layered_budget: -1
+layered_scorer: clip
+layered_layer1_mode: global_patch_sort
+verify_prefix_property: true
 # 与 eval_vsibench / train_vsibench 划分一致时可覆盖
 train_ratio: 0.8
 

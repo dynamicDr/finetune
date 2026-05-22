@@ -1,0 +1,293 @@
+{
+  "sample_id": "268-3",
+  "stage": "coarse",
+  "round": 0,
+  "question": "Which of the following topics is the most likely focus of this video?",
+  "options": [
+    "A. Camera advertising.",
+    "B. Photography course.",
+    "C. Promotional film.",
+    "D. Publicity of tourist attractions."
+  ],
+  "gt_answer": "A",
+  "all_keywords": [
+    "a camera being held"
+  ],
+  "focus_keywords": [
+    "a camera being held"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "file": "00_frame_125.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "file": "01_frame_175.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "file": "02_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "file": "03_frame_475.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "file": "04_frame_500.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "file": "05_frame_1025.jpg"
+    },
+    {
+      "index_in_pool": 59,
+      "frame_id": 1475,
+      "file": "06_frame_1475.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1500,
+      "file": "07_frame_1500.jpg"
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1700,
+      "file": "08_frame_1700.jpg"
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1725,
+      "file": "09_frame_1725.jpg"
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1750,
+      "file": "10_frame_1750.jpg"
+    },
+    {
+      "index_in_pool": 84,
+      "frame_id": 2100,
+      "file": "11_frame_2100.jpg"
+    },
+    {
+      "index_in_pool": 85,
+      "frame_id": 2125,
+      "file": "12_frame_2125.jpg"
+    },
+    {
+      "index_in_pool": 86,
+      "frame_id": 2150,
+      "file": "13_frame_2150.jpg"
+    },
+    {
+      "index_in_pool": 91,
+      "frame_id": 2275,
+      "file": "14_frame_2275.jpg"
+    },
+    {
+      "index_in_pool": 92,
+      "frame_id": 2300,
+      "file": "15_frame_2300.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 5,
+      "frame_id": 125
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025
+    },
+    {
+      "index_in_pool": 59,
+      "frame_id": 1475
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1500
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1700
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1725
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1750
+    },
+    {
+      "index_in_pool": 84,
+      "frame_id": 2100
+    },
+    {
+      "index_in_pool": 85,
+      "frame_id": 2125
+    },
+    {
+      "index_in_pool": 86,
+      "frame_id": 2150
+    },
+    {
+      "index_in_pool": 91,
+      "frame_id": 2275
+    },
+    {
+      "index_in_pool": 92,
+      "frame_id": 2300
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "keyword_scores": {
+        "a camera being held": 0.2698861062526703
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "keyword_scores": {
+        "a camera being held": 0.2957989275455475
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "keyword_scores": {
+        "a camera being held": 0.28640714287757874
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "keyword_scores": {
+        "a camera being held": 0.28322678804397583
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "keyword_scores": {
+        "a camera being held": 0.2869420647621155
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "keyword_scores": {
+        "a camera being held": 0.2847808599472046
+      }
+    },
+    {
+      "index_in_pool": 59,
+      "frame_id": 1475,
+      "keyword_scores": {
+        "a camera being held": 0.2793753147125244
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1500,
+      "keyword_scores": {
+        "a camera being held": 0.27877381443977356
+      }
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1700,
+      "keyword_scores": {
+        "a camera being held": 0.29101401567459106
+      }
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1725,
+      "keyword_scores": {
+        "a camera being held": 0.2755550444126129
+      }
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1750,
+      "keyword_scores": {
+        "a camera being held": 0.2736632227897644
+      }
+    },
+    {
+      "index_in_pool": 84,
+      "frame_id": 2100,
+      "keyword_scores": {
+        "a camera being held": 0.2951406240463257
+      }
+    },
+    {
+      "index_in_pool": 85,
+      "frame_id": 2125,
+      "keyword_scores": {
+        "a camera being held": 0.2895401418209076
+      }
+    },
+    {
+      "index_in_pool": 86,
+      "frame_id": 2150,
+      "keyword_scores": {
+        "a camera being held": 0.2858029305934906
+      }
+    },
+    {
+      "index_in_pool": 91,
+      "frame_id": 2275,
+      "keyword_scores": {
+        "a camera being held": 0.2717248499393463
+      }
+    },
+    {
+      "index_in_pool": 92,
+      "frame_id": 2300,
+      "keyword_scores": {
+        "a camera being held": 0.27068057656288147
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.39166155457496643,
+  "option_probs": {
+    "A": 8.400832368265106e-18,
+    "B": 1.565167519550058e-16,
+    "C": 3.2110156145322314e-18,
+    "D": 3.803227809577806e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.21737600793130696
+}
