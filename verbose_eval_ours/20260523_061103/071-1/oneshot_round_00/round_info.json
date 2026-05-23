@@ -1,0 +1,264 @@
+{
+  "sample_id": "071-1",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "How many hours of sleep does this video recommend adults aim to achieve each day, as depicted in the animation?",
+  "options": [
+    "A. 5-7.",
+    "B. 7-9.",
+    "C. 9-11.",
+    "D. 11-13."
+  ],
+  "gt_answer": "B",
+  "raw_keywords_before_dedup": [
+    "a sleep recommendation animation",
+    "text displaying '5-7",
+    "text displaying '7-9",
+    "text displaying '9-11",
+    "text displaying '11-13"
+  ],
+  "all_keywords": [
+    "text displaying '5-7",
+    "text displaying '7-9",
+    "text displaying '11-13"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 168,
+      "file": "01_frame_168.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 192,
+      "file": "02_frame_192.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 480,
+      "file": "03_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 503,
+      "file": "04_frame_503.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 527,
+      "file": "05_frame_527.jpg"
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 839,
+      "file": "06_frame_839.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1247,
+      "file": "07_frame_1247.jpg"
+    },
+    {
+      "index_in_pool": 53,
+      "frame_id": 1271,
+      "file": "08_frame_1271.jpg"
+    },
+    {
+      "index_in_pool": 55,
+      "frame_id": 1319,
+      "file": "09_frame_1319.jpg"
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1343,
+      "file": "10_frame_1343.jpg"
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1367,
+      "file": "11_frame_1367.jpg"
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1582,
+      "file": "12_frame_1582.jpg"
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1630,
+      "file": "13_frame_1630.jpg"
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1654,
+      "file": "14_frame_1654.jpg"
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1678,
+      "file": "15_frame_1678.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "text displaying '5-7": 0.27146443724632263,
+        "text displaying '7-9": 0.27374517917633057,
+        "text displaying '11-13": 0.2718023657798767
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 168,
+      "keyword_scores": {
+        "text displaying '5-7": 0.23182426393032074,
+        "text displaying '7-9": 0.23351724445819855,
+        "text displaying '11-13": 0.2212708294391632
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 192,
+      "keyword_scores": {
+        "text displaying '5-7": 0.2324192374944687,
+        "text displaying '7-9": 0.23459011316299438,
+        "text displaying '11-13": 0.22392000257968903
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 480,
+      "keyword_scores": {
+        "text displaying '5-7": 0.23201622068881989,
+        "text displaying '7-9": 0.23550903797149658,
+        "text displaying '11-13": 0.23059919476509094
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 503,
+      "keyword_scores": {
+        "text displaying '5-7": 0.2462208867073059,
+        "text displaying '7-9": 0.2505360245704651,
+        "text displaying '11-13": 0.24642644822597504
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 527,
+      "keyword_scores": {
+        "text displaying '5-7": 0.2644784450531006,
+        "text displaying '7-9": 0.2662487328052521,
+        "text displaying '11-13": 0.26051488518714905
+      }
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 839,
+      "keyword_scores": {
+        "text displaying '5-7": 0.24754303693771362,
+        "text displaying '7-9": 0.24749495089054108,
+        "text displaying '11-13": 0.243210569024086
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1247,
+      "keyword_scores": {
+        "text displaying '5-7": 0.22951124608516693,
+        "text displaying '7-9": 0.23158994317054749,
+        "text displaying '11-13": 0.22751814126968384
+      }
+    },
+    {
+      "index_in_pool": 53,
+      "frame_id": 1271,
+      "keyword_scores": {
+        "text displaying '5-7": 0.23634947836399078,
+        "text displaying '7-9": 0.23332563042640686,
+        "text displaying '11-13": 0.22501574456691742
+      }
+    },
+    {
+      "index_in_pool": 55,
+      "frame_id": 1319,
+      "keyword_scores": {
+        "text displaying '5-7": 0.24060049653053284,
+        "text displaying '7-9": 0.23771405220031738,
+        "text displaying '11-13": 0.22989347577095032
+      }
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1343,
+      "keyword_scores": {
+        "text displaying '5-7": 0.23553632199764252,
+        "text displaying '7-9": 0.23245663940906525,
+        "text displaying '11-13": 0.2253500372171402
+      }
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1367,
+      "keyword_scores": {
+        "text displaying '5-7": 0.23700962960720062,
+        "text displaying '7-9": 0.23311328887939453,
+        "text displaying '11-13": 0.22602447867393494
+      }
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1582,
+      "keyword_scores": {
+        "text displaying '5-7": 0.2367202490568161,
+        "text displaying '7-9": 0.23584207892417908,
+        "text displaying '11-13": 0.23070040345191956
+      }
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1630,
+      "keyword_scores": {
+        "text displaying '5-7": 0.24596856534481049,
+        "text displaying '7-9": 0.24449272453784943,
+        "text displaying '11-13": 0.2431495040655136
+      }
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1654,
+      "keyword_scores": {
+        "text displaying '5-7": 0.2452157735824585,
+        "text displaying '7-9": 0.24407382309436798,
+        "text displaying '11-13": 0.24195729196071625
+      }
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1678,
+      "keyword_scores": {
+        "text displaying '5-7": 0.24525117874145508,
+        "text displaying '7-9": 0.2444360852241516,
+        "text displaying '11-13": 0.2428423911333084
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "option_probs": {
+    "A": 9.27032182158415e-18,
+    "B": 6.47809639593641e-16,
+    "C": 2.1580573022278125e-18,
+    "D": 3.8725386043474226e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.2237359769642353
+}

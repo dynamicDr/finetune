@@ -1,0 +1,317 @@
+{
+  "sample_id": "045-3",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "Where were the people in the video located while observing the total solar eclipse?",
+  "options": [
+    "A. Stadium.",
+    "B. Nature park.",
+    "C. Street.",
+    "D. Rooftop."
+  ],
+  "gt_answer": "A",
+  "raw_keywords_before_dedup": [
+    "a stadium",
+    "a nature park",
+    "a street",
+    "a rooftop"
+  ],
+  "all_keywords": [
+    "a stadium",
+    "a rooftop"
+  ],
+  "focus_keywords": [
+    "a stadium",
+    "a rooftop"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 30,
+      "file": "00_frame_30.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 90,
+      "file": "01_frame_90.jpg"
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 270,
+      "file": "02_frame_270.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 330,
+      "file": "03_frame_330.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "file": "04_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "file": "05_frame_390.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 450,
+      "file": "06_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 480,
+      "file": "07_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 509,
+      "file": "08_frame_509.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539,
+      "file": "09_frame_539.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569,
+      "file": "10_frame_569.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 599,
+      "file": "11_frame_599.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629,
+      "file": "12_frame_629.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 659,
+      "file": "13_frame_659.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 689,
+      "file": "14_frame_689.jpg"
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1409,
+      "file": "15_frame_1409.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 30
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 90
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 270
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 330
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 450
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 480
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 509
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 599
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 659
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 689
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1409
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 30,
+      "keyword_scores": {
+        "a stadium": 0.20820964872837067,
+        "a rooftop": 0.2189594805240631
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 90,
+      "keyword_scores": {
+        "a stadium": 0.22255438566207886,
+        "a rooftop": 0.20563894510269165
+      }
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 270,
+      "keyword_scores": {
+        "a stadium": 0.18425899744033813,
+        "a rooftop": 0.20912998914718628
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 330,
+      "keyword_scores": {
+        "a stadium": 0.22769197821617126,
+        "a rooftop": 0.1757175624370575
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "keyword_scores": {
+        "a stadium": 0.23204132914543152,
+        "a rooftop": 0.1772843301296234
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "keyword_scores": {
+        "a stadium": 0.2058998942375183,
+        "a rooftop": 0.18096455931663513
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 450,
+      "keyword_scores": {
+        "a stadium": 0.21609419584274292,
+        "a rooftop": 0.19528061151504517
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a stadium": 0.1911589652299881,
+        "a rooftop": 0.20098532736301422
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 509,
+      "keyword_scores": {
+        "a stadium": 0.18061494827270508,
+        "a rooftop": 0.20452462136745453
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539,
+      "keyword_scores": {
+        "a stadium": 0.17526155710220337,
+        "a rooftop": 0.20369495451450348
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569,
+      "keyword_scores": {
+        "a stadium": 0.20564915239810944,
+        "a rooftop": 0.23287716507911682
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 599,
+      "keyword_scores": {
+        "a stadium": 0.17793327569961548,
+        "a rooftop": 0.20581412315368652
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629,
+      "keyword_scores": {
+        "a stadium": 0.21304617822170258,
+        "a rooftop": 0.22008121013641357
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 659,
+      "keyword_scores": {
+        "a stadium": 0.2171703279018402,
+        "a rooftop": 0.22604753077030182
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 689,
+      "keyword_scores": {
+        "a stadium": 0.20856188237667084,
+        "a rooftop": 0.21610470116138458
+      }
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1409,
+      "keyword_scores": {
+        "a stadium": 0.21099387109279633,
+        "a rooftop": 0.2413737177848816
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "entropy": 0.0,
+  "option_probs": {
+    "A": 4.781315252115783e-16,
+    "B": 2.1464308076939508e-17,
+    "C": 5.531691906461848e-18,
+    "D": 2.828356267417604e-17
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.23715520999394357
+}

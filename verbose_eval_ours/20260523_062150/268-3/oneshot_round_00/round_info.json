@@ -1,0 +1,452 @@
+{
+  "sample_id": "268-3",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "Which of the following topics is the most likely focus of this video?",
+  "options": [
+    "A. Camera advertising.",
+    "B. Photography course.",
+    "C. Promotional film.",
+    "D. Publicity of tourist attractions."
+  ],
+  "gt_answer": "A",
+  "raw_keywords_before_dedup": [
+    "a camera being held",
+    "a person holding a camera",
+    "a camera lens being focused",
+    "a camera being pointed at a scene",
+    "a person taking a photo",
+    "a camera being displayed",
+    "a camera being used in outdoor setting",
+    "a camera being used in indoor setting",
+    "a camera being shown in close-up",
+    "a camera being shown in wide shot",
+    "a person looking through camera viewfinder",
+    "a camera being set up on tripod",
+    "a camera being used to film landscape"
+  ],
+  "keywords_after_text_dedup": [
+    "a camera being held",
+    "a person holding a camera",
+    "a camera lens being focused",
+    "a camera being pointed at a scene",
+    "a person taking a photo",
+    "a camera being displayed",
+    "a camera being used in outdoor setting",
+    "a camera being used in indoor setting",
+    "a camera being shown in close-up",
+    "a camera being shown in wide shot",
+    "a person looking through camera viewfinder",
+    "a camera being set up on tripod",
+    "a camera being used to film landscape"
+  ],
+  "keywords_after_semantic_dedup": [
+    "a camera lens being focused",
+    "a person taking a photo",
+    "a camera being shown in wide shot",
+    "a person looking through camera viewfinder",
+    "a camera being used to film landscape"
+  ],
+  "semantic_dedup_scores": {
+    "max_keywords": 5,
+    "semantic_threshold": 0.85,
+    "input_count": 13,
+    "output_count": 5,
+    "input_keywords": [
+      "a camera being held",
+      "a person holding a camera",
+      "a camera lens being focused",
+      "a camera being pointed at a scene",
+      "a person taking a photo",
+      "a camera being displayed",
+      "a camera being used in outdoor setting",
+      "a camera being used in indoor setting",
+      "a camera being shown in close-up",
+      "a camera being shown in wide shot",
+      "a person looking through camera viewfinder",
+      "a camera being set up on tripod",
+      "a camera being used to film landscape"
+    ],
+    "kept_keywords": [
+      "a camera lens being focused",
+      "a person taking a photo",
+      "a camera being shown in wide shot",
+      "a person looking through camera viewfinder",
+      "a camera being used to film landscape"
+    ],
+    "removed_keywords": [
+      {
+        "keyword": "a camera being displayed",
+        "most_similar_keyword": "a camera being shown in close-up",
+        "max_similarity_to_others": 0.953210711479187,
+        "removal_priority_score": 1.953210711479187,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a camera being shown in close-up",
+        "most_similar_keyword": "a camera being shown in wide shot",
+        "max_similarity_to_others": 0.945439875125885,
+        "removal_priority_score": 1.9454398155212402,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a camera being used in outdoor setting",
+        "most_similar_keyword": "a camera being used to film landscape",
+        "max_similarity_to_others": 0.9447503089904785,
+        "removal_priority_score": 1.9447503089904785,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a camera being held",
+        "most_similar_keyword": "a camera being shown in wide shot",
+        "max_similarity_to_others": 0.9393898844718933,
+        "removal_priority_score": 1.939389944076538,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a person holding a camera",
+        "most_similar_keyword": "a person taking a photo",
+        "max_similarity_to_others": 0.9381512999534607,
+        "removal_priority_score": 1.9381513595581055,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a camera being pointed at a scene",
+        "most_similar_keyword": "a camera being used to film landscape",
+        "max_similarity_to_others": 0.9276610016822815,
+        "removal_priority_score": 1.9276609420776367,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a camera being set up on tripod",
+        "most_similar_keyword": "a camera being used to film landscape",
+        "max_similarity_to_others": 0.9199877977371216,
+        "removal_priority_score": 1.9199877977371216,
+        "above_threshold": true
+      },
+      {
+        "keyword": "a camera being used in indoor setting",
+        "most_similar_keyword": "a camera being shown in wide shot",
+        "max_similarity_to_others": 0.9150547981262207,
+        "removal_priority_score": 1.9150547981262207,
+        "above_threshold": true
+      }
+    ],
+    "per_keyword_max_similarity": [
+      {
+        "keyword": "a camera being held",
+        "max_similarity_to_others": 0.9398075938224792,
+        "most_similar_keyword": "a camera being displayed"
+      },
+      {
+        "keyword": "a person holding a camera",
+        "max_similarity_to_others": 0.9386667013168335,
+        "most_similar_keyword": "a camera being held"
+      },
+      {
+        "keyword": "a camera lens being focused",
+        "max_similarity_to_others": 0.9145315885543823,
+        "most_similar_keyword": "a camera being held"
+      },
+      {
+        "keyword": "a camera being pointed at a scene",
+        "max_similarity_to_others": 0.9276610016822815,
+        "most_similar_keyword": "a camera being used to film landscape"
+      },
+      {
+        "keyword": "a person taking a photo",
+        "max_similarity_to_others": 0.9381512999534607,
+        "most_similar_keyword": "a person holding a camera"
+      },
+      {
+        "keyword": "a camera being displayed",
+        "max_similarity_to_others": 0.953210711479187,
+        "most_similar_keyword": "a camera being shown in close-up"
+      },
+      {
+        "keyword": "a camera being used in outdoor setting",
+        "max_similarity_to_others": 0.9447503089904785,
+        "most_similar_keyword": "a camera being used to film landscape"
+      },
+      {
+        "keyword": "a camera being used in indoor setting",
+        "max_similarity_to_others": 0.9150547981262207,
+        "most_similar_keyword": "a camera being shown in wide shot"
+      },
+      {
+        "keyword": "a camera being shown in close-up",
+        "max_similarity_to_others": 0.953210711479187,
+        "most_similar_keyword": "a camera being displayed"
+      },
+      {
+        "keyword": "a camera being shown in wide shot",
+        "max_similarity_to_others": 0.9479534029960632,
+        "most_similar_keyword": "a camera being displayed"
+      },
+      {
+        "keyword": "a person looking through camera viewfinder",
+        "max_similarity_to_others": 0.8796369433403015,
+        "most_similar_keyword": "a person holding a camera"
+      },
+      {
+        "keyword": "a camera being set up on tripod",
+        "max_similarity_to_others": 0.9199877977371216,
+        "most_similar_keyword": "a camera being used to film landscape"
+      },
+      {
+        "keyword": "a camera being used to film landscape",
+        "max_similarity_to_others": 0.9447503089904785,
+        "most_similar_keyword": "a camera being used in outdoor setting"
+      }
+    ]
+  },
+  "keywords_after_info_filter": [
+    "a camera lens being focused",
+    "a person looking through camera viewfinder",
+    "a camera being used to film landscape"
+  ],
+  "all_keywords": [
+    "a camera lens being focused",
+    "a person looking through camera viewfinder",
+    "a camera being used to film landscape"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "file": "00_frame_100.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "file": "01_frame_125.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "file": "02_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "file": "03_frame_175.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "file": "04_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "file": "05_frame_475.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "file": "06_frame_500.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700,
+      "file": "07_frame_700.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "file": "08_frame_1025.jpg"
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1050,
+      "file": "09_frame_1050.jpg"
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1425,
+      "file": "10_frame_1425.jpg"
+    },
+    {
+      "index_in_pool": 58,
+      "frame_id": 1450,
+      "file": "11_frame_1450.jpg"
+    },
+    {
+      "index_in_pool": 59,
+      "frame_id": 1475,
+      "file": "12_frame_1475.jpg"
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1500,
+      "file": "13_frame_1500.jpg"
+    },
+    {
+      "index_in_pool": 67,
+      "frame_id": 1675,
+      "file": "14_frame_1675.jpg"
+    },
+    {
+      "index_in_pool": 84,
+      "frame_id": 2100,
+      "file": "15_frame_2100.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2574307322502136,
+        "a person looking through camera viewfinder": 0.28097546100616455,
+        "a camera being used to film landscape": 0.2456880658864975
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "keyword_scores": {
+        "a camera lens being focused": 0.27202022075653076,
+        "a person looking through camera viewfinder": 0.2659352123737335,
+        "a camera being used to film landscape": 0.2515002489089966
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2860192656517029,
+        "a person looking through camera viewfinder": 0.28618064522743225,
+        "a camera being used to film landscape": 0.263692706823349
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "keyword_scores": {
+        "a camera lens being focused": 0.3143783509731293,
+        "a person looking through camera viewfinder": 0.30675214529037476,
+        "a camera being used to film landscape": 0.2753617763519287
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "keyword_scores": {
+        "a camera lens being focused": 0.29046735167503357,
+        "a person looking through camera viewfinder": 0.29847073554992676,
+        "a camera being used to film landscape": 0.27153095602989197
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2865443825721741,
+        "a person looking through camera viewfinder": 0.29368409514427185,
+        "a camera being used to film landscape": 0.2701728045940399
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2968887686729431,
+        "a person looking through camera viewfinder": 0.3019847869873047,
+        "a camera being used to film landscape": 0.2905307412147522
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2829301953315735,
+        "a person looking through camera viewfinder": 0.281236857175827,
+        "a camera being used to film landscape": 0.2733733057975769
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2871325612068176,
+        "a person looking through camera viewfinder": 0.31138578057289124,
+        "a camera being used to film landscape": 0.28421446681022644
+      }
+    },
+    {
+      "index_in_pool": 42,
+      "frame_id": 1050,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2769113779067993,
+        "a person looking through camera viewfinder": 0.2537551522254944,
+        "a camera being used to film landscape": 0.2763502299785614
+      }
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1425,
+      "keyword_scores": {
+        "a camera lens being focused": 0.26046791672706604,
+        "a person looking through camera viewfinder": 0.2844468057155609,
+        "a camera being used to film landscape": 0.2675945460796356
+      }
+    },
+    {
+      "index_in_pool": 58,
+      "frame_id": 1450,
+      "keyword_scores": {
+        "a camera lens being focused": 0.27116480469703674,
+        "a person looking through camera viewfinder": 0.294715940952301,
+        "a camera being used to film landscape": 0.2751442492008209
+      }
+    },
+    {
+      "index_in_pool": 59,
+      "frame_id": 1475,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2895868122577667,
+        "a person looking through camera viewfinder": 0.2906322777271271,
+        "a camera being used to film landscape": 0.27578669786453247
+      }
+    },
+    {
+      "index_in_pool": 60,
+      "frame_id": 1500,
+      "keyword_scores": {
+        "a camera lens being focused": 0.28653690218925476,
+        "a person looking through camera viewfinder": 0.28615549206733704,
+        "a camera being used to film landscape": 0.2673402428627014
+      }
+    },
+    {
+      "index_in_pool": 67,
+      "frame_id": 1675,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2659042775630951,
+        "a person looking through camera viewfinder": 0.2851148545742035,
+        "a camera being used to film landscape": 0.3048684298992157
+      }
+    },
+    {
+      "index_in_pool": 84,
+      "frame_id": 2100,
+      "keyword_scores": {
+        "a camera lens being focused": 0.2972164750099182,
+        "a person looking through camera viewfinder": 0.32055196166038513,
+        "a camera being used to film landscape": 0.2820526361465454
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "option_probs": {
+    "A": 7.502672395475275e-18,
+    "B": 1.291667726946655e-16,
+    "C": 1.8978217986682302e-18,
+    "D": 2.9097927893821056e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.21951408381573856
+}

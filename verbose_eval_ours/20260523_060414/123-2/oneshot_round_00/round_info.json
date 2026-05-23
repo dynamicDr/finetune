@@ -1,0 +1,296 @@
+{
+  "sample_id": "123-2",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "According to the video, which of the following statements about Thailand's agenda on air pollution is correct?",
+  "options": [
+    "A. The agenda worked.",
+    "B. The agenda has been modified.",
+    "C. The agenda failed.",
+    "D. The agenda was abolished."
+  ],
+  "gt_answer": "C",
+  "raw_keywords_before_dedup": [
+    "[]"
+  ],
+  "all_keywords": [
+    "[]"
+  ],
+  "focus_keywords": [
+    "[]"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 25,
+      "file": "00_frame_25.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "file": "01_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "file": "02_frame_175.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200,
+      "file": "03_frame_200.jpg"
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "file": "04_frame_225.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "file": "05_frame_250.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "file": "06_frame_275.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "file": "07_frame_300.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "file": "08_frame_325.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "file": "09_frame_350.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "file": "10_frame_375.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 400,
+      "file": "11_frame_400.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 425,
+      "file": "12_frame_425.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "file": "13_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "file": "14_frame_475.jpg"
+    },
+    {
+      "index_in_pool": 53,
+      "frame_id": 1325,
+      "file": "15_frame_1325.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 25
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 400
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 425
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475
+    },
+    {
+      "index_in_pool": 53,
+      "frame_id": 1325
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 25,
+      "keyword_scores": {
+        "[]": 0.2050543874502182
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "keyword_scores": {
+        "[]": 0.2083289474248886
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "keyword_scores": {
+        "[]": 0.20320816338062286
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200,
+      "keyword_scores": {
+        "[]": 0.2106785625219345
+      }
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "keyword_scores": {
+        "[]": 0.2064439058303833
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "keyword_scores": {
+        "[]": 0.203241229057312
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "keyword_scores": {
+        "[]": 0.20722000300884247
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "keyword_scores": {
+        "[]": 0.2093571126461029
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "keyword_scores": {
+        "[]": 0.2082485854625702
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "keyword_scores": {
+        "[]": 0.2057473063468933
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "keyword_scores": {
+        "[]": 0.20099273324012756
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 400,
+      "keyword_scores": {
+        "[]": 0.20523405075073242
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 425,
+      "keyword_scores": {
+        "[]": 0.20728901028633118
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "keyword_scores": {
+        "[]": 0.20394553244113922
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "keyword_scores": {
+        "[]": 0.2079932689666748
+      }
+    },
+    {
+      "index_in_pool": 53,
+      "frame_id": 1325,
+      "keyword_scores": {
+        "[]": 0.22215837240219116
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "entropy": 0.0,
+  "option_probs": {
+    "A": 5.362140599177882e-18,
+    "B": 5.823068206042741e-19,
+    "C": 3.033372850730079e-18,
+    "D": 1.1229081970742721e-17
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.2187963358592242
+}

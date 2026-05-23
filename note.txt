@@ -954,4 +954,5 @@ python run.py --multirun \
   use_preprocessed_clip_frames=true \
   train_ratio=0 \
   seed=24 \
-  slurm=default_4090
+  slurm=default_4090 \
+  quota_prescreen_alpha=3

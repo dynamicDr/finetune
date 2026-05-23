@@ -30,13 +30,13 @@ def dump_verbose_round(
     options: list[str] | None,
     gt_answer: Any,
     all_keywords: list[str],
-    focus_keywords: list[str],
     frame_ids: list[int],
     selected_idx: list[int],
-    added_idx: list[int],
     imgs: list[Image.Image],
     image_keyword_scores: list[dict[str, Any]],
     vlm_out: dict[str, Any],
+    raw_keywords_before_dedup: list[str] | None = None,
+    keywords_after_info_filter: list[dict[str, Any]] | None = None,
 ) -> None:
     if not verbose or verbose_run_dir is None:
         return
@@ -53,7 +53,6 @@ def dump_verbose_round(
         imgs[idx].save(img_path)
         selected_images.append({"index_in_pool": int(idx), "frame_id": fid, "file": name})
 
-    added_images = [{"index_in_pool": int(i), "frame_id": int(frame_ids[i])} for i in added_idx]
     score_table_image = _render_keyword_frame_score_image(
         round_dir=round_dir,
         keywords=all_keywords,
@@ -70,14 +69,13 @@ def dump_verbose_round(
         "question": question,
         "options": options or [],
         "gt_answer": str(gt_answer),
+        "raw_keywords_before_dedup": raw_keywords_before_dedup or [],
+        "keywords_after_info_filter": keywords_after_info_filter or [],
         "all_keywords": all_keywords,
-        "focus_keywords": focus_keywords,
         "selected_count": len(selected_idx),
         "selected_images": selected_images,
-        "newly_added_images": added_images,
         "image_keyword_clip_scores": image_keyword_scores,
         "pred_answer": str(vlm_out.get("pred_answer", "")),
-        "entropy": float(vlm_out.get("entropy", 0.0)),
         "option_probs": _to_serializable_option_probs(vlm_out.get("option_probs", {})),
         "keyword_frame_score_image": score_table_image,
         "response": str(vlm_out.get("response", "")),

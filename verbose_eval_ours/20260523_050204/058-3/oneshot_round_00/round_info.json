@@ -1,0 +1,311 @@
+{
+  "sample_id": "058-3",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "What is one of the causes of wind according to the video?",
+  "options": [
+    "A. The sun is like a lamp.",
+    "B. The sea is cooler than the ground, and thus the sea wind forms.",
+    "C. The earth's rotaion changes as it orbits, and thus the temperature in a certain place changes.",
+    "D. The sun generates solar winds."
+  ],
+  "gt_answer": "C",
+  "all_keywords": [
+    "the sea is cooler than the ground",
+    "the earth's rotation changes as it orbits"
+  ],
+  "focus_keywords": [
+    "the sea is cooler than the ground",
+    "the earth's rotation changes as it orbits"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 24,
+      "file": "01_frame_24.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 288,
+      "file": "02_frame_288.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 312,
+      "file": "03_frame_312.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 336,
+      "file": "04_frame_336.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 360,
+      "file": "05_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384,
+      "file": "06_frame_384.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 504,
+      "file": "07_frame_504.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 528,
+      "file": "08_frame_528.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 552,
+      "file": "09_frame_552.jpg"
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 576,
+      "file": "10_frame_576.jpg"
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 600,
+      "file": "11_frame_600.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 624,
+      "file": "12_frame_624.jpg"
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 648,
+      "file": "13_frame_648.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 672,
+      "file": "14_frame_672.jpg"
+    },
+    {
+      "index_in_pool": 85,
+      "frame_id": 2040,
+      "file": "15_frame_2040.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 24
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 288
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 312
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 336
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 504
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 528
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 552
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 576
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 600
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 624
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 648
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 672
+    },
+    {
+      "index_in_pool": 85,
+      "frame_id": 2040
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.21607495844364166,
+        "the earth's rotation changes as it orbits": 0.20314332842826843
+      }
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 24,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.21265266835689545,
+        "the earth's rotation changes as it orbits": 0.18269404768943787
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 288,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.21284005045890808,
+        "the earth's rotation changes as it orbits": 0.24241232872009277
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 312,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.2169976830482483,
+        "the earth's rotation changes as it orbits": 0.2486526519060135
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 336,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.21567368507385254,
+        "the earth's rotation changes as it orbits": 0.2423049807548523
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 360,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.2178952842950821,
+        "the earth's rotation changes as it orbits": 0.245287224650383
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.22156019508838654,
+        "the earth's rotation changes as it orbits": 0.25236740708351135
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 504,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.2175765037536621,
+        "the earth's rotation changes as it orbits": 0.25832992792129517
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 528,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.2740662097930908,
+        "the earth's rotation changes as it orbits": 0.2439040094614029
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 552,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.2631741464138031,
+        "the earth's rotation changes as it orbits": 0.29135510325431824
+      }
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 576,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.2327924519777298,
+        "the earth's rotation changes as it orbits": 0.30795276165008545
+      }
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 600,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.22383660078048706,
+        "the earth's rotation changes as it orbits": 0.3029330372810364
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 624,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.21644961833953857,
+        "the earth's rotation changes as it orbits": 0.2724020183086395
+      }
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 648,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.22178250551223755,
+        "the earth's rotation changes as it orbits": 0.30769258737564087
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 672,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.22251704335212708,
+        "the earth's rotation changes as it orbits": 0.30655497312545776
+      }
+    },
+    {
+      "index_in_pool": 85,
+      "frame_id": 2040,
+      "keyword_scores": {
+        "the sea is cooler than the ground": 0.21422861516475677,
+        "the earth's rotation changes as it orbits": 0.3165183961391449
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "entropy": 0.0,
+  "option_probs": {
+    "A": 5.229205869887603e-18,
+    "B": 1.3096582133621816e-17,
+    "C": 2.523492573742374e-18,
+    "D": 3.221948986561957e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.21912877494469285
+}

@@ -1,0 +1,331 @@
+{
+  "sample_id": "043-2",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "How many people are watching TV in the video?",
+  "options": [
+    "A. 1.",
+    "B. 3.",
+    "C. 2.",
+    "D. 4."
+  ],
+  "gt_answer": "C",
+  "raw_keywords_before_dedup": [
+    "a television screen",
+    "a person sitting in front of the television",
+    "a person sitting to the left of the television",
+    "a person sitting to the right of the television",
+    "a person sitting behind the television"
+  ],
+  "keywords_after_text_dedup": [
+    "a television screen",
+    "a person sitting in front of the television",
+    "a person sitting to the left of the television",
+    "a person sitting to the right of the television",
+    "a person sitting behind the television"
+  ],
+  "keywords_after_semantic_dedup": [
+    "a television screen",
+    "a person sitting in front of the television",
+    "a person sitting to the left of the television",
+    "a person sitting to the right of the television",
+    "a person sitting behind the television"
+  ],
+  "semantic_dedup_scores": {
+    "max_keywords": 5,
+    "semantic_threshold": 0.85,
+    "input_count": 5,
+    "output_count": 5,
+    "input_keywords": [
+      "a television screen",
+      "a person sitting in front of the television",
+      "a person sitting to the left of the television",
+      "a person sitting to the right of the television",
+      "a person sitting behind the television"
+    ],
+    "kept_keywords": [
+      "a television screen",
+      "a person sitting in front of the television",
+      "a person sitting to the left of the television",
+      "a person sitting to the right of the television",
+      "a person sitting behind the television"
+    ],
+    "removed_keywords": [],
+    "per_keyword_max_similarity": [
+      {
+        "keyword": "a television screen",
+        "max_similarity_to_others": 0.8989201784133911,
+        "most_similar_keyword": "a person sitting to the left of the television"
+      },
+      {
+        "keyword": "a person sitting in front of the television",
+        "max_similarity_to_others": 0.9721886515617371,
+        "most_similar_keyword": "a person sitting to the left of the television"
+      },
+      {
+        "keyword": "a person sitting to the left of the television",
+        "max_similarity_to_others": 0.9907733201980591,
+        "most_similar_keyword": "a person sitting to the right of the television"
+      },
+      {
+        "keyword": "a person sitting to the right of the television",
+        "max_similarity_to_others": 0.9907733201980591,
+        "most_similar_keyword": "a person sitting to the left of the television"
+      },
+      {
+        "keyword": "a person sitting behind the television",
+        "max_similarity_to_others": 0.9634908437728882,
+        "most_similar_keyword": "a person sitting in front of the television"
+      }
+    ]
+  },
+  "keywords_after_info_filter": [
+    "a person sitting in front of the television",
+    "a person sitting to the left of the television",
+    "a person sitting behind the television"
+  ],
+  "all_keywords": [
+    "a person sitting in front of the television",
+    "a person sitting to the left of the television",
+    "a person sitting behind the television"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 13,
+      "frame_id": 312,
+      "file": "00_frame_312.jpg"
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1055,
+      "file": "01_frame_1055.jpg"
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1079,
+      "file": "02_frame_1079.jpg"
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103,
+      "file": "03_frame_1103.jpg"
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1127,
+      "file": "04_frame_1127.jpg"
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1247,
+      "file": "05_frame_1247.jpg"
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1343,
+      "file": "06_frame_1343.jpg"
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1367,
+      "file": "07_frame_1367.jpg"
+    },
+    {
+      "index_in_pool": 64,
+      "frame_id": 1534,
+      "file": "08_frame_1534.jpg"
+    },
+    {
+      "index_in_pool": 65,
+      "frame_id": 1558,
+      "file": "09_frame_1558.jpg"
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1582,
+      "file": "10_frame_1582.jpg"
+    },
+    {
+      "index_in_pool": 67,
+      "frame_id": 1606,
+      "file": "11_frame_1606.jpg"
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1630,
+      "file": "12_frame_1630.jpg"
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1654,
+      "file": "13_frame_1654.jpg"
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1678,
+      "file": "14_frame_1678.jpg"
+    },
+    {
+      "index_in_pool": 71,
+      "frame_id": 1702,
+      "file": "15_frame_1702.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 13,
+      "frame_id": 312,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2098812460899353,
+        "a person sitting to the left of the television": 0.20981581509113312,
+        "a person sitting behind the television": 0.22750701010227203
+      }
+    },
+    {
+      "index_in_pool": 44,
+      "frame_id": 1055,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.22099442780017853,
+        "a person sitting to the left of the television": 0.22070826590061188,
+        "a person sitting behind the television": 0.2256501168012619
+      }
+    },
+    {
+      "index_in_pool": 45,
+      "frame_id": 1079,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.23019112646579742,
+        "a person sitting to the left of the television": 0.2244284301996231,
+        "a person sitting behind the television": 0.24307367205619812
+      }
+    },
+    {
+      "index_in_pool": 46,
+      "frame_id": 1103,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2256552278995514,
+        "a person sitting to the left of the television": 0.22414036095142365,
+        "a person sitting behind the television": 0.23258663713932037
+      }
+    },
+    {
+      "index_in_pool": 47,
+      "frame_id": 1127,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.21495047211647034,
+        "a person sitting to the left of the television": 0.20688150823116302,
+        "a person sitting behind the television": 0.23357073962688446
+      }
+    },
+    {
+      "index_in_pool": 52,
+      "frame_id": 1247,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2193523496389389,
+        "a person sitting to the left of the television": 0.22565118968486786,
+        "a person sitting behind the television": 0.23130635917186737
+      }
+    },
+    {
+      "index_in_pool": 56,
+      "frame_id": 1343,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.21682389080524445,
+        "a person sitting to the left of the television": 0.20504844188690186,
+        "a person sitting behind the television": 0.22625041007995605
+      }
+    },
+    {
+      "index_in_pool": 57,
+      "frame_id": 1367,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.22571870684623718,
+        "a person sitting to the left of the television": 0.222103551030159,
+        "a person sitting behind the television": 0.23830600082874298
+      }
+    },
+    {
+      "index_in_pool": 64,
+      "frame_id": 1534,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.3054101765155792,
+        "a person sitting to the left of the television": 0.2971143424510956,
+        "a person sitting behind the television": 0.30632323026657104
+      }
+    },
+    {
+      "index_in_pool": 65,
+      "frame_id": 1558,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2839537560939789,
+        "a person sitting to the left of the television": 0.2844838500022888,
+        "a person sitting behind the television": 0.2847035527229309
+      }
+    },
+    {
+      "index_in_pool": 66,
+      "frame_id": 1582,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2801039218902588,
+        "a person sitting to the left of the television": 0.2828293442726135,
+        "a person sitting behind the television": 0.2826879620552063
+      }
+    },
+    {
+      "index_in_pool": 67,
+      "frame_id": 1606,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.27281850576400757,
+        "a person sitting to the left of the television": 0.27297672629356384,
+        "a person sitting behind the television": 0.26992926001548767
+      }
+    },
+    {
+      "index_in_pool": 68,
+      "frame_id": 1630,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2812175750732422,
+        "a person sitting to the left of the television": 0.27777722477912903,
+        "a person sitting behind the television": 0.2768058776855469
+      }
+    },
+    {
+      "index_in_pool": 69,
+      "frame_id": 1654,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2839128077030182,
+        "a person sitting to the left of the television": 0.27954399585723877,
+        "a person sitting behind the television": 0.2748430669307709
+      }
+    },
+    {
+      "index_in_pool": 70,
+      "frame_id": 1678,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.26188206672668457,
+        "a person sitting to the left of the television": 0.24777816236019135,
+        "a person sitting behind the television": 0.2694072425365448
+      }
+    },
+    {
+      "index_in_pool": 71,
+      "frame_id": 1702,
+      "keyword_scores": {
+        "a person sitting in front of the television": 0.2684071660041809,
+        "a person sitting to the left of the television": 0.24789759516716003,
+        "a person sitting behind the television": 0.27714234590530396
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "option_probs": {
+    "A": 1.311487863655553e-19,
+    "B": 3.8087661181485873e-20,
+    "C": 1.985897307938607e-20,
+    "D": 1.083155251259923e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C. 2.",
+  "inference_time": 0.30646549304947257
+}

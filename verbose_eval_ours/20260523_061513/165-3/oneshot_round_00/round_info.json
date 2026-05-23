@@ -1,0 +1,251 @@
+{
+  "sample_id": "165-3",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "What is the competition event taking place in the video?",
+  "options": [
+    "A. Men's 400 meters.",
+    "B. Men's 200 meters.",
+    "C. Women's 400 meters.",
+    "D. Women's 200 meters."
+  ],
+  "gt_answer": "A",
+  "raw_keywords_before_dedup": [
+    "a track and field stadium",
+    "athletes running on a track",
+    "a starting line with runners",
+    "a finish line with a clock",
+    "a crowd of spectators",
+    "a track with lanes",
+    "a scoreboard displaying times",
+    "athletes wearing athletic uniforms",
+    "a track with a red and white finish line"
+  ],
+  "all_keywords": [
+    "a finish line with a clock",
+    "a track with a red and white finish line"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 25,
+      "file": "01_frame_25.jpg"
+    },
+    {
+      "index_in_pool": 2,
+      "frame_id": 50,
+      "file": "02_frame_50.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "file": "03_frame_75.jpg"
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "file": "04_frame_100.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "file": "05_frame_125.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "file": "06_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "file": "07_frame_175.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200,
+      "file": "08_frame_200.jpg"
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "file": "09_frame_225.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "file": "10_frame_250.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "file": "11_frame_275.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "file": "12_frame_300.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "file": "13_frame_325.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "file": "14_frame_350.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "file": "15_frame_375.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2731674909591675,
+        "a track with a red and white finish line": 0.24795159697532654
+      }
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 25,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2665013372898102,
+        "a track with a red and white finish line": 0.2383946180343628
+      }
+    },
+    {
+      "index_in_pool": 2,
+      "frame_id": 50,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2575715482234955,
+        "a track with a red and white finish line": 0.2486533671617508
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "keyword_scores": {
+        "a finish line with a clock": 0.25735536217689514,
+        "a track with a red and white finish line": 0.2630538046360016
+      }
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2721538245677948,
+        "a track with a red and white finish line": 0.2588842809200287
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "keyword_scores": {
+        "a finish line with a clock": 0.27838557958602905,
+        "a track with a red and white finish line": 0.27827292680740356
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2763476073741913,
+        "a track with a red and white finish line": 0.29116567969322205
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "keyword_scores": {
+        "a finish line with a clock": 0.28554731607437134,
+        "a track with a red and white finish line": 0.29543250799179077
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200,
+      "keyword_scores": {
+        "a finish line with a clock": 0.28331881761550903,
+        "a track with a red and white finish line": 0.290117084980011
+      }
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "keyword_scores": {
+        "a finish line with a clock": 0.27347561717033386,
+        "a track with a red and white finish line": 0.26777660846710205
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "keyword_scores": {
+        "a finish line with a clock": 0.27479198575019836,
+        "a track with a red and white finish line": 0.25464490056037903
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2698215842247009,
+        "a track with a red and white finish line": 0.262299120426178
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "keyword_scores": {
+        "a finish line with a clock": 0.26642608642578125,
+        "a track with a red and white finish line": 0.25083327293395996
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "keyword_scores": {
+        "a finish line with a clock": 0.26483407616615295,
+        "a track with a red and white finish line": 0.25195956230163574
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "keyword_scores": {
+        "a finish line with a clock": 0.2673927843570709,
+        "a track with a red and white finish line": 0.24757623672485352
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "keyword_scores": {
+        "a finish line with a clock": 0.24338126182556152,
+        "a track with a red and white finish line": 0.2213582992553711
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "option_probs": {
+    "A": 1.8796196368147308e-16,
+    "B": 4.596033041539246e-18,
+    "C": 1.0605286607886717e-18,
+    "D": 1.2138313135646116e-18
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.21930925198830664
+}

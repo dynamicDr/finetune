@@ -1,0 +1,246 @@
+{
+  "sample_id": "269-1",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "In what manner do the children in the video get transported by their parents?",
+  "options": [
+    "A. Stroller.",
+    "B. Car.",
+    "C. Bike.",
+    "D. Carry in the bosom."
+  ],
+  "gt_answer": "A",
+  "raw_keywords_before_dedup": [
+    "a stroller",
+    "a car",
+    "a bike",
+    "a child being carried in the bosom"
+  ],
+  "all_keywords": [
+    "a stroller",
+    "a child being carried in the bosom"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 24,
+      "file": "01_frame_24.jpg"
+    },
+    {
+      "index_in_pool": 2,
+      "frame_id": 48,
+      "file": "02_frame_48.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 72,
+      "file": "03_frame_72.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384,
+      "file": "04_frame_384.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 408,
+      "file": "05_frame_408.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432,
+      "file": "06_frame_432.jpg"
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 647,
+      "file": "07_frame_647.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 671,
+      "file": "08_frame_671.jpg"
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 695,
+      "file": "09_frame_695.jpg"
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 719,
+      "file": "10_frame_719.jpg"
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 743,
+      "file": "11_frame_743.jpg"
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 767,
+      "file": "12_frame_767.jpg"
+    },
+    {
+      "index_in_pool": 38,
+      "frame_id": 911,
+      "file": "13_frame_911.jpg"
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 935,
+      "file": "14_frame_935.jpg"
+    },
+    {
+      "index_in_pool": 40,
+      "frame_id": 959,
+      "file": "15_frame_959.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "a stroller": 0.23400379717350006,
+        "a child being carried in the bosom": 0.23510658740997314
+      }
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 24,
+      "keyword_scores": {
+        "a stroller": 0.31060531735420227,
+        "a child being carried in the bosom": 0.24274761974811554
+      }
+    },
+    {
+      "index_in_pool": 2,
+      "frame_id": 48,
+      "keyword_scores": {
+        "a stroller": 0.31298935413360596,
+        "a child being carried in the bosom": 0.23568087816238403
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 72,
+      "keyword_scores": {
+        "a stroller": 0.31375396251678467,
+        "a child being carried in the bosom": 0.24832795560359955
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 384,
+      "keyword_scores": {
+        "a stroller": 0.28604352474212646,
+        "a child being carried in the bosom": 0.22116954624652863
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 408,
+      "keyword_scores": {
+        "a stroller": 0.28178998827934265,
+        "a child being carried in the bosom": 0.21679747104644775
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 432,
+      "keyword_scores": {
+        "a stroller": 0.2822906970977783,
+        "a child being carried in the bosom": 0.21509891748428345
+      }
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 647,
+      "keyword_scores": {
+        "a stroller": 0.3007301986217499,
+        "a child being carried in the bosom": 0.24882738292217255
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 671,
+      "keyword_scores": {
+        "a stroller": 0.2791956067085266,
+        "a child being carried in the bosom": 0.22163423895835876
+      }
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 695,
+      "keyword_scores": {
+        "a stroller": 0.2744121551513672,
+        "a child being carried in the bosom": 0.22926479578018188
+      }
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 719,
+      "keyword_scores": {
+        "a stroller": 0.28362956643104553,
+        "a child being carried in the bosom": 0.24615249037742615
+      }
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 743,
+      "keyword_scores": {
+        "a stroller": 0.29770344495773315,
+        "a child being carried in the bosom": 0.23041412234306335
+      }
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 767,
+      "keyword_scores": {
+        "a stroller": 0.27665647864341736,
+        "a child being carried in the bosom": 0.19992323219776154
+      }
+    },
+    {
+      "index_in_pool": 38,
+      "frame_id": 911,
+      "keyword_scores": {
+        "a stroller": 0.3025921881198883,
+        "a child being carried in the bosom": 0.26306381821632385
+      }
+    },
+    {
+      "index_in_pool": 39,
+      "frame_id": 935,
+      "keyword_scores": {
+        "a stroller": 0.29145193099975586,
+        "a child being carried in the bosom": 0.22575709223747253
+      }
+    },
+    {
+      "index_in_pool": 40,
+      "frame_id": 959,
+      "keyword_scores": {
+        "a stroller": 0.2838995158672333,
+        "a child being carried in the bosom": 0.21870526671409607
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "option_probs": {
+    "A": 6.678646574123608e-19,
+    "B": 7.877718920656901e-19,
+    "C": 1.3298750783113923e-20,
+    "D": 1.580050604511516e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A. Stroller.",
+  "inference_time": 0.3027123308274895
+}

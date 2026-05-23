@@ -112,15 +112,12 @@ def main(cfg: DictConfig) -> None:
             if preprocessed_clip_dir is not None and str(preprocessed_clip_dir).strip() not in ("", "null", "None"):
                 dataset_shared += ["--preprocessed_clip_dir", str(preprocessed_clip_dir)]
         if script_key == "vqa_eval_ours.py":
-            max_refine_rounds = OmegaConf.select(cfg, "max_refine_rounds", default=None)
-            if max_refine_rounds is not None and str(max_refine_rounds).strip() not in ("", "null", "None"):
-                dataset_shared += ["--max_refine_rounds", str(int(max_refine_rounds))]
-            entropy_stop_threshold = OmegaConf.select(cfg, "entropy_stop_threshold", default=None)
-            if entropy_stop_threshold is not None and str(entropy_stop_threshold).strip() not in ("", "null", "None"):
-                dataset_shared += ["--entropy_stop_threshold", str(float(entropy_stop_threshold))]
-            convergence_delta_threshold = OmegaConf.select(cfg, "convergence_delta_threshold", default=None)
-            if convergence_delta_threshold is not None and str(convergence_delta_threshold).strip() not in ("", "null", "None"):
-                dataset_shared += ["--convergence_delta_threshold", str(float(convergence_delta_threshold))]
+            quota_prescreen_alpha = OmegaConf.select(cfg, "quota_prescreen_alpha", default=None)
+            if quota_prescreen_alpha is not None and str(quota_prescreen_alpha).strip() not in ("", "null", "None"):
+                dataset_shared += ["--quota_prescreen_alpha", str(int(quota_prescreen_alpha))]
+            max_keywords = OmegaConf.select(cfg, "max_keywords", default=None)
+            if max_keywords is not None and str(max_keywords).strip() not in ("", "null", "None"):
+                dataset_shared += ["--max_keywords", str(int(max_keywords))]
             ours_clip_model_id = OmegaConf.select(cfg, "ours_clip_model_id", default=None)
             if ours_clip_model_id is not None and str(ours_clip_model_id).strip() not in ("", "null", "None"):
                 dataset_shared += ["--ours_clip_model_id", str(ours_clip_model_id)]

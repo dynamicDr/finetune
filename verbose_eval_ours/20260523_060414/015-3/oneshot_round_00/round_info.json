@@ -1,0 +1,347 @@
+{
+  "sample_id": "015-3",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "Based on the information provided by the video, which of the following statements is not correct?",
+  "options": [
+    "A. The painting got more expensive because it shredded.",
+    "B. The buyer put a shredder inside the painting many years ago.",
+    "C. People in the auction house were stunned when the painting shredded.",
+    "D. Banksky considered the shredding of painting is part of art."
+  ],
+  "gt_answer": "B",
+  "raw_keywords_before_dedup": [
+    "a painting being shredded",
+    "a shredder inside the painting",
+    "people in an auction house",
+    "a buyer at an auction",
+    "a painting on display",
+    "an auction house setting",
+    "a crowd reacting",
+    "a person holding a shredder",
+    "a painting being auctioned",
+    "a painting with visible damage",
+    "a person speaking at auction",
+    "a painting being cut by a shredder",
+    "a painting with shredded edges",
+    "a person looking shocked",
+    "a painting being examined",
+    "a person holding a painting"
+  ],
+  "all_keywords": [
+    "a painting being shredded",
+    "a crowd reacting",
+    "a person holding a shredder"
+  ],
+  "focus_keywords": [
+    "a painting being shredded",
+    "a crowd reacting",
+    "a person holding a shredder"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 30,
+      "file": "01_frame_30.jpg"
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 120,
+      "file": "02_frame_120.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 150,
+      "file": "03_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 180,
+      "file": "04_frame_180.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 300,
+      "file": "05_frame_300.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 330,
+      "file": "06_frame_330.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "file": "07_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "file": "08_frame_390.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569,
+      "file": "09_frame_569.jpg"
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 719,
+      "file": "10_frame_719.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 779,
+      "file": "11_frame_779.jpg"
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 869,
+      "file": "12_frame_869.jpg"
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 899,
+      "file": "13_frame_899.jpg"
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1439,
+      "file": "14_frame_1439.jpg"
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1469,
+      "file": "15_frame_1469.jpg"
+    }
+  ],
+  "newly_added_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 30
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 120
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 150
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 180
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 300
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 330
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 719
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 779
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 869
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 899
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1439
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1469
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "a painting being shredded": 0.286655992269516,
+        "a crowd reacting": 0.27464669942855835,
+        "a person holding a shredder": 0.2441389113664627
+      }
+    },
+    {
+      "index_in_pool": 1,
+      "frame_id": 30,
+      "keyword_scores": {
+        "a painting being shredded": 0.28247106075286865,
+        "a crowd reacting": 0.25656163692474365,
+        "a person holding a shredder": 0.22401946783065796
+      }
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 120,
+      "keyword_scores": {
+        "a painting being shredded": 0.249054953455925,
+        "a crowd reacting": 0.29599884152412415,
+        "a person holding a shredder": 0.2205330729484558
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 150,
+      "keyword_scores": {
+        "a painting being shredded": 0.2236357480287552,
+        "a crowd reacting": 0.27068156003952026,
+        "a person holding a shredder": 0.21314658224582672
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 180,
+      "keyword_scores": {
+        "a painting being shredded": 0.2143290787935257,
+        "a crowd reacting": 0.2672271728515625,
+        "a person holding a shredder": 0.19989867508411407
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 300,
+      "keyword_scores": {
+        "a painting being shredded": 0.30320289731025696,
+        "a crowd reacting": 0.23644500970840454,
+        "a person holding a shredder": 0.24488581717014313
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 330,
+      "keyword_scores": {
+        "a painting being shredded": 0.27810704708099365,
+        "a crowd reacting": 0.2567845582962036,
+        "a person holding a shredder": 0.2506451904773712
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "keyword_scores": {
+        "a painting being shredded": 0.2929501235485077,
+        "a crowd reacting": 0.27579790353775024,
+        "a person holding a shredder": 0.24251872301101685
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "keyword_scores": {
+        "a painting being shredded": 0.28950217366218567,
+        "a crowd reacting": 0.27011048793792725,
+        "a person holding a shredder": 0.2378227412700653
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 569,
+      "keyword_scores": {
+        "a painting being shredded": 0.2888430058956146,
+        "a crowd reacting": 0.24342580139636993,
+        "a person holding a shredder": 0.2518206834793091
+      }
+    },
+    {
+      "index_in_pool": 24,
+      "frame_id": 719,
+      "keyword_scores": {
+        "a painting being shredded": 0.285177618265152,
+        "a crowd reacting": 0.2706005573272705,
+        "a person holding a shredder": 0.2475811094045639
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 779,
+      "keyword_scores": {
+        "a painting being shredded": 0.28545886278152466,
+        "a crowd reacting": 0.25980043411254883,
+        "a person holding a shredder": 0.22505538165569305
+      }
+    },
+    {
+      "index_in_pool": 29,
+      "frame_id": 869,
+      "keyword_scores": {
+        "a painting being shredded": 0.2978711426258087,
+        "a crowd reacting": 0.22547084093093872,
+        "a person holding a shredder": 0.2496975213289261
+      }
+    },
+    {
+      "index_in_pool": 30,
+      "frame_id": 899,
+      "keyword_scores": {
+        "a painting being shredded": 0.2690722942352295,
+        "a crowd reacting": 0.19444546103477478,
+        "a person holding a shredder": 0.2566259503364563
+      }
+    },
+    {
+      "index_in_pool": 48,
+      "frame_id": 1439,
+      "keyword_scores": {
+        "a painting being shredded": 0.27034759521484375,
+        "a crowd reacting": 0.22082917392253876,
+        "a person holding a shredder": 0.28980889916419983
+      }
+    },
+    {
+      "index_in_pool": 49,
+      "frame_id": 1469,
+      "keyword_scores": {
+        "a painting being shredded": 0.3333037495613098,
+        "a crowd reacting": 0.22147440910339355,
+        "a person holding a shredder": 0.28536897897720337
+      }
+    }
+  ],
+  "pred_answer": "A",
+  "entropy": 0.0,
+  "option_probs": {
+    "A": 2.9316027714031943e-19,
+    "B": 1.3834631483756273e-18,
+    "C": 1.866219613806891e-20,
+    "D": 2.5272021822284612e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "A",
+  "inference_time": 0.22074629296548665
+}
