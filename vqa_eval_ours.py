@@ -42,6 +42,19 @@ def build_user_text(question: str, options: list[str] | None) -> str:
     return f"{question}\n\nPlease provide the numerical answer directly."
 
 
+def build_user_text_with_subtitles(question: str, options: list[str] | None, subtitles: list[str] | None) -> str:
+    options_text = "\n".join(options or [])
+    subtitle_text = "\n".join((subtitles or [])).strip() or "No subtitles available"
+    return (
+        "This video's subtitles are listed below:\n"
+        f"{subtitle_text}\n\n"
+        "Select the best answer to the following multiple-choice question based on the video. "
+        "Respond with only the letter (A, B, C, or D) of the correct option.\n"
+        f"{question}\n{options_text}\n"
+        "The best answer is:"
+    )
+
+
 def calculate_mra(pred: float, gt: float) -> float:
     if gt == 0:
         return 1.0 if pred == 0 else 0.0
@@ -138,6 +151,101 @@ def _collect_video_frames_uniform(video_path: str, target_frames: int) -> tuple[
     return frame_ids, images
 
 
+def _parse_subtitle_time(time_str: str) -> float:
+    h, m, s_ms = time_str.split(":")
+    s, ms = s_ms.split(",")
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
+
+
+def _load_srt_segments(subtitle_path: str) -> list[tuple[float, float, str]]:
+    p = Path(subtitle_path)
+    if not p.is_file():
+        return []
+    text = p.read_text(encoding="utf-8", errors="ignore")
+    blocks = re.split(r"\n\s*\n", text.strip())
+    segs: list[tuple[float, float, str]] = []
+    for block in blocks:
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        if len(lines) < 2:
+            continue
+        time_line_idx = 0 if "-->" in lines[0] else (1 if len(lines) > 1 and "-->" in lines[1] else -1)
+        if time_line_idx < 0:
+            continue
+        try:
+            ts0, ts1 = [x.strip() for x in lines[time_line_idx].split("-->")]
+            start_t = _parse_subtitle_time(ts0)
+            end_t = _parse_subtitle_time(ts1)
+        except Exception:
+            continue
+        content_lines = lines[time_line_idx + 1 :]
+        if not content_lines:
+            continue
+        raw = " ".join(content_lines)
+        cleaned = re.sub(r"<[^>]+>", "", raw).strip()
+        if cleaned:
+            segs.append((start_t, end_t, cleaned))
+    return segs
+
+
+def _resolve_subtitle_path(sample: VQASample, subtitles_dir: str | None) -> str | None:
+    explicit_dir = os.path.expanduser(subtitles_dir) if subtitles_dir else ""
+    video_path = Path(sample.video_path).expanduser().resolve()
+    video_stem = video_path.stem
+    meta_video_id = str(sample.metadata.get("videoID", "")).strip() if isinstance(sample.metadata, dict) else ""
+    candidates: list[Path] = []
+    if explicit_dir:
+        base = Path(explicit_dir)
+        if base.is_dir():
+            for stem in [meta_video_id, video_stem]:
+                if stem:
+                    candidates.extend([base / f"{stem}.srt", base / f"{stem}.SRT"])
+    for root in [video_path.parent, video_path.parent.parent]:
+        for subname in ("subtitle", "subtitles"):
+            d = root / subname
+            for stem in [meta_video_id, video_stem]:
+                if stem:
+                    candidates.extend([d / f"{stem}.srt", d / f"{stem}.SRT"])
+    for p in candidates:
+        if p.is_file():
+            return str(p)
+    return None
+
+
+def _collect_subtitles_for_sample(
+    sample: VQASample,
+    sampled_frame_ids: list[int],
+    subtitles_dir: str | None,
+) -> tuple[list[str], list[str]]:
+    subtitle_path = _resolve_subtitle_path(sample, subtitles_dir=subtitles_dir)
+    if not subtitle_path or not sampled_frame_ids:
+        return [], ["" for _ in sampled_frame_ids]
+    cap = cv2.VideoCapture(sample.video_path)
+    if not cap.isOpened():
+        return [], ["" for _ in sampled_frame_ids]
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    cap.release()
+    if fps <= 1e-6:
+        return [], ["" for _ in sampled_frame_ids]
+    segments = _load_srt_segments(subtitle_path)
+    if not segments:
+        return [], ["" for _ in sampled_frame_ids]
+    out: list[str] = []
+    seen: set[str] = set()
+    per_frame_subs: list[str] = []
+    for fid in sampled_frame_ids:
+        t = float(fid) / fps
+        matched = ""
+        for s0, s1, txt in segments:
+            if s0 <= t < s1:
+                matched = txt
+                if txt not in seen:
+                    seen.add(txt)
+                    out.append(txt)
+                break
+        per_frame_subs.append(matched)
+    return out, per_frame_subs
+
+
 def _to_feature_tensor(features: Any) -> torch.Tensor:
     if isinstance(features, torch.Tensor):
         return features
@@ -219,7 +327,11 @@ def _extract_keywords_with_llm_text(
     question: str,
     options: list[str] | None,
     max_new_tokens: int,
+    target_keywords: int,
 ) -> tuple[list[str], list[str]]:
+    target_keywords = max(1, int(target_keywords))
+    low_keywords = max(1, target_keywords - 1)
+    high_keywords = target_keywords + 1
     options_text = "\n".join(options or [])
     prompt = (
         "You are a visual element extractor for video question answering.\n"
@@ -233,30 +345,42 @@ def _extract_keywords_with_llm_text(
         "- Each element must be a short DECLARATIVE phrase, e.g. \"a red cat\", "
         "\"a railway under construction\", \"an ancient tomb being excavated\".\n"
         "- Do NOT output single bare words (e.g. \"cat\") or questions.\n"
+        f"- Output around {target_keywords} keywords (preferred range: {low_keywords}-{high_keywords}).\n"
         "- Output STRICTLY a JSON array of strings. No explanation, no markdown, "
         "no extra text.\n\n"
         f"Question:\n{question}\n\n"
         f"Options:\n{options_text}"
     )
-    content = [{"type": "text", "text": prompt}]
-    text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
-    inputs = proc(text=[text], padding=True, return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1)
-    seq = out[0][len(inputs.input_ids[0]):]
-    resp = proc.decode(seq, skip_special_tokens=True, clean_up_tokenization_spaces=False).strip()
+    def _ask_once(prompt_text: str) -> tuple[list[str], list[str]]:
+        content = [{"type": "text", "text": prompt_text}]
+        text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
+        inputs = proc(text=[text], padding=True, return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1)
+        seq = out[0][len(inputs.input_ids[0]):]
+        resp = proc.decode(seq, skip_special_tokens=True, clean_up_tokenization_spaces=False).strip()
+        kws_raw_local = _parse_visual_keyword_phrases(resp)
+        out_kws_local, seen_local = [], set()
+        for kw in kws_raw_local:
+            s = kw.strip().lower()
+            if not s:
+                continue
+            if s in seen_local:
+                continue
+            seen_local.add(s)
+            out_kws_local.append(s)
+        return kws_raw_local, out_kws_local
 
-    kws_raw = _parse_visual_keyword_phrases(resp)
-    out_kws, seen = [], set()
-    for kw in kws_raw:
-        s = kw.strip().lower()
-        if not s:
-            continue
-        if s in seen:
-            continue
-        seen.add(s)
-        out_kws.append(s)
-    return kws_raw, out_kws
+    kws_raw, out_kws = _ask_once(prompt)
+    if out_kws:
+        return kws_raw, out_kws
+
+    retry_prompt = (
+        prompt
+        + "\n\nYour previous answer was empty or not parseable. Retry now.\n"
+        + "You MUST output a valid JSON array of visual phrases and include at least 1 keyword."
+    )
+    return _ask_once(retry_prompt)
 
 
 # ==================== 信息量计算与预算分配 ====================
@@ -675,6 +799,8 @@ def _eval_one_sample(
     budget: int,
     pool_size: int,
     preprocessed_clip_dir: str | None,
+    use_subtitles: bool,
+    subtitles_dir: str | None,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
     if args.use_preprocessed_clip_frames:
@@ -695,6 +821,7 @@ def _eval_one_sample(
         question=sample.question,
         options=sample.options,
         max_new_tokens=128,
+        target_keywords=args.max_keywords,
     )
     if not kws:
         raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
@@ -771,7 +898,14 @@ def _eval_one_sample(
     )
 
     one_shot_frames = _resize_lowres([imgs[i] for i in selected_idx], args.lowres_size)
-    one_shot_out = _run_vlm_once(model, proc, one_shot_frames, prompt, max_new_tokens, model_mode)
+    sampled_frame_ids = [int(frame_ids[i]) for i in selected_idx]
+    subtitles_for_prompt, selected_frame_subtitles = (
+        _collect_subtitles_for_sample(sample, sampled_frame_ids, subtitles_dir=subtitles_dir)
+        if use_subtitles
+        else ([], ["" for _ in sampled_frame_ids])
+    )
+    prompt_use = build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt) if use_subtitles else prompt
+    one_shot_out = _run_vlm_once(model, proc, one_shot_frames, prompt_use, max_new_tokens, model_mode)
     one_shot_kw_scores = _build_image_keyword_scores(selected_idx, frame_ids, kws_use, kw_emb_use, img_emb)
     dump_verbose_round(
         verbose=VERBOSE,
@@ -787,9 +921,11 @@ def _eval_one_sample(
         selected_idx=selected_idx,
         imgs=imgs,
         image_keyword_scores=one_shot_kw_scores,
+        keyword_info_scores=info_pack["rows"],
         vlm_out=one_shot_out,
         raw_keywords_before_dedup=kws_raw,
         keywords_after_info_filter=[{"keyword": kw, "info": float(kw_info_use[i].item())} for i, kw in enumerate(kws_use)],
+        selected_frame_subtitles=selected_frame_subtitles,
     )
     _log(f"sample={sample.sample_id} one-shot pred={one_shot_out['pred_answer']}, frames={len(selected_idx)}")
     return {
@@ -804,7 +940,19 @@ def _eval_one_sample(
 
 
 # ==================== 数据集级评估 ====================
-def evaluate_vqa(model: Any, proc: Any, samples: list[VQASample], args: argparse.Namespace, max_new_tokens: int, model_mode: str, budget: int, pool_size: int, preprocessed_clip_dir: str | None) -> dict[str, Any]:
+def evaluate_vqa(
+    model: Any,
+    proc: Any,
+    samples: list[VQASample],
+    args: argparse.Namespace,
+    max_new_tokens: int,
+    model_mode: str,
+    budget: int,
+    pool_size: int,
+    preprocessed_clip_dir: str | None,
+    use_subtitles: bool,
+    subtitles_dir: str | None,
+) -> dict[str, Any]:
     clip_proc, clip_model, clip_device = _load_clip(args.ours_clip_model_id, args.ours_clip_device)
 
     res = {"correct": 0, "total": 0, "mra_sum": 0.0, "mra_count": 0, "inference_times": [], "frame_sampling_times": [], "embedding_build_times": [], "selected_frame_counts": [], "over_max_tokens_count": 0}
@@ -812,7 +960,23 @@ def evaluate_vqa(model: Any, proc: Any, samples: list[VQASample], args: argparse
     for s in pbar:
         if args.task_filter != "all" and s.task_type != args.task_filter:
             continue
-        out = _eval_one_sample(model, proc, clip_proc, clip_model, clip_device, s, build_user_text(s.question, s.options), args, max_new_tokens, model_mode, budget, pool_size, preprocessed_clip_dir)
+        out = _eval_one_sample(
+            model,
+            proc,
+            clip_proc,
+            clip_model,
+            clip_device,
+            s,
+            build_user_text(s.question, s.options),
+            args,
+            max_new_tokens,
+            model_mode,
+            budget,
+            pool_size,
+            preprocessed_clip_dir,
+            use_subtitles=use_subtitles,
+            subtitles_dir=subtitles_dir,
+        )
         pred = out["pred_answer"]
         res["inference_times"].append(float(out["inference_time"]))
         res["frame_sampling_times"].append(float(out["frame_sampling_time"]))
@@ -864,6 +1028,8 @@ def parse_args():
     p.add_argument("--use_preprocessed_clip_frames", action="store_true")
     p.add_argument("--preprocessed_clip_fps", type=float, default=1.0)
     p.add_argument("--preprocessed_clip_dir", type=str, default="")
+    p.add_argument("--use_subtitles", action="store_true", help="为 Video-MME 按采样帧时间对齐读取字幕并拼入 prompt")
+    p.add_argument("--subtitles_dir", type=str, default="", help="字幕目录（可选）；为空时尝试在视频邻近目录下自动查找 subtitle/subtitles")
     p.add_argument("--candidate_pool_size", type=int, default=128)
     p.add_argument("--quota_prescreen_alpha", type=int, default=3, help="配额软预筛系数 alpha：每个关键词预筛 top-(alpha*q_i) 帧")
     p.add_argument("--max_keywords", type=int, default=5, help="最大关键词数：不超过该值不做语义裁剪，超过则删除重复度最高的词")
@@ -934,7 +1100,19 @@ def main():
     )
 
     model, proc = load_model_and_processor(resolved_model_path, use_lora=args.use_lora, base_model=args.base_model, merge_lora=args.merge_lora)
-    results = evaluate_vqa(model, proc, samples, args, effective_max_new_tokens, model_mode, budget, pool_size, preprocessed_clip_dir)
+    results = evaluate_vqa(
+        model,
+        proc,
+        samples,
+        args,
+        effective_max_new_tokens,
+        model_mode,
+        budget,
+        pool_size,
+        preprocessed_clip_dir,
+        use_subtitles=bool(args.use_subtitles),
+        subtitles_dir=(args.subtitles_dir.strip() if args.subtitles_dir.strip() else None),
+    )
 
     avg_acc, avg_time = _compute_accuracy_from_results(results, args.task_filter)
     eval_n, correct = _compute_score_counts_for_csv(results, args.task_filter)

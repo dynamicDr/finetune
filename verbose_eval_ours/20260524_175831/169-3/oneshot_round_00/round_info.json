@@ -1,0 +1,278 @@
+{
+  "sample_id": "169-3",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "How many times did the two athletes dive together at the same time in the video?",
+  "options": [
+    "A. 3.",
+    "B. 4.",
+    "C. 6.",
+    "D. 8."
+  ],
+  "gt_answer": "A",
+  "raw_keywords_before_dedup": [
+    "two athletes diving",
+    "diving pool",
+    "water splash",
+    "counting dives",
+    "on-screen numbers"
+  ],
+  "keywords_after_info_filter": [
+    {
+      "keyword": "two athletes diving",
+      "info": 0.12820331752300262
+    },
+    {
+      "keyword": "diving pool",
+      "info": 0.10994716733694077
+    },
+    {
+      "keyword": "water splash",
+      "info": 0.12527182698249817
+    }
+  ],
+  "all_keywords": [
+    "two athletes diving",
+    "diving pool",
+    "water splash"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "file": "00_frame_250.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "file": "01_frame_300.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "file": "02_frame_350.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 425,
+      "file": "03_frame_425.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "file": "04_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "file": "05_frame_475.jpg"
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "file": "06_frame_500.jpg"
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 625,
+      "file": "07_frame_625.jpg"
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "file": "08_frame_650.jpg"
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 675,
+      "file": "09_frame_675.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700,
+      "file": "10_frame_700.jpg"
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 775,
+      "file": "11_frame_775.jpg"
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 800,
+      "file": "12_frame_800.jpg"
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 875,
+      "file": "13_frame_875.jpg"
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "file": "14_frame_1025.jpg"
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1250,
+      "file": "15_frame_1250.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "keyword_scores": {
+        "two athletes diving": 0.34095704555511475,
+        "diving pool": 0.29557090997695923,
+        "water splash": 0.24060802161693573
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "keyword_scores": {
+        "two athletes diving": 0.3399343490600586,
+        "diving pool": 0.3075772821903229,
+        "water splash": 0.25887539982795715
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "keyword_scores": {
+        "two athletes diving": 0.3021879196166992,
+        "diving pool": 0.2886817157268524,
+        "water splash": 0.2742087244987488
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 425,
+      "keyword_scores": {
+        "two athletes diving": 0.3465415835380554,
+        "diving pool": 0.31778663396835327,
+        "water splash": 0.2548601031303406
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 450,
+      "keyword_scores": {
+        "two athletes diving": 0.2834528684616089,
+        "diving pool": 0.2841663360595703,
+        "water splash": 0.2995035648345947
+      }
+    },
+    {
+      "index_in_pool": 19,
+      "frame_id": 475,
+      "keyword_scores": {
+        "two athletes diving": 0.3259032666683197,
+        "diving pool": 0.30448272824287415,
+        "water splash": 0.24318847060203552
+      }
+    },
+    {
+      "index_in_pool": 20,
+      "frame_id": 500,
+      "keyword_scores": {
+        "two athletes diving": 0.3573837876319885,
+        "diving pool": 0.3091144561767578,
+        "water splash": 0.25106871128082275
+      }
+    },
+    {
+      "index_in_pool": 25,
+      "frame_id": 625,
+      "keyword_scores": {
+        "two athletes diving": 0.32600992918014526,
+        "diving pool": 0.3129573166370392,
+        "water splash": 0.27804869413375854
+      }
+    },
+    {
+      "index_in_pool": 26,
+      "frame_id": 650,
+      "keyword_scores": {
+        "two athletes diving": 0.32034197449684143,
+        "diving pool": 0.30524176359176636,
+        "water splash": 0.27282142639160156
+      }
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 675,
+      "keyword_scores": {
+        "two athletes diving": 0.3117034137248993,
+        "diving pool": 0.29079946875572205,
+        "water splash": 0.30357998609542847
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 700,
+      "keyword_scores": {
+        "two athletes diving": 0.3369540572166443,
+        "diving pool": 0.2854175865650177,
+        "water splash": 0.2069341242313385
+      }
+    },
+    {
+      "index_in_pool": 31,
+      "frame_id": 775,
+      "keyword_scores": {
+        "two athletes diving": 0.33830708265304565,
+        "diving pool": 0.3175416588783264,
+        "water splash": 0.2510495185852051
+      }
+    },
+    {
+      "index_in_pool": 32,
+      "frame_id": 800,
+      "keyword_scores": {
+        "two athletes diving": 0.27606695890426636,
+        "diving pool": 0.3000943958759308,
+        "water splash": 0.2845938503742218
+      }
+    },
+    {
+      "index_in_pool": 35,
+      "frame_id": 875,
+      "keyword_scores": {
+        "two athletes diving": 0.3458200693130493,
+        "diving pool": 0.3007749021053314,
+        "water splash": 0.24436978995800018
+      }
+    },
+    {
+      "index_in_pool": 41,
+      "frame_id": 1025,
+      "keyword_scores": {
+        "two athletes diving": 0.3675118386745453,
+        "diving pool": 0.3145507872104645,
+        "water splash": 0.2550884187221527
+      }
+    },
+    {
+      "index_in_pool": 50,
+      "frame_id": 1250,
+      "keyword_scores": {
+        "two athletes diving": 0.365558922290802,
+        "diving pool": 0.33068203926086426,
+        "water splash": 0.2823631167411804
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "option_probs": {
+    "A": 4.969771139528315e-19,
+    "B": 6.129218871510124e-20,
+    "C": 3.834853915207214e-20,
+    "D": 1.9928778670914262e-20
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B. 4.",
+  "inference_time": 0.30764224007725716
+}

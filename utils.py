@@ -34,9 +34,11 @@ def dump_verbose_round(
     selected_idx: list[int],
     imgs: list[Image.Image],
     image_keyword_scores: list[dict[str, Any]],
+    keyword_info_scores: list[dict[str, Any]] | None,
     vlm_out: dict[str, Any],
     raw_keywords_before_dedup: list[str] | None = None,
     keywords_after_info_filter: list[dict[str, Any]] | None = None,
+    selected_frame_subtitles: list[str] | None = None,
 ) -> None:
     if not verbose or verbose_run_dir is None:
         return
@@ -46,20 +48,33 @@ def dump_verbose_round(
     round_dir.mkdir(parents=True, exist_ok=True)
 
     selected_images = []
+    frame_subs = selected_frame_subtitles or []
     for order, idx in enumerate(selected_idx):
         fid = int(frame_ids[idx])
         name = f"{order:02d}_frame_{fid}.jpg"
         img_path = round_dir / name
         imgs[idx].save(img_path)
-        selected_images.append({"index_in_pool": int(idx), "frame_id": fid, "file": name})
+        selected_images.append(
+            {
+                "index_in_pool": int(idx),
+                "frame_id": fid,
+                "file": name,
+                "subtitle": str(frame_subs[order]) if order < len(frame_subs) else "",
+            }
+        )
 
     score_table_image = _render_keyword_frame_score_image(
         round_dir=round_dir,
+        question=question,
+        options=options or [],
+        gt_answer=str(gt_answer),
         keywords=all_keywords,
+        keyword_info_scores=keyword_info_scores or [],
         selected_idx=selected_idx,
         frame_ids=frame_ids,
         imgs=imgs,
         image_keyword_scores=image_keyword_scores,
+        selected_frame_subtitles=frame_subs,
     )
 
     payload = {
@@ -81,17 +96,22 @@ def dump_verbose_round(
         "response": str(vlm_out.get("response", "")),
         "inference_time": float(vlm_out.get("inference_time", 0.0)),
     }
-    with (round_dir / "round_info.json").open("w", encoding="utf-8") as f:
+    with (round_dir / "info.json").open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
 def _render_keyword_frame_score_image(
     round_dir: Path,
+    question: str,
+    options: list[str],
+    gt_answer: str,
     keywords: list[str],
+    keyword_info_scores: list[dict[str, Any]],
     selected_idx: list[int],
     frame_ids: list[int],
     imgs: list[Image.Image],
     image_keyword_scores: list[dict[str, Any]],
+    selected_frame_subtitles: list[str] | None = None,
 ) -> str:
     out_name = "keyword_frame_clip_scores.png"
     if not keywords or not selected_idx:
@@ -113,29 +133,39 @@ def _render_keyword_frame_score_image(
 
     font = ImageFont.load_default()
     pad_x, pad_y = 10, 8
-    row_h = 28
+    row_h = 56
     score_fmt = "{:.3f}"
     max_kw_chars = max((len(k) for k in keywords), default=8)
-    left_w = min(520, max(160, max_kw_chars * 8 + 24))
+    left_w = min(780, max(360, max_kw_chars * 8 + 260))
     thumb_w = 112
     thumb_h = 64
     cell_w = thumb_w + 8
-    header_h = thumb_h + 22
+    header_h = thumb_h + 40
     title_h = 28
+    info_lines = [f"Question: {question}"] + [f"Option {chr(ord('A') + i)}: {opt}" for i, opt in enumerate(options[:8])] + [f"Ground Truth: {gt_answer}"]
+    info_row_h = 16
+    info_h = 12 + len(info_lines) * info_row_h
 
     n_rows = len(keywords)
     n_cols = len(idx_order)
     img_w = left_w + n_cols * cell_w + pad_x * 2
-    img_h = title_h + header_h + n_rows * row_h + pad_y * 2
+    img_h = info_h + title_h + header_h + n_rows * row_h + pad_y * 2
     canvas = Image.new("RGB", (img_w, img_h), (255, 255, 255))
     draw = ImageDraw.Draw(canvas)
 
-    draw.text((pad_x, 6), "CLIP keyword-frame similarity table", fill=(0, 0, 0), font=font)
+    draw.rectangle((pad_x, pad_y, img_w - pad_x, pad_y + info_h - 4), outline=(180, 180, 180), fill=(248, 248, 248))
+    for i, line in enumerate(info_lines):
+        show = line if len(line) <= 180 else line[:177] + "..."
+        draw.text((pad_x + 8, pad_y + 4 + i * info_row_h), show, fill=(20, 20, 20), font=font)
+
+    draw.text((pad_x, pad_y + info_h + 2), "CLIP keyword-frame similarity table", fill=(0, 0, 0), font=font)
 
     x0 = pad_x
-    y0 = title_h
+    y0 = pad_y + info_h + title_h
     draw.rectangle((x0, y0, x0 + left_w, y0 + header_h), outline=(180, 180, 180), fill=(245, 245, 245))
-    draw.text((x0 + 8, y0 + 12), "keyword / frame", fill=(30, 30, 30), font=font)
+    draw.text((x0 + 8, y0 + 12), "keyword + info-scores / frame", fill=(30, 30, 30), font=font)
+
+    info_map = {str(item.get("keyword", "")): item for item in keyword_info_scores}
 
     for c, idx in enumerate(idx_order):
         cx0 = x0 + left_w + c * cell_w
@@ -148,13 +178,30 @@ def _render_keyword_frame_score_image(
         canvas.paste(im, (tx, ty))
         draw.rectangle((tx - 1, ty - 1, tx + im.width + 1, ty + im.height + 1), outline=(120, 120, 120))
         draw.text((cx0 + 6, y0 + thumb_h + 6), f"frame_{int(frame_ids[idx])}", fill=(30, 30, 30), font=font)
+        sub = ""
+        if selected_frame_subtitles and c < len(selected_frame_subtitles):
+            sub = str(selected_frame_subtitles[c]).strip()
+        if len(sub) > 22:
+            sub = sub[:19] + "..."
+        draw.text((cx0 + 6, y0 + thumb_h + 18), f"sub: {sub}" if sub else "sub:", fill=(60, 60, 60), font=font)
 
     for r, kw in enumerate(keywords):
         ry0 = y0 + header_h + r * row_h
         ry1 = ry0 + row_h
         draw.rectangle((x0, ry0, x0 + left_w, ry1), outline=(210, 210, 210), fill=(252, 252, 252))
-        kw_show = kw if len(kw) <= 64 else kw[:61] + "..."
-        draw.text((x0 + 8, ry0 + 8), kw_show, fill=(20, 20, 20), font=font)
+        kw_show = kw if len(kw) <= 72 else kw[:69] + "..."
+        info_row = info_map.get(kw, {})
+        peak_term = float(info_row.get("peak_term", 0.0))
+        prom_term = float(info_row.get("prominence_term", 0.0))
+        conc_term = float(info_row.get("concentration_term", 0.0))
+        info_score = float(info_row.get("info", 0.0))
+        draw.text((x0 + 8, ry0 + 6), kw_show, fill=(20, 20, 20), font=font)
+        draw.text(
+            (x0 + 8, ry0 + 30),
+            f"peak={peak_term:.3f}  prom={prom_term:.3f}  conc={conc_term:.3f}  info={info_score:.3f}",
+            fill=(40, 40, 40),
+            font=font,
+        )
 
         for c in range(n_cols):
             cx0 = x0 + left_w + c * cell_w

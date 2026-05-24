@@ -1,0 +1,278 @@
+{
+  "sample_id": "007-2",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "What kind of communication is listed before Semaphore?",
+  "options": [
+    "A. Telephone.",
+    "B. Homing pigeon.",
+    "C. Telegraph.",
+    "D. Pony express."
+  ],
+  "gt_answer": "D",
+  "raw_keywords_before_dedup": [
+    "a list of communication methods",
+    "a telegraph machine",
+    "a homing pigeon in flight",
+    "a pony express rider",
+    "a telephone receiver"
+  ],
+  "keywords_after_info_filter": [
+    {
+      "keyword": "a telegraph machine",
+      "info": 0.17231325805187225
+    },
+    {
+      "keyword": "a homing pigeon in flight",
+      "info": 0.12406562268733978
+    },
+    {
+      "keyword": "a pony express rider",
+      "info": 0.20315858721733093
+    }
+  ],
+  "all_keywords": [
+    "a telegraph machine",
+    "a homing pigeon in flight",
+    "a pony express rider"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "file": "00_frame_0.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 150,
+      "file": "01_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 180,
+      "file": "02_frame_180.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 210,
+      "file": "03_frame_210.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 240,
+      "file": "04_frame_240.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "file": "05_frame_360.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "file": "06_frame_390.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420,
+      "file": "07_frame_420.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 450,
+      "file": "08_frame_450.jpg"
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 480,
+      "file": "09_frame_480.jpg"
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 509,
+      "file": "10_frame_509.jpg"
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539,
+      "file": "11_frame_539.jpg"
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629,
+      "file": "12_frame_629.jpg"
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 809,
+      "file": "13_frame_809.jpg"
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 839,
+      "file": "14_frame_839.jpg"
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 1019,
+      "file": "15_frame_1019.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 0,
+      "frame_id": 0,
+      "keyword_scores": {
+        "a telegraph machine": 0.23456206917762756,
+        "a homing pigeon in flight": 0.16985303163528442,
+        "a pony express rider": 0.1996416300535202
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 150,
+      "keyword_scores": {
+        "a telegraph machine": 0.18086476624011993,
+        "a homing pigeon in flight": 0.1833556890487671,
+        "a pony express rider": 0.21310581266880035
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 180,
+      "keyword_scores": {
+        "a telegraph machine": 0.19186808168888092,
+        "a homing pigeon in flight": 0.20297810435295105,
+        "a pony express rider": 0.21543040871620178
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 210,
+      "keyword_scores": {
+        "a telegraph machine": 0.19244806468486786,
+        "a homing pigeon in flight": 0.20387595891952515,
+        "a pony express rider": 0.23867428302764893
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 240,
+      "keyword_scores": {
+        "a telegraph machine": 0.19090235233306885,
+        "a homing pigeon in flight": 0.18346181511878967,
+        "a pony express rider": 0.2222992479801178
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 360,
+      "keyword_scores": {
+        "a telegraph machine": 0.21505708992481232,
+        "a homing pigeon in flight": 0.23851056396961212,
+        "a pony express rider": 0.19228576123714447
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 390,
+      "keyword_scores": {
+        "a telegraph machine": 0.2140408456325531,
+        "a homing pigeon in flight": 0.2093168944120407,
+        "a pony express rider": 0.22991786897182465
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 420,
+      "keyword_scores": {
+        "a telegraph machine": 0.21474318206310272,
+        "a homing pigeon in flight": 0.19543452560901642,
+        "a pony express rider": 0.21557554602622986
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 450,
+      "keyword_scores": {
+        "a telegraph machine": 0.23329855501651764,
+        "a homing pigeon in flight": 0.25800228118896484,
+        "a pony express rider": 0.23031233251094818
+      }
+    },
+    {
+      "index_in_pool": 16,
+      "frame_id": 480,
+      "keyword_scores": {
+        "a telegraph machine": 0.2094176709651947,
+        "a homing pigeon in flight": 0.22132810950279236,
+        "a pony express rider": 0.20112189650535583
+      }
+    },
+    {
+      "index_in_pool": 17,
+      "frame_id": 509,
+      "keyword_scores": {
+        "a telegraph machine": 0.22071513533592224,
+        "a homing pigeon in flight": 0.2259555608034134,
+        "a pony express rider": 0.2134786993265152
+      }
+    },
+    {
+      "index_in_pool": 18,
+      "frame_id": 539,
+      "keyword_scores": {
+        "a telegraph machine": 0.1987566500902176,
+        "a homing pigeon in flight": 0.27410727739334106,
+        "a pony express rider": 0.1917259246110916
+      }
+    },
+    {
+      "index_in_pool": 21,
+      "frame_id": 629,
+      "keyword_scores": {
+        "a telegraph machine": 0.19726787507534027,
+        "a homing pigeon in flight": 0.291928768157959,
+        "a pony express rider": 0.1951187402009964
+      }
+    },
+    {
+      "index_in_pool": 27,
+      "frame_id": 809,
+      "keyword_scores": {
+        "a telegraph machine": 0.21027930080890656,
+        "a homing pigeon in flight": 0.16216644644737244,
+        "a pony express rider": 0.33820033073425293
+      }
+    },
+    {
+      "index_in_pool": 28,
+      "frame_id": 839,
+      "keyword_scores": {
+        "a telegraph machine": 0.2204548865556717,
+        "a homing pigeon in flight": 0.23721003532409668,
+        "a pony express rider": 0.2970665991306305
+      }
+    },
+    {
+      "index_in_pool": 34,
+      "frame_id": 1019,
+      "keyword_scores": {
+        "a telegraph machine": 0.3179287016391754,
+        "a homing pigeon in flight": 0.14623136818408966,
+        "a pony express rider": 0.15295468270778656
+      }
+    }
+  ],
+  "pred_answer": "B",
+  "option_probs": {
+    "A": 1.2828769613791385e-15,
+    "B": 6.327377774459633e-15,
+    "C": 8.546808021515903e-16,
+    "D": 3.894221366783877e-14
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "B",
+  "inference_time": 0.21822937903925776
+}

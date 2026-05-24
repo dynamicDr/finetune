@@ -952,6 +952,8 @@ python run.py --multirun \
   model=qwen3_8b_instruct \
   task_filter=short \
   use_preprocessed_clip_frames=true \
+  use_subtitles=true \
+  subtitles_dir=~/dataset/Video-MME/subtitle \
   train_ratio=0 \
   seed=24 \
   slurm=default_4090 \

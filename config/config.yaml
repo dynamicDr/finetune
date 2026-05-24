@@ -20,6 +20,8 @@ frame_sampling_method: uniform
 use_preprocessed_clip_frames: false
 preprocessed_clip_fps: 1.0
 preprocessed_clip_dir: ""
+use_subtitles: false
+subtitles_dir: ""
 quota_prescreen_alpha: 3
 max_keywords: 5
 focus_blip_model_name: Salesforce/blip-itm-base-coco

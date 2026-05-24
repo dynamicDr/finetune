@@ -1,0 +1,257 @@
+{
+  "sample_id": "012-2",
+  "stage": "oneshot",
+  "round": 0,
+  "question": "What did the student do after eating the banana in the video?",
+  "options": [
+    "A. He ate a banana in exhibition again in 2019.",
+    "B. He throwed the skin of banana.",
+    "C. He reattached the skin of banana using the same tape.",
+    "D. The action of eating a banana was considered art."
+  ],
+  "gt_answer": "C",
+  "raw_keywords_before_dedup": [
+    "a student eating a banana",
+    "banana skin",
+    "tape",
+    "exhibition",
+    "2019"
+  ],
+  "keywords_after_info_filter": [
+    {
+      "keyword": "banana skin",
+      "info": 0.09089883416891098
+    },
+    {
+      "keyword": "tape",
+      "info": 0.08595194667577744
+    }
+  ],
+  "all_keywords": [
+    "banana skin",
+    "tape"
+  ],
+  "selected_count": 16,
+  "selected_images": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 25,
+      "file": "00_frame_25.jpg"
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "file": "01_frame_75.jpg"
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "file": "02_frame_100.jpg"
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "file": "03_frame_125.jpg"
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "file": "04_frame_150.jpg"
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "file": "05_frame_175.jpg"
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200,
+      "file": "06_frame_200.jpg"
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "file": "07_frame_225.jpg"
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "file": "08_frame_250.jpg"
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "file": "09_frame_275.jpg"
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "file": "10_frame_300.jpg"
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "file": "11_frame_325.jpg"
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "file": "12_frame_350.jpg"
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "file": "13_frame_375.jpg"
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 550,
+      "file": "14_frame_550.jpg"
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 575,
+      "file": "15_frame_575.jpg"
+    }
+  ],
+  "image_keyword_clip_scores": [
+    {
+      "index_in_pool": 1,
+      "frame_id": 25,
+      "keyword_scores": {
+        "banana skin": 0.23768559098243713,
+        "tape": 0.24353300034999847
+      }
+    },
+    {
+      "index_in_pool": 3,
+      "frame_id": 75,
+      "keyword_scores": {
+        "banana skin": 0.27107226848602295,
+        "tape": 0.21561291813850403
+      }
+    },
+    {
+      "index_in_pool": 4,
+      "frame_id": 100,
+      "keyword_scores": {
+        "banana skin": 0.2710261642932892,
+        "tape": 0.20897790789604187
+      }
+    },
+    {
+      "index_in_pool": 5,
+      "frame_id": 125,
+      "keyword_scores": {
+        "banana skin": 0.26645272970199585,
+        "tape": 0.21534650027751923
+      }
+    },
+    {
+      "index_in_pool": 6,
+      "frame_id": 150,
+      "keyword_scores": {
+        "banana skin": 0.26952680945396423,
+        "tape": 0.21924874186515808
+      }
+    },
+    {
+      "index_in_pool": 7,
+      "frame_id": 175,
+      "keyword_scores": {
+        "banana skin": 0.22736765444278717,
+        "tape": 0.24582158029079437
+      }
+    },
+    {
+      "index_in_pool": 8,
+      "frame_id": 200,
+      "keyword_scores": {
+        "banana skin": 0.2193729430437088,
+        "tape": 0.23945248126983643
+      }
+    },
+    {
+      "index_in_pool": 9,
+      "frame_id": 225,
+      "keyword_scores": {
+        "banana skin": 0.22161637246608734,
+        "tape": 0.2368822544813156
+      }
+    },
+    {
+      "index_in_pool": 10,
+      "frame_id": 250,
+      "keyword_scores": {
+        "banana skin": 0.20349977910518646,
+        "tape": 0.27355116605758667
+      }
+    },
+    {
+      "index_in_pool": 11,
+      "frame_id": 275,
+      "keyword_scores": {
+        "banana skin": 0.21135130524635315,
+        "tape": 0.27989083528518677
+      }
+    },
+    {
+      "index_in_pool": 12,
+      "frame_id": 300,
+      "keyword_scores": {
+        "banana skin": 0.20222456753253937,
+        "tape": 0.2760131359100342
+      }
+    },
+    {
+      "index_in_pool": 13,
+      "frame_id": 325,
+      "keyword_scores": {
+        "banana skin": 0.2098609060049057,
+        "tape": 0.27097776532173157
+      }
+    },
+    {
+      "index_in_pool": 14,
+      "frame_id": 350,
+      "keyword_scores": {
+        "banana skin": 0.2320832908153534,
+        "tape": 0.27746596932411194
+      }
+    },
+    {
+      "index_in_pool": 15,
+      "frame_id": 375,
+      "keyword_scores": {
+        "banana skin": 0.29600587487220764,
+        "tape": 0.2478431910276413
+      }
+    },
+    {
+      "index_in_pool": 22,
+      "frame_id": 550,
+      "keyword_scores": {
+        "banana skin": 0.29304495453834534,
+        "tape": 0.26889973878860474
+      }
+    },
+    {
+      "index_in_pool": 23,
+      "frame_id": 575,
+      "keyword_scores": {
+        "banana skin": 0.30391815304756165,
+        "tape": 0.2371949702501297
+      }
+    }
+  ],
+  "pred_answer": "C",
+  "option_probs": {
+    "A": 6.006301891885024e-19,
+    "B": 1.678143081711158e-20,
+    "C": 2.271873751553852e-19,
+    "D": 1.9270878550605205e-19
+  },
+  "keyword_frame_score_image": "keyword_frame_clip_scores.png",
+  "response": "C",
+  "inference_time": 0.22299693594686687
+}
