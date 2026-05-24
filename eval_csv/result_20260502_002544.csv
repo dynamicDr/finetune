@@ -1,8 +1,0 @@
-timestamp,dataset,seed,task_filter,num_samples,evaluated_samples,correct_count,accuracy_percent,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,avg_embedding_build_time,avg_total_time_hours,over_max_tokens_count,model_name,lora_path,train_ratio,eval_split
-2026-05-02 01:01:04,videomme,42,short,900,900,672.000000,74.67,16,74.67,0.937,uniform,1.018097,0.000000,0.585584,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test
-2026-05-02 01:03:34,videomme,42,medium,900,900,543.000000,60.33,16,60.33,0.950,uniform,1.001161,0.000000,0.579125,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test
-2026-05-02 01:04:08,videomme,42,long,900,900,478.000000,53.11,16,53.11,0.964,uniform,1.020310,0.000000,0.588520,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test
-2026-05-02 01:56:07,videomme,42,short,900,900,681.000000,75.67,16,75.67,0.938,clip,2.214712,0.000000,0.861307,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test
-2026-05-02 05:48:08,videomme,42,medium,900,900,572.000000,63.56,16,63.56,0.956,clip,14.291831,0.000000,3.861373,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test
-2026-05-02 12:53:49,videomme,42,short,900,900,682.000000,75.78,16,75.78,0.942,aks-clip,8.200176,0.000000,2.376842,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test
-2026-05-02 16:07:30,videomme,42,short,900,900,681.000000,75.67,16,75.67,0.931,aks-blip,8.991026,0.000000,2.567071,0,Qwen/Qwen3-VL-8B-Instruct,,0.0,test

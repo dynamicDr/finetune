@@ -1,5 +1,10 @@
 # ---- run.py / Hydra / Submitit ----
 outputs/
+verbose_eval_ours/
+eval_csv/
+eval_scv/
+logs/
+*.log
 config/slurm/default_4090.yaml
 config/slurm/h800.yaml
 config/slurm/hgpu_batch.yaml

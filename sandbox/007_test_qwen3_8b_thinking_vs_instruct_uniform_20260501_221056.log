@@ -1,82 +1,0 @@
-加载数据...
-short: 可用=182, 取样=10
-medium: 可用=182, 取样=10
-uniform帧缓存完成: 20 个样本
-
-================ 加载模型: thinking (Qwen/Qwen3-VL-8B-Thinking) ================
-[config] max_new_tokens 已按模式固定: model_key=thinking, effective_max_new_tokens=4086
-[perf-debug][load] model_path=Qwen/Qwen3-VL-8B-Thinking, use_lora=False, base_model=None, merge_lora=False
-Loading weights:   0%|          | 0/750 [00:00<?, ?it/s]Loading weights: 100%|██████████| 750/750 [00:00<00:00, 10191.70it/s]
-[perf-debug][model] dtype=torch.bfloat16, attn_impl=sdpa, device=cuda:0
-[perf-debug][processor] processor=Qwen3VLProcessor, min_pixels=None, max_pixels=None
-
-===== 开始测试 model=thinking, task=short, num_samples=10 =====
-thinking-short-uniform:   0%|          | 0/10 [00:00<?, ?it/s]===============218-1=============
-ground truth: C
-thinking-short-uniform:   0%|          | 0/10 [00:13<?, ?it/s, acc=100.00%, avg_total=13.98s, n=1][timing][sample] model=thinking, task=short, idx=1, sample_id=218-1, total=13.9784s, prompt_build=0.0000s, frame_sampling=0.3703s, model_call_total=13.9774s, processor=0.2156s, embedding_build=0.7671s, inference=12.9646s, decode=0.0005s, model_other=0.0296s, wall_model_call=13.9780s, answer_extract=0.0004s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=488, hit_max_tokens=False
-thinking-short-uniform:  10%|█         | 1/10 [00:13<02:05, 13.98s/it, acc=100.00%, avg_total=13.98s, n=1]===============183-1=============
-ground truth: B
-thinking-short-uniform:  10%|█         | 1/10 [00:16<02:05, 13.98s/it, acc=100.00%, avg_total=8.02s, n=2] [timing][sample] model=thinking, task=short, idx=2, sample_id=183-1, total=2.0533s, prompt_build=0.0000s, frame_sampling=0.1618s, model_call_total=2.0530s, processor=0.0430s, embedding_build=0.0801s, inference=1.9293s, decode=0.0003s, model_other=0.0003s, wall_model_call=2.0532s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=82, hit_max_tokens=False
-thinking-short-uniform:  20%|██        | 2/10 [00:16<00:55,  6.96s/it, acc=100.00%, avg_total=8.02s, n=2]===============166-3=============
-ground truth: C
-thinking-short-uniform:  20%|██        | 2/10 [00:21<00:55,  6.96s/it, acc=66.67%, avg_total=7.00s, n=3] [timing][sample] model=thinking, task=short, idx=3, sample_id=166-3, total=4.9678s, prompt_build=0.0000s, frame_sampling=0.6063s, model_call_total=4.9675s, processor=0.2041s, embedding_build=0.4514s, inference=4.3114s, decode=0.0003s, model_other=0.0003s, wall_model_call=4.9677s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=140, hit_max_tokens=False
-thinking-short-uniform:  30%|███       | 3/10 [00:21<00:42,  6.05s/it, acc=66.67%, avg_total=7.00s, n=3]===============241-1=============
-ground truth: C
-thinking-short-uniform:  30%|███       | 3/10 [00:23<00:42,  6.05s/it, acc=75.00%, avg_total=6.00s, n=4][timing][sample] model=thinking, task=short, idx=4, sample_id=241-1, total=2.9910s, prompt_build=0.0000s, frame_sampling=0.2359s, model_call_total=2.9907s, processor=0.1846s, embedding_build=0.4531s, inference=2.3526s, decode=0.0002s, model_other=0.0003s, wall_model_call=2.9909s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=60, hit_max_tokens=False
-thinking-short-uniform:  40%|████      | 4/10 [00:23<00:29,  4.84s/it, acc=75.00%, avg_total=6.00s, n=4]===============299-3=============
-ground truth: D
-thinking-short-uniform:  40%|████      | 4/10 [00:30<00:29,  4.84s/it, acc=60.00%, avg_total=6.19s, n=5][timing][sample] model=thinking, task=short, idx=5, sample_id=299-3, total=6.9493s, prompt_build=0.0000s, frame_sampling=0.1379s, model_call_total=6.9488s, processor=0.0440s, embedding_build=0.0897s, inference=6.8145s, decode=0.0003s, model_other=0.0003s, wall_model_call=6.9492s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=302, hit_max_tokens=False
-thinking-short-uniform:  50%|█████     | 5/10 [00:30<00:28,  5.60s/it, acc=60.00%, avg_total=6.19s, n=5]===============146-2=============
-ground truth: B
-thinking-short-uniform:  50%|█████     | 5/10 [00:58<00:28,  5.60s/it, acc=50.00%, avg_total=9.70s, n=6][timing][sample] model=thinking, task=short, idx=6, sample_id=146-2, total=27.2617s, prompt_build=0.0000s, frame_sampling=0.4005s, model_call_total=27.2604s, processor=0.1904s, embedding_build=0.4528s, inference=26.6162s, decode=0.0007s, model_other=0.0003s, wall_model_call=27.2614s, answer_extract=0.0002s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=1045, hit_max_tokens=False
-thinking-short-uniform:  60%|██████    | 6/10 [00:58<00:51, 12.97s/it, acc=50.00%, avg_total=9.70s, n=6]===============008-2=============
-ground truth: B
-thinking-short-uniform:  60%|██████    | 6/10 [01:37<00:51, 12.97s/it, acc=42.86%, avg_total=13.91s, n=7][timing][sample] model=thinking, task=short, idx=7, sample_id=008-2, total=39.1364s, prompt_build=0.0000s, frame_sampling=0.3690s, model_call_total=39.1344s, processor=0.1922s, embedding_build=0.4546s, inference=38.4858s, decode=0.0014s, model_other=0.0005s, wall_model_call=39.1360s, answer_extract=0.0004s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=1521, hit_max_tokens=False
-thinking-short-uniform:  70%|███████   | 7/10 [01:37<01:04, 21.52s/it, acc=42.86%, avg_total=13.91s, n=7]===============202-2=============
-ground truth: C
-thinking-short-uniform:  70%|███████   | 7/10 [01:40<01:04, 21.52s/it, acc=50.00%, avg_total=12.56s, n=8][timing][sample] model=thinking, task=short, idx=8, sample_id=202-2, total=3.1034s, prompt_build=0.0000s, frame_sampling=0.5229s, model_call_total=3.1032s, processor=0.2099s, embedding_build=0.4553s, inference=2.4372s, decode=0.0003s, model_other=0.0005s, wall_model_call=3.1033s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=63, hit_max_tokens=False
-thinking-short-uniform:  80%|████████  | 8/10 [01:40<00:31, 15.66s/it, acc=50.00%, avg_total=12.56s, n=8]===============266-2=============
-ground truth: C
-thinking-short-uniform:  80%|████████  | 8/10 [01:43<00:31, 15.66s/it, acc=55.56%, avg_total=11.47s, n=9][timing][sample] model=thinking, task=short, idx=9, sample_id=266-2, total=2.8211s, prompt_build=0.0000s, frame_sampling=0.4267s, model_call_total=2.8209s, processor=0.1961s, embedding_build=0.4554s, inference=2.1686s, decode=0.0005s, model_other=0.0003s, wall_model_call=2.8210s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=52, hit_max_tokens=False
-thinking-short-uniform:  90%|█████████ | 9/10 [01:43<00:11, 11.65s/it, acc=55.56%, avg_total=11.47s, n=9]===============100-2=============
-ground truth: B
-thinking-short-uniform:  90%|█████████ | 9/10 [01:47<00:11, 11.65s/it, acc=60.00%, avg_total=10.80s, n=10][timing][sample] model=thinking, task=short, idx=10, sample_id=100-2, total=4.7275s, prompt_build=0.0000s, frame_sampling=0.2538s, model_call_total=4.7272s, processor=0.1877s, embedding_build=0.4562s, inference=4.0829s, decode=0.0002s, model_other=0.0002s, wall_model_call=4.7274s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=130, hit_max_tokens=False
-thinking-short-uniform: 100%|██████████| 10/10 [01:47<00:00,  9.51s/it, acc=60.00%, avg_total=10.80s, n=10]thinking-short-uniform: 100%|██████████| 10/10 [01:47<00:00, 10.80s/it, acc=60.00%, avg_total=10.80s, n=10]
-
-===== 开始测试 model=thinking, task=medium, num_samples=10 =====
-thinking-medium-uniform:   0%|          | 0/10 [00:00<?, ?it/s]===============375-3=============
-ground truth: A
-thinking-medium-uniform:   0%|          | 0/10 [00:10<?, ?it/s, acc=0.00%, avg_total=10.98s, n=1][timing][sample] model=thinking, task=medium, idx=1, sample_id=375-3, total=10.9761s, prompt_build=0.0000s, frame_sampling=0.4074s, model_call_total=10.9755s, processor=0.1892s, embedding_build=0.4556s, inference=10.3303s, decode=0.0003s, model_other=0.0002s, wall_model_call=10.9760s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=384, hit_max_tokens=False
-thinking-medium-uniform:  10%|█         | 1/10 [00:10<01:38, 10.98s/it, acc=0.00%, avg_total=10.98s, n=1]===============327-2=============
-ground truth: A
-thinking-medium-uniform:  10%|█         | 1/10 [00:34<01:38, 10.98s/it, acc=50.00%, avg_total=17.18s, n=2][timing][sample] model=thinking, task=medium, idx=2, sample_id=327-2, total=23.3907s, prompt_build=0.0000s, frame_sampling=0.2360s, model_call_total=23.3895s, processor=0.1916s, embedding_build=0.4544s, inference=22.7424s, decode=0.0009s, model_other=0.0002s, wall_model_call=23.3905s, answer_extract=0.0002s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=887, hit_max_tokens=False
-thinking-medium-uniform:  20%|██        | 2/10 [00:34<02:26, 18.28s/it, acc=50.00%, avg_total=17.18s, n=2]===============379-2=============
-ground truth: C
-thinking-medium-uniform:  20%|██        | 2/10 [00:37<02:26, 18.28s/it, acc=33.33%, avg_total=12.64s, n=3][timing][sample] model=thinking, task=medium, idx=3, sample_id=379-2, total=3.5549s, prompt_build=0.0000s, frame_sampling=0.4300s, model_call_total=3.5547s, processor=0.1922s, embedding_build=0.4551s, inference=2.9066s, decode=0.0004s, model_other=0.0003s, wall_model_call=3.5548s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=82, hit_max_tokens=False
-thinking-medium-uniform:  30%|███       | 3/10 [00:37<01:20, 11.56s/it, acc=33.33%, avg_total=12.64s, n=3]===============338-2=============
-ground truth: A
-thinking-medium-uniform:  30%|███       | 3/10 [00:42<01:20, 11.56s/it, acc=50.00%, avg_total=10.53s, n=4][timing][sample] model=thinking, task=medium, idx=4, sample_id=338-2, total=4.1883s, prompt_build=0.0000s, frame_sampling=0.3409s, model_call_total=4.1880s, processor=0.1927s, embedding_build=0.4548s, inference=3.5399s, decode=0.0002s, model_other=0.0003s, wall_model_call=4.1881s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=107, hit_max_tokens=False
-thinking-medium-uniform:  40%|████      | 4/10 [00:42<00:51,  8.65s/it, acc=50.00%, avg_total=10.53s, n=4]===============354-3=============
-ground truth: D
-thinking-medium-uniform:  40%|████      | 4/10 [00:47<00:51,  8.65s/it, acc=60.00%, avg_total=9.48s, n=5] [timing][sample] model=thinking, task=medium, idx=5, sample_id=354-3, total=5.3144s, prompt_build=0.0000s, frame_sampling=0.3702s, model_call_total=5.3140s, processor=0.1848s, embedding_build=0.4549s, inference=4.6738s, decode=0.0002s, model_other=0.0003s, wall_model_call=5.3143s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=154, hit_max_tokens=False
-thinking-medium-uniform:  50%|█████     | 5/10 [00:47<00:37,  7.45s/it, acc=60.00%, avg_total=9.48s, n=5]===============583-2=============
-ground truth: C
-thinking-medium-uniform:  50%|█████     | 5/10 [01:13<00:37,  7.45s/it, acc=50.00%, avg_total=12.21s, n=6][timing][sample] model=thinking, task=medium, idx=6, sample_id=583-2, total=25.8097s, prompt_build=0.0000s, frame_sampling=0.4522s, model_call_total=25.8085s, processor=0.1866s, embedding_build=0.4554s, inference=25.1656s, decode=0.0007s, model_other=0.0003s, wall_model_call=25.8095s, answer_extract=0.0002s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=986, hit_max_tokens=False
-thinking-medium-uniform:  60%|██████    | 6/10 [01:13<00:54, 13.69s/it, acc=50.00%, avg_total=12.21s, n=6]===============434-1=============
-ground truth: C
-thinking-medium-uniform:  60%|██████    | 6/10 [01:22<00:54, 13.69s/it, acc=42.86%, avg_total=11.78s, n=7][timing][sample] model=thinking, task=medium, idx=7, sample_id=434-1, total=9.1964s, prompt_build=0.0000s, frame_sampling=0.4811s, model_call_total=9.1959s, processor=0.2032s, embedding_build=0.4581s, inference=8.5338s, decode=0.0003s, model_other=0.0005s, wall_model_call=9.1963s, answer_extract=0.0001s, score_update=0.0000s, is_correct=False, basic_match=False, has_think_end=True, generated_tokens=311, hit_max_tokens=False
-thinking-medium-uniform:  70%|███████   | 7/10 [01:22<00:36, 12.22s/it, acc=42.86%, avg_total=11.78s, n=7]===============341-1=============
-ground truth: A
-thinking-medium-uniform:  70%|███████   | 7/10 [01:27<00:36, 12.22s/it, acc=50.00%, avg_total=10.96s, n=8][timing][sample] model=thinking, task=medium, idx=8, sample_id=341-1, total=5.2237s, prompt_build=0.0000s, frame_sampling=0.4415s, model_call_total=5.2234s, processor=0.1860s, embedding_build=0.4552s, inference=4.5816s, decode=0.0003s, model_other=0.0002s, wall_model_call=5.2236s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=150, hit_max_tokens=False
-thinking-medium-uniform:  80%|████████  | 8/10 [01:27<00:19,  9.99s/it, acc=50.00%, avg_total=10.96s, n=8]===============581-2=============
-ground truth: D
-thinking-medium-uniform:  80%|████████  | 8/10 [01:33<00:19,  9.99s/it, acc=55.56%, avg_total=10.41s, n=9][timing][sample] model=thinking, task=medium, idx=9, sample_id=581-2, total=5.9949s, prompt_build=0.0000s, frame_sampling=0.4413s, model_call_total=5.9945s, processor=0.1877s, embedding_build=0.4552s, inference=5.3511s, decode=0.0003s, model_other=0.0003s, wall_model_call=5.9948s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=181, hit_max_tokens=False
-thinking-medium-uniform:  90%|█████████ | 9/10 [01:33<00:08,  8.74s/it, acc=55.56%, avg_total=10.41s, n=9]===============334-1=============
-ground truth: C
-thinking-medium-uniform:  90%|█████████ | 9/10 [01:40<00:08,  8.74s/it, acc=60.00%, avg_total=10.04s, n=10][timing][sample] model=thinking, task=medium, idx=10, sample_id=334-1, total=6.7700s, prompt_build=0.0000s, frame_sampling=0.3100s, model_call_total=6.7696s, processor=0.1881s, embedding_build=0.4555s, inference=6.1253s, decode=0.0004s, model_other=0.0003s, wall_model_call=6.7699s, answer_extract=0.0001s, score_update=0.0000s, is_correct=True, basic_match=True, has_think_end=True, generated_tokens=213, hit_max_tokens=False
-thinking-medium-uniform: 100%|██████████| 10/10 [01:40<00:00,  8.13s/it, acc=60.00%, avg_total=10.04s, n=10]thinking-medium-uniform: 100%|██████████| 10/10 [01:40<00:00, 10.04s/it, acc=60.00%, avg_total=10.04s, n=10]
-
-================ 加载模型: instruct (Qwen/Qwen3-VL-8B-Instruct) ================
-[config] max_new_tokens 已按模式固定: model_key=instruct, effective_max_new_tokens=128
-[perf-debug][load] model_path=Qwen/Qwen3-VL-8B-Instruct, use_lora=False, base_model=None, merge_lora=False
-Loading weights:   0%|          | 0/750 [00:00<?, ?it/s]Loading weights: 100%|██████████| 750/750 [00:00<00:00, 9653.23it/s]

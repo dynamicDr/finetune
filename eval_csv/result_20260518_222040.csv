@@ -1,2 +1,0 @@
-timestamp,dataset,seed,task_filter,num_samples,evaluated_samples,correct_count,accuracy_percent,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,avg_embedding_build_time,avg_total_time_hours,over_max_tokens_count,model_name,lora_path,train_ratio,eval_split
-2026-05-18 22:34:45,videomme,42,short,90,90,67.000000,74.44,16,74.44,4.967,ours,0.764304,2.898989,0.217618,0,Qwen/Qwen3-VL-8B-Instruct,,0.9,test

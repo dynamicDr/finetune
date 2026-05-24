@@ -111,6 +111,12 @@ def main(cfg: DictConfig) -> None:
             preprocessed_clip_dir = OmegaConf.select(cfg, "preprocessed_clip_dir", default=None)
             if preprocessed_clip_dir is not None and str(preprocessed_clip_dir).strip() not in ("", "null", "None"):
                 dataset_shared += ["--preprocessed_clip_dir", str(preprocessed_clip_dir)]
+            use_subtitles = OmegaConf.select(cfg, "use_subtitles", default=False)
+            if bool(use_subtitles):
+                dataset_shared.append("--use_subtitles")
+            subtitles_dir = OmegaConf.select(cfg, "subtitles_dir", default=None)
+            if subtitles_dir is not None and str(subtitles_dir).strip() not in ("", "null", "None"):
+                dataset_shared += ["--subtitles_dir", str(subtitles_dir)]
         if script_key == "vqa_eval_ours.py":
             quota_prescreen_alpha = OmegaConf.select(cfg, "quota_prescreen_alpha", default=None)
             if quota_prescreen_alpha is not None and str(quota_prescreen_alpha).strip() not in ("", "null", "None"):

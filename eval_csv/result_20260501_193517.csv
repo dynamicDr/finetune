@@ -1,4 +1,0 @@
-timestamp,dataset,seed,task_filter,num_samples,evaluated_samples,correct_count,accuracy_percent,num_frames,avg_accuracy,avg_inference_time,frame_sampling_method,avg_frame_sampling_time,avg_embedding_build_time,avg_total_time_hours,over_max_tokens_count,model_name,lora_path,train_ratio,eval_split
-2026-05-01 19:37:00,videomme,42,short,90,90,47.000000,52.22,4,52.22,0.330,uniform,0.266401,0.000000,0.025721,0,llava-hf/LLaVA-NeXT-Video-7B-hf,,0.9,test
-2026-05-01 19:42:18,videomme,42,short,90,90,0.000000,0.00,8,0.00,3.598,uniform,0.496956,0.000000,0.113954,90,llava-hf/LLaVA-NeXT-Video-7B-hf,,0.9,test
-2026-05-01 19:46:12,videomme,42,short,90,90,1.000000,1.11,16,1.11,5.885,uniform,0.993695,0.000000,0.179161,82,llava-hf/LLaVA-NeXT-Video-7B-hf,,0.9,test
