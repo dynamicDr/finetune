@@ -937,7 +937,7 @@ python run.py --multirun \
 5/20：
 Spatio-Temporal Layered Compression 运行脚本：
 
-主方法（Video-MME，20样本，小子集跑通）
+主方法（Video-MME，20样本，小子集跑通），带字幕：
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
   script=vqa_eval_ours.py \
@@ -958,3 +958,68 @@ python run.py --multirun \
   seed=24 \
   slurm=default_4090 \
   quota_prescreen_alpha=3
+
+主方法（Video-MME，20样本，小子集跑通），不带字幕：
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=vqa_eval_ours.py \
+  dataset=videomme \
+  dataset_name=lmms-lab/Video-MME \
+  dataset_no_config=true \
+  dataset_split=test \
+  video_dir=~/dataset/Video-MME \
+  frame_sampling_method=ours \
+  num_frames=16 \
+  num_samples=20 \
+  model=qwen3_8b_instruct \
+  task_filter=short \
+  use_preprocessed_clip_frames=true \
+  use_subtitles=false \
+  train_ratio=0 \
+  seed=24 \
+  slurm=default_4090 \
+  quota_prescreen_alpha=3
+
+
+
+
+5.25 今天要开始验证主方法到底work不work了！先从16+短/中开始
+
+主方法：
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=vqa_eval_ours.py \
+  dataset=videomme \
+  dataset_name=lmms-lab/Video-MME \
+  dataset_no_config=true \
+  dataset_split=test \
+  video_dir=~/dataset/Video-MME \
+  frame_sampling_method=ours \
+  num_frames=16 \
+  model=qwen3_8b_instruct \
+  task_filter=short \
+  use_preprocessed_clip_frames=true \
+  train_ratio=0 \
+  seed=42 \
+  slurm=hgpu_batch \
+  quota_prescreen_alpha=3,5 \
+  max_keywords=3,5 \
+  info_aggressiveness=0,0.6,1
+
+【zzy在跑】直接开跑qwen+32frames的baseline：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2\
+    num_frames=32 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch

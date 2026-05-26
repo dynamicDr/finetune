@@ -133,48 +133,15 @@ def main(cfg: DictConfig) -> None:
             ours_clip_batch_size = OmegaConf.select(cfg, "ours_clip_batch_size", default=None)
             if ours_clip_batch_size is not None and str(ours_clip_batch_size).strip() not in ("", "null", "None"):
                 dataset_shared += ["--ours_clip_batch_size", str(int(ours_clip_batch_size))]
-            candidate_pool_size = OmegaConf.select(cfg, "candidate_pool_size", default=None)
-            if candidate_pool_size is not None and str(candidate_pool_size).strip() not in ("", "null", "None"):
-                dataset_shared += ["--candidate_pool_size", str(int(candidate_pool_size))]
-            keyword_sim_merge_threshold = OmegaConf.select(cfg, "keyword_sim_merge_threshold", default=None)
-            if keyword_sim_merge_threshold is not None and str(keyword_sim_merge_threshold).strip() not in ("", "null", "None"):
-                dataset_shared += ["--keyword_sim_merge_threshold", str(float(keyword_sim_merge_threshold))]
-            info_peak_floor = OmegaConf.select(cfg, "info_peak_floor", default=None)
-            if info_peak_floor is not None and str(info_peak_floor).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_peak_floor", str(float(info_peak_floor))]
-            info_peak_ceiling = OmegaConf.select(cfg, "info_peak_ceiling", default=None)
-            if info_peak_ceiling is not None and str(info_peak_ceiling).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_peak_ceiling", str(float(info_peak_ceiling))]
-            info_prominence_center = OmegaConf.select(cfg, "info_prominence_center", default=None)
-            if info_prominence_center is not None and str(info_prominence_center).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_prominence_center", str(float(info_prominence_center))]
-            info_prominence_scale = OmegaConf.select(cfg, "info_prominence_scale", default=None)
-            if info_prominence_scale is not None and str(info_prominence_scale).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_prominence_scale", str(float(info_prominence_scale))]
-            info_entropy_temperature = OmegaConf.select(cfg, "info_entropy_temperature", default=None)
-            if info_entropy_temperature is not None and str(info_entropy_temperature).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_entropy_temperature", str(float(info_entropy_temperature))]
-            info_mix_prominence = OmegaConf.select(cfg, "info_mix_prominence", default=None)
-            if info_mix_prominence is not None and str(info_mix_prominence).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_mix_prominence", str(float(info_mix_prominence))]
-            keyword_keep_peak_min = OmegaConf.select(cfg, "keyword_keep_peak_min", default=None)
-            if keyword_keep_peak_min is not None and str(keyword_keep_peak_min).strip() not in ("", "null", "None"):
-                dataset_shared += ["--keyword_keep_peak_min", str(float(keyword_keep_peak_min))]
-            keyword_keep_info_min = OmegaConf.select(cfg, "keyword_keep_info_min", default=None)
-            if keyword_keep_info_min is not None and str(keyword_keep_info_min).strip() not in ("", "null", "None"):
-                dataset_shared += ["--keyword_keep_info_min", str(float(keyword_keep_info_min))]
-            keyword_keep_info_quantile = OmegaConf.select(cfg, "keyword_keep_info_quantile", default=None)
-            if keyword_keep_info_quantile is not None and str(keyword_keep_info_quantile).strip() not in ("", "null", "None"):
-                dataset_shared += ["--keyword_keep_info_quantile", str(float(keyword_keep_info_quantile))]
-            keyword_keep_min_keywords = OmegaConf.select(cfg, "keyword_keep_min_keywords", default=None)
-            if keyword_keep_min_keywords is not None and str(keyword_keep_min_keywords).strip() not in ("", "null", "None"):
-                dataset_shared += ["--keyword_keep_min_keywords", str(int(keyword_keep_min_keywords))]
+            candidate_pool_fps = OmegaConf.select(cfg, "candidate_pool_fps", default=None)
+            if candidate_pool_fps is not None and str(candidate_pool_fps).strip() not in ("", "null", "None"):
+                dataset_shared += ["--candidate_pool_fps", str(float(candidate_pool_fps))]
+            info_aggressiveness = OmegaConf.select(cfg, "info_aggressiveness", default=None)
+            if info_aggressiveness is not None and str(info_aggressiveness).strip() not in ("", "null", "None"):
+                dataset_shared += ["--info_aggressiveness", str(float(info_aggressiveness))]
             coarse_uniform_ratio = OmegaConf.select(cfg, "coarse_uniform_ratio", default=None)
             if coarse_uniform_ratio is not None and str(coarse_uniform_ratio).strip() not in ("", "null", "None"):
                 dataset_shared += ["--coarse_uniform_ratio", str(float(coarse_uniform_ratio))]
-            lowres_size = OmegaConf.select(cfg, "lowres_size", default=None)
-            if lowres_size is not None and str(lowres_size).strip() not in ("", "null", "None"):
-                dataset_shared += ["--lowres_size", str(int(lowres_size))]
     model_snapshot = resolve_model_path(cfg.model.path)
 
     if script_key in ("train_vsibench.py", "vqa_train.py"):

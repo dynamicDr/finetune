@@ -99,18 +99,22 @@ def _resolve_subtitle_path(sample: VQASample, subtitles_dir: str | None) -> str 
     video_stem = video_path.stem
     meta_video_id = str(sample.metadata.get("videoID", "")).strip() if isinstance(sample.metadata, dict) else ""
     candidates: list[Path] = []
+    subtitle_dir_names = ("subtitle", "subtitles", "subtitles/subtitle")
+
+    def _append_stem_files(base_dir: Path) -> None:
+        for stem in [meta_video_id, video_stem]:
+            if stem:
+                candidates.extend([base_dir / f"{stem}.srt", base_dir / f"{stem}.SRT"])
+
     if explicit_dir:
         base = Path(explicit_dir)
         if base.is_dir():
-            for stem in [meta_video_id, video_stem]:
-                if stem:
-                    candidates.extend([base / f"{stem}.srt", base / f"{stem}.SRT"])
-    for root in [video_path.parent, video_path.parent.parent]:
-        for subname in ("subtitle", "subtitles"):
-            d = root / subname
-            for stem in [meta_video_id, video_stem]:
-                if stem:
-                    candidates.extend([d / f"{stem}.srt", d / f"{stem}.SRT"])
+            _append_stem_files(base)
+            for subname in subtitle_dir_names:
+                _append_stem_files(base / subname)
+    for root in [video_path.parent, video_path.parent.parent, video_path.parent.parent.parent]:
+        for subname in subtitle_dir_names:
+            _append_stem_files(root / subname)
     for p in candidates:
         if p.is_file():
             return str(p)

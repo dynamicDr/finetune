@@ -22,8 +22,15 @@ preprocessed_clip_fps: 1.0
 preprocessed_clip_dir: ""
 use_subtitles: false
 subtitles_dir: ""
+# vqa_eval_ours.py 选帧与关键词超参数（run.py 会传给脚本）
 quota_prescreen_alpha: 3
 max_keywords: 5
+info_aggressiveness: 0.6
+candidate_pool_fps: 1.0
+ours_clip_model_id: openai/clip-vit-base-patch32
+ours_clip_device: null
+ours_clip_batch_size: 16
+coarse_uniform_ratio: 0.0
 focus_blip_model_name: Salesforce/blip-itm-base-coco
 focus_blip_device: null
 focus_blip_batch_size: 16

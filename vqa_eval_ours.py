@@ -115,25 +115,58 @@ def _load_preprocessed_candidate_frames(preprocessed_clip_dir: str, sample_id: s
                 image_paths.append(p)
     if not image_paths:
         raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
-    images = [Image.open(p).convert("RGB") for p in image_paths]
+    images: list[Image.Image] = []
+    for p in image_paths:
+        with Image.open(p) as img:
+            images.append(img.convert("RGB"))
     return frame_ids, images
 
 
-def _sample_uniform_positions(total: int, target: int) -> list[int]:
-    if target >= total:
-        return list(range(total))
-    return sorted(set(int(x) for x in torch.linspace(0, total - 1, target).round().tolist()))
+def _frame_indices_by_target_fps(total_frames: int, src_fps: float, target_fps: float) -> list[int]:
+    if total_frames <= 0:
+        return []
+    if target_fps <= 0:
+        raise ValueError(f"target_fps 必须 > 0，当前: {target_fps}")
+    if not src_fps or src_fps <= 0:
+        return list(range(total_frames))
+    step = src_fps / target_fps
+    indices: list[int] = []
+    cursor = 0.0
+    last = -1
+    while True:
+        idx = int(round(cursor))
+        if idx >= total_frames:
+            break
+        if idx != last:
+            indices.append(idx)
+            last = idx
+        cursor += step
+    if indices and indices[0] != 0:
+        indices.insert(0, 0)
+    return indices
 
 
-def _collect_video_frames_uniform(video_path: str, target_frames: int) -> tuple[list[int], list[Image.Image]]:
+def _pool_positions_at_fps(n_items: int, src_fps: float, target_fps: float) -> list[int]:
+    """在已有 n_items 个按 src_fps 采样的条目上，重采样到 target_fps。"""
+    if n_items <= 0:
+        return []
+    if target_fps <= 0:
+        raise ValueError(f"target_fps 必须 > 0，当前: {target_fps}")
+    if not src_fps or src_fps <= 0:
+        src_fps = float(target_fps)
+    return _frame_indices_by_target_fps(n_items, src_fps, target_fps)
+
+
+def _collect_video_frames_at_fps(video_path: str, target_fps: float) -> tuple[list[int], list[Image.Image]]:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"无法打开视频: {video_path}")
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    src_fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
     if frame_count <= 0:
         cap.release()
         raise RuntimeError(f"视频帧数无效: {video_path}")
-    idxs = _sample_uniform_positions(frame_count, target_frames)
+    idxs = _frame_indices_by_target_fps(frame_count, src_fps, target_fps)
     frame_ids, images = [], []
     try:
         for fid in idxs:
@@ -193,18 +226,22 @@ def _resolve_subtitle_path(sample: VQASample, subtitles_dir: str | None) -> str 
     video_stem = video_path.stem
     meta_video_id = str(sample.metadata.get("videoID", "")).strip() if isinstance(sample.metadata, dict) else ""
     candidates: list[Path] = []
+    subtitle_dir_names = ("subtitle", "subtitles", "subtitles/subtitle")
+
+    def _append_stem_files(base_dir: Path) -> None:
+        for stem in [meta_video_id, video_stem]:
+            if stem:
+                candidates.extend([base_dir / f"{stem}.srt", base_dir / f"{stem}.SRT"])
+
     if explicit_dir:
         base = Path(explicit_dir)
         if base.is_dir():
-            for stem in [meta_video_id, video_stem]:
-                if stem:
-                    candidates.extend([base / f"{stem}.srt", base / f"{stem}.SRT"])
-    for root in [video_path.parent, video_path.parent.parent]:
-        for subname in ("subtitle", "subtitles"):
-            d = root / subname
-            for stem in [meta_video_id, video_stem]:
-                if stem:
-                    candidates.extend([d / f"{stem}.srt", d / f"{stem}.SRT"])
+            _append_stem_files(base)
+            for subname in subtitle_dir_names:
+                _append_stem_files(base / subname)
+    for root in [video_path.parent, video_path.parent.parent, video_path.parent.parent.parent]:
+        for subname in subtitle_dir_names:
+            _append_stem_files(root / subname)
     for p in candidates:
         if p.is_file():
             return str(p)
@@ -384,14 +421,13 @@ def _extract_keywords_with_llm_text(
 
 
 # ==================== 信息量计算与预算分配 ====================
-def _merge_keywords(kws: list[str], emb: torch.Tensor, th: float, max_keywords: int) -> tuple[list[str], torch.Tensor, dict[str, Any]]:
-    """仅在关键词超限时，按“重复度最高优先删除”裁剪到最大数量。"""
+def _merge_keywords(kws: list[str], emb: torch.Tensor, max_keywords: int) -> tuple[list[str], torch.Tensor, dict[str, Any]]:
+    """未超过 max_keywords 时不删减；超过时删除与其它词 CLIP 相似度最高的 (n - max_keywords) 个。"""
     n = len(kws)
     if n == 0:
         ids = torch.empty((0,), device=emb.device, dtype=torch.long)
         return [], emb[ids], {
             "max_keywords": int(max_keywords),
-            "semantic_threshold": float(th),
             "input_count": 0,
             "output_count": 0,
             "input_keywords": [],
@@ -400,27 +436,30 @@ def _merge_keywords(kws: list[str], emb: torch.Tensor, th: float, max_keywords: 
             "per_keyword_max_similarity": [],
         }
     max_keywords = max(1, int(max_keywords))
-    sim = emb @ emb.T  # (N, N)
-    sim.fill_diagonal_(-1e9)
-    argmax_idx = sim.argmax(dim=1)
-    max_sim_all = sim.max(dim=1).values
     per_keyword_scores: list[dict[str, Any]] = []
-    for i, kw in enumerate(kws):
-        best_j = int(argmax_idx[i].item())
-        best_sim = float(max_sim_all[i].item()) if n > 1 else 0.0
+    if n == 1:
         per_keyword_scores.append(
-            {
-                "keyword": kw,
-                "max_similarity_to_others": best_sim if n > 1 else 0.0,
-                "most_similar_keyword": kws[best_j] if n > 1 else "",
-            }
+            {"keyword": kws[0], "max_similarity_to_others": 0.0, "most_similar_keyword": ""}
         )
+    else:
+        sim = emb @ emb.T
+        sim.fill_diagonal_(-1e9)
+        argmax_idx = sim.argmax(dim=1)
+        max_sim_all = sim.max(dim=1).values
+        for i, kw in enumerate(kws):
+            best_j = int(argmax_idx[i].item())
+            per_keyword_scores.append(
+                {
+                    "keyword": kw,
+                    "max_similarity_to_others": float(max_sim_all[i].item()),
+                    "most_similar_keyword": kws[best_j],
+                }
+            )
 
     if n <= max_keywords:
         ids = torch.arange(n, device=emb.device, dtype=torch.long)
         return kws, emb[ids], {
             "max_keywords": int(max_keywords),
-            "semantic_threshold": float(th),
             "input_count": int(n),
             "output_count": int(n),
             "input_keywords": list(kws),
@@ -429,34 +468,21 @@ def _merge_keywords(kws: list[str], emb: torch.Tensor, th: float, max_keywords: 
             "per_keyword_max_similarity": per_keyword_scores,
         }
 
-    keep = list(range(n))
-    removed_rows: list[dict[str, Any]] = []
-    while len(keep) > max_keywords:
-        idx = torch.tensor(keep, device=emb.device, dtype=torch.long)
-        sub = sim[idx][:, idx]  # (K, K)
-        max_sim = sub.max(dim=1).values
-        max_pos = sub.argmax(dim=1)
-        # 兼容历史阈值：优先删除与其它词相似度达到阈值的关键词
-        remove_score = torch.where(max_sim >= th, max_sim + 1.0, max_sim)
-        rm_local = int(torch.argmax(remove_score).item())
-        rm_global = int(keep[rm_local])
-        peer_local = int(max_pos[rm_local].item())
-        peer_global = int(keep[peer_local]) if keep else rm_global
-        removed_rows.append(
-            {
-                "keyword": kws[rm_global],
-                "most_similar_keyword": kws[peer_global] if rm_global != peer_global else "",
-                "max_similarity_to_others": float(max_sim[rm_local].item()),
-                "removal_priority_score": float(remove_score[rm_local].item()),
-                "above_threshold": bool(float(max_sim[rm_local].item()) >= float(th)),
-            }
-        )
-        keep.pop(rm_local)
+    ranked = sorted(range(n), key=lambda i: per_keyword_scores[i]["max_similarity_to_others"], reverse=True)
+    remove_ids = set(ranked[: n - max_keywords])
+    keep = [i for i in range(n) if i not in remove_ids]
+    removed_rows = [
+        {
+            "keyword": kws[i],
+            "most_similar_keyword": per_keyword_scores[i]["most_similar_keyword"],
+            "max_similarity_to_others": per_keyword_scores[i]["max_similarity_to_others"],
+        }
+        for i in ranked[: n - max_keywords]
+    ]
     ids = torch.tensor(keep, device=emb.device, dtype=torch.long)
     kept_keywords = [kws[i] for i in keep]
     return kept_keywords, emb[ids], {
         "max_keywords": int(max_keywords),
-        "semantic_threshold": float(th),
         "input_count": int(n),
         "output_count": int(len(kept_keywords)),
         "input_keywords": list(kws),
@@ -491,6 +517,7 @@ def _compute_keyword_information(
     img_emb: torch.Tensor,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
+    """合并后的关键词全部保留；用 info_aggressiveness 控制配额权重。"""
     m = int(kw_emb_rep.shape[0])
     n = int(img_emb.shape[0])
     if m == 0 or n == 0:
@@ -499,9 +526,7 @@ def _compute_keyword_information(
             "kw_emb_use": kw_emb_rep[:0],
             "kw_weights": torch.empty((0,), device=img_emb.device),
             "rows": [],
-            "keep_ids": [],
-            "info_threshold": float(args.keyword_keep_info_min),
-            "info_quantile_value": float(args.keyword_keep_info_min),
+            "kw_info_use": kw_emb_rep[:0],
         }
 
     sims = kw_emb_rep @ img_emb.T  # (M, N)
@@ -510,48 +535,44 @@ def _compute_keyword_information(
     std = sims.std(dim=1, unbiased=False).clamp(min=1e-6)
     prominence_z = (peak - mean) / std
 
-    denom = max(1e-6, args.info_peak_ceiling - args.info_peak_floor)
-    peak_term = ((peak - args.info_peak_floor) / denom).clamp(min=0.0, max=1.0)
+    aggr = min(1.0, max(0.0, float(args.info_aggressiveness)))
 
-    z_scale = max(1e-6, float(args.info_prominence_scale))
-    prominence_term = torch.sigmoid((prominence_z - args.info_prominence_center) / z_scale)
+    # 单一超参映射到原 6 个信息量控制项
+    peak_floor = 0.10 + 0.20 * aggr
+    peak_ceiling = 0.45 + 0.30 * aggr
+    prominence_center = 1.0 + 1.2 * aggr
+    prominence_scale = 1.0 - 0.6 * aggr
+    entropy_temperature = 0.14 - 0.10 * aggr
+    mix_prominence = 0.2 + 0.6 * aggr
+
+    denom = max(1e-6, peak_ceiling - peak_floor)
+    peak_term = ((peak - peak_floor) / denom).clamp(min=0.0, max=1.0)
+
+    z_scale = max(1e-6, float(prominence_scale))
+    prominence_term = torch.sigmoid((prominence_z - prominence_center) / z_scale)
 
     if n <= 1:
         concentration_term = torch.ones_like(peak)
     else:
-        temp = max(1e-3, float(args.info_entropy_temperature))
+        temp = max(1e-3, float(entropy_temperature))
         logits = (sims - mean.unsqueeze(1)) / temp
         p = torch.softmax(logits, dim=1).clamp(min=1e-12)
         ent = -(p * torch.log(p)).sum(dim=1)
         concentration_term = (1.0 - ent / math.log(float(n))).clamp(min=0.0, max=1.0)
 
-    mix = float(args.info_mix_prominence)
+    mix = float(mix_prominence)
     mix = min(1.0, max(0.0, mix))
     shape_term = mix * prominence_term + (1.0 - mix) * concentration_term
     info = (peak_term * shape_term).clamp(min=0.0)
 
-    if m > 1:
-        q = min(0.95, max(0.0, float(args.keyword_keep_info_quantile)))
-        qv = float(torch.quantile(info, q).item()) if q > 0.0 else float(info.min().item())
+    kws_use = list(kws_rep)
+    kw_emb_use = kw_emb_rep
+    if aggr <= 1e-12:
+        # 用户要求：aggressiveness=0 时关键词均分
+        kw_info = torch.ones((m,), device=kw_emb_rep.device)
+        kw_weights = torch.ones((m,), device=kw_emb_rep.device) / float(m)
     else:
-        qv = float(info[0].item())
-    info_th = max(float(args.keyword_keep_info_min), qv)
-    keep_mask = (peak >= float(args.keyword_keep_peak_min)) & (info >= info_th)
-
-    min_keep = max(1, int(args.keyword_keep_min_keywords))
-    min_keep = min(min_keep, m)
-    keep_ids = torch.nonzero(keep_mask).squeeze(1).tolist()
-    if len(keep_ids) < min_keep:
-        topk = torch.argsort(info, descending=True)[:min_keep].tolist()
-        keep_ids = sorted(set(keep_ids + [int(i) for i in topk]))
-
-    keep_tensor = torch.tensor(keep_ids, device=kw_emb_rep.device, dtype=torch.long)
-    kws_use = [kws_rep[i] for i in keep_ids]
-    kw_emb_use = kw_emb_rep[keep_tensor]
-    kw_info = info[keep_tensor]
-    if kw_info.numel() == 0:
-        kw_weights = torch.empty((0,), device=kw_emb_rep.device)
-    else:
+        kw_info = info
         s = float(kw_info.sum().item())
         kw_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
 
@@ -568,7 +589,7 @@ def _compute_keyword_information(
                 "prominence_term": float(prominence_term[i].item()),
                 "concentration_term": float(concentration_term[i].item()),
                 "info": float(info[i].item()),
-                "kept": bool(i in keep_ids),
+                "kept": True,
             }
         )
 
@@ -578,9 +599,26 @@ def _compute_keyword_information(
         "kw_weights": kw_weights,
         "kw_info_use": kw_info,
         "rows": rows,
-        "keep_ids": keep_ids,
-        "info_threshold": float(info_th),
-        "info_quantile_value": float(qv),
+        "mapped_params": {
+            "info_peak_floor": float(peak_floor),
+            "info_peak_ceiling": float(peak_ceiling),
+            "info_prominence_center": float(prominence_center),
+            "info_prominence_scale": float(prominence_scale),
+            "info_entropy_temperature": float(entropy_temperature),
+            "info_mix_prominence": float(mix_prominence),
+        },
+    }
+
+
+def _mapped_info_params_from_aggr(aggr_raw: float) -> dict[str, float]:
+    aggr = min(1.0, max(0.0, float(aggr_raw)))
+    return {
+        "info_peak_floor": float(0.10 + 0.20 * aggr),
+        "info_peak_ceiling": float(0.45 + 0.30 * aggr),
+        "info_prominence_center": float(1.0 + 1.2 * aggr),
+        "info_prominence_scale": float(1.0 - 0.6 * aggr),
+        "info_entropy_temperature": float(0.14 - 0.10 * aggr),
+        "info_mix_prominence": float(0.2 + 0.6 * aggr),
     }
 
 
@@ -655,15 +693,6 @@ def _option_probs(proc: Any, logits: torch.Tensor) -> dict[str, float]:
             if toks:
                 ids.add(int(toks[0]))
         out[o] = float(sum(float(p[i].item()) for i in ids)) if ids else 0.0
-    return out
-
-
-def _resize_lowres(frames: list[Image.Image], size: int) -> list[Image.Image]:
-    out = []
-    for im in frames:
-        w, h = im.size
-        scale = size / max(w, h)
-        out.append(im.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.BICUBIC))
     return out
 
 
@@ -797,19 +826,22 @@ def _eval_one_sample(
     max_new_tokens: int,
     model_mode: str,
     budget: int,
-    pool_size: int,
     preprocessed_clip_dir: str | None,
     use_subtitles: bool,
     subtitles_dir: str | None,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
+    pool_fps = float(args.candidate_pool_fps)
+    if pool_fps <= 0:
+        raise ValueError(f"candidate_pool_fps 必须 > 0，当前: {pool_fps}")
     if args.use_preprocessed_clip_frames:
         frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
-        if len(imgs) > pool_size:
-            keep = _sample_uniform_positions(len(imgs), pool_size)
+        src_fps = float(args.preprocessed_clip_fps)
+        keep = _pool_positions_at_fps(len(imgs), src_fps, pool_fps)
+        if keep:
             frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
     else:
-        frame_ids, imgs = _collect_video_frames_uniform(sample.video_path, pool_size)
+        frame_ids, imgs = _collect_video_frames_at_fps(sample.video_path, pool_fps)
     frame_sampling_time = time.perf_counter() - t0
 
     t1 = time.perf_counter()
@@ -827,12 +859,7 @@ def _eval_one_sample(
         raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
     kws_after_text_dedup = list(kws)
     kw_emb = _encode_texts(kws_after_text_dedup, clip_proc, clip_model, clip_device, 32)
-    kws_rep, kw_emb_rep, _ = _merge_keywords(
-        kws_after_text_dedup,
-        kw_emb,
-        args.keyword_sim_merge_threshold,
-        args.max_keywords,
-    )
+    kws_rep, kw_emb_rep, _ = _merge_keywords(kws_after_text_dedup, kw_emb, args.max_keywords)
     info_pack = _compute_keyword_information(kws_rep, kw_emb_rep, img_emb, args)
     kws_use: list[str] = info_pack["kws_use"]
     kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
@@ -844,20 +871,11 @@ def _eval_one_sample(
         keep_weight_map: dict[str, float] = {}
         for i, kw in enumerate(kws_use):
             keep_weight_map[kw] = float(kw_weights[i].item()) if kw_weights.numel() > i else 0.0
-        _log(
-            "sample={} info_threshold={:.4f} (quantile={:.4f}, min={:.4f})".format(
-                sample.sample_id,
-                float(info_pack["info_threshold"]),
-                float(info_pack["info_quantile_value"]),
-                float(args.keyword_keep_info_min),
-            )
-        )
         for r in info_pack["rows"]:
             _log(
-                "sample={} kw='{}' kept={} info={:.4f} weight={:.4f} peak={:.4f} prom_z={:.3f} conc={:.3f}".format(
+                "sample={} kw='{}' info={:.4f} weight={:.4f} peak={:.4f} prom_z={:.3f} conc={:.3f}".format(
                     sample.sample_id,
                     r["keyword"],
-                    r["kept"],
                     r["info"],
                     keep_weight_map.get(r["keyword"], 0.0),
                     r["peak"],
@@ -865,7 +883,7 @@ def _eval_one_sample(
                     r["concentration_term"],
                 )
             )
-    _log(f"sample={sample.sample_id} 关键词过滤: merged={len(kws_rep)} -> kept={len(kws_use)}")
+    _log(f"sample={sample.sample_id} 关键词: llm={len(kws_after_text_dedup)} -> after_cap={len(kws_use)}")
 
     emb_time = time.perf_counter() - t1
     _log(
@@ -897,7 +915,7 @@ def _eval_one_sample(
         f"贪心选帧={len(selected_idx)}, alpha={int(args.quota_prescreen_alpha)}"
     )
 
-    one_shot_frames = _resize_lowres([imgs[i] for i in selected_idx], args.lowres_size)
+    one_shot_frames = [imgs[i] for i in selected_idx]
     sampled_frame_ids = [int(frame_ids[i]) for i in selected_idx]
     subtitles_for_prompt, selected_frame_subtitles = (
         _collect_subtitles_for_sample(sample, sampled_frame_ids, subtitles_dir=subtitles_dir)
@@ -948,7 +966,6 @@ def evaluate_vqa(
     max_new_tokens: int,
     model_mode: str,
     budget: int,
-    pool_size: int,
     preprocessed_clip_dir: str | None,
     use_subtitles: bool,
     subtitles_dir: str | None,
@@ -972,7 +989,6 @@ def evaluate_vqa(
             max_new_tokens,
             model_mode,
             budget,
-            pool_size,
             preprocessed_clip_dir,
             use_subtitles=use_subtitles,
             subtitles_dir=subtitles_dir,
@@ -1030,23 +1046,126 @@ def parse_args():
     p.add_argument("--preprocessed_clip_dir", type=str, default="")
     p.add_argument("--use_subtitles", action="store_true", help="为 Video-MME 按采样帧时间对齐读取字幕并拼入 prompt")
     p.add_argument("--subtitles_dir", type=str, default="", help="字幕目录（可选）；为空时尝试在视频邻近目录下自动查找 subtitle/subtitles")
-    p.add_argument("--candidate_pool_size", type=int, default=128)
+    p.add_argument(
+        "--candidate_pool_fps",
+        type=float,
+        default=1.0,
+        help="候选池粗采样目标 fps（默认 1.0，即一秒一帧）；视频按源 fps 换算帧索引，预处理目录按 preprocessed_clip_fps 重采样",
+    )
     p.add_argument("--quota_prescreen_alpha", type=int, default=3, help="配额软预筛系数 alpha：每个关键词预筛 top-(alpha*q_i) 帧")
-    p.add_argument("--max_keywords", type=int, default=5, help="最大关键词数：不超过该值不做语义裁剪，超过则删除重复度最高的词")
-    p.add_argument("--keyword_sim_merge_threshold", type=float, default=0.85)
-    p.add_argument("--info_peak_floor", type=float, default=0.20, help="信息量计算: 峰值项下限")
-    p.add_argument("--info_peak_ceiling", type=float, default=0.60, help="信息量计算: 峰值项上限")
-    p.add_argument("--info_prominence_center", type=float, default=1.5, help="信息量计算: 峰值突出度(sigmoid中心, z-score)")
-    p.add_argument("--info_prominence_scale", type=float, default=0.7, help="信息量计算: 峰值突出度(sigmoid斜率)")
-    p.add_argument("--info_entropy_temperature", type=float, default=0.08, help="信息量计算: 分布集中度温度")
-    p.add_argument("--info_mix_prominence", type=float, default=0.6, help="信息量计算: 突出度与集中度融合权重")
-    p.add_argument("--keyword_keep_peak_min", type=float, default=0.18, help="关键词保留: 峰值硬阈值")
-    p.add_argument("--keyword_keep_info_min", type=float, default=0.08, help="关键词保留: 信息量最小阈值")
-    p.add_argument("--keyword_keep_info_quantile", type=float, default=0.35, help="关键词保留: 信息量分位阈值")
-    p.add_argument("--keyword_keep_min_keywords", type=int, default=2, help="关键词保留: 最少保留词数")
+    p.add_argument(
+        "--max_keywords",
+        type=int,
+        default=5,
+        help="最大关键词数：不超过则全保留；超过则删除与其它词 CLIP 相似度最高的 (n-max_keywords) 个",
+    )
+    p.add_argument(
+        "--info_aggressiveness",
+        type=float,
+        default=0.6,
+        help="信息量单一控制参数(0~1)：0时关键词均分配额，越大越偏向突出且集中的关键词",
+    )
     p.add_argument("--coarse_uniform_ratio", type=float, default=0.0, help="coarse选帧中均匀抽样占比，其余预算按关键词信息量分配")
-    p.add_argument("--lowres_size", type=int, default=336)
     return p.parse_args()
+
+
+def _ours_csv_columns() -> list[str]:
+    return [
+        "timestamp",
+        "dataset",
+        "seed",
+        "task_filter",
+        "num_samples",
+        "correct_count",
+        "accuracy_percent",
+        "num_frames",
+        "avg_inference_time",
+        "frame_sampling_method",
+        "avg_frame_sampling_time",
+        "avg_embedding_build_time",
+        "avg_selected_frame_count",
+        "avg_total_time_hours",
+        "model_name",
+        "lora_path",
+        "candidate_pool_fps",
+        "quota_prescreen_alpha",
+        "max_keywords",
+        "info_aggressiveness",
+        "mapped_info_peak_floor",
+        "mapped_info_peak_ceiling",
+        "mapped_info_prominence_center",
+        "mapped_info_prominence_scale",
+        "mapped_info_entropy_temperature",
+        "mapped_info_mix_prominence",
+        "use_preprocessed_clip_frames",
+        "preprocessed_clip_fps",
+        "use_subtitles",
+    ]
+
+
+def _ours_csv_row(
+    args: argparse.Namespace,
+    *,
+    mapped_info_params: dict[str, float],
+    num_samples: int,
+    correct_count: float,
+    accuracy_percent: float,
+    avg_inference_time: float,
+    avg_frame_sampling_time: float,
+    avg_embedding_build_time: float,
+    avg_selected_frame_count: float,
+    avg_total_time_hours: float,
+    model_name: str,
+    lora_path: str,
+) -> list[Any]:
+    return [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        args.dataset,
+        args.seed,
+        args.task_filter,
+        num_samples,
+        f"{correct_count:.6f}",
+        f"{accuracy_percent:.2f}",
+        args.num_frames,
+        f"{avg_inference_time:.3f}",
+        args.frame_sampling_method,
+        f"{avg_frame_sampling_time:.6f}",
+        f"{avg_embedding_build_time:.6f}",
+        f"{avg_selected_frame_count:.6f}",
+        f"{avg_total_time_hours:.6f}",
+        model_name,
+        lora_path,
+        f"{float(args.candidate_pool_fps):g}",
+        int(args.quota_prescreen_alpha),
+        int(args.max_keywords),
+        f"{float(args.info_aggressiveness):g}",
+        f"{float(mapped_info_params.get('info_peak_floor', 0.0)):g}",
+        f"{float(mapped_info_params.get('info_peak_ceiling', 0.0)):g}",
+        f"{float(mapped_info_params.get('info_prominence_center', 0.0)):g}",
+        f"{float(mapped_info_params.get('info_prominence_scale', 0.0)):g}",
+        f"{float(mapped_info_params.get('info_entropy_temperature', 0.0)):g}",
+        f"{float(mapped_info_params.get('info_mix_prominence', 0.0)):g}",
+        bool(args.use_preprocessed_clip_frames),
+        f"{float(args.preprocessed_clip_fps):g}",
+        bool(args.use_subtitles),
+    ]
+
+
+def _log_ours_eval_to_csv(log_file: str, columns: list[str], row: list[Any]) -> None:
+    path = Path(log_file).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not path.is_file() or path.stat().st_size == 0
+    if not write_header:
+        with path.open("r", newline="", encoding="utf-8") as rf:
+            existing_header = next(csv.reader(rf), None)
+        if existing_header != columns:
+            _log(f"CSV 表头与当前版本不一致，跳过写入: {path}")
+            return
+    with path.open("a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if write_header:
+            w.writerow(columns)
+        w.writerow(row)
 
 
 def main():
@@ -1093,10 +1212,10 @@ def main():
         raise RuntimeError("本脚本仅支持 instruct 模式。请改用 instruct 模型或扩展实现。")
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
 
-    pool_size = args.candidate_pool_size
     budget = max(1, int(args.num_frames))
     _log(
-        f"配置: pool_size={pool_size}, budget={budget}, quota_prescreen_alpha={int(args.quota_prescreen_alpha)}"
+        f"配置: candidate_pool_fps={float(args.candidate_pool_fps):g}, "
+        f"budget={budget}, quota_prescreen_alpha={int(args.quota_prescreen_alpha)}"
     )
 
     model, proc = load_model_and_processor(resolved_model_path, use_lora=args.use_lora, base_model=args.base_model, merge_lora=args.merge_lora)
@@ -1108,26 +1227,37 @@ def main():
         effective_max_new_tokens,
         model_mode,
         budget,
-        pool_size,
         preprocessed_clip_dir,
         use_subtitles=bool(args.use_subtitles),
         subtitles_dir=(args.subtitles_dir.strip() if args.subtitles_dir.strip() else None),
     )
 
     avg_acc, avg_time = _compute_accuracy_from_results(results, args.task_filter)
-    eval_n, correct = _compute_score_counts_for_csv(results, args.task_filter)
+    _, correct = _compute_score_counts_for_csv(results, args.task_filter)
     avg_fs = _avg(results["frame_sampling_times"])
     avg_emb = _avg(results["embedding_build_times"])
     avg_sel = _avg(results["selected_frame_counts"])
     avg_total_h = (time.perf_counter() - exp_t0) / 3600.0
 
-    Path(log_file).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
-    file_exists = os.path.exists(log_file)
-    with open(log_file, "a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        if not file_exists:
-            w.writerow(["timestamp", "dataset", "seed", "task_filter", "num_samples", "evaluated_samples", "correct_count", "accuracy_percent", "num_frames", "avg_accuracy", "avg_inference_time", "frame_sampling_method", "avg_frame_sampling_time", "avg_embedding_build_time", "avg_selected_frame_count", "avg_total_time_hours", "over_max_tokens_count", "model_name", "lora_path", "train_ratio", "eval_split", "ours_clip_model_id", "ours_clip_batch_size", "use_preprocessed_clip_frames", "preprocessed_clip_fps", "quota_prescreen_alpha"])
-        w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.dataset, args.seed, args.task_filter, len(samples), eval_n, f"{correct:.6f}", f"{avg_acc:.2f}", args.num_frames, f"{avg_acc:.2f}", f"{avg_time:.3f}", args.frame_sampling_method, f"{avg_fs:.6f}", f"{avg_emb:.6f}", f"{avg_sel:.6f}", f"{avg_total_h:.6f}", results["over_max_tokens_count"], model_name, lora_path, args.train_ratio, "train" if args.use_train_split else "test", args.ours_clip_model_id, args.ours_clip_batch_size, args.use_preprocessed_clip_frames, args.preprocessed_clip_fps, args.quota_prescreen_alpha])
+    csv_columns = _ours_csv_columns()
+    _log_ours_eval_to_csv(
+        log_file,
+        csv_columns,
+        _ours_csv_row(
+            args,
+            mapped_info_params=_mapped_info_params_from_aggr(float(args.info_aggressiveness)),
+            num_samples=len(samples),
+            correct_count=correct,
+            accuracy_percent=avg_acc,
+            avg_inference_time=avg_time,
+            avg_frame_sampling_time=avg_fs,
+            avg_embedding_build_time=avg_emb,
+            avg_selected_frame_count=avg_sel,
+            avg_total_time_hours=avg_total_h,
+            model_name=model_name,
+            lora_path=lora_path,
+        ),
+    )
     _log(f"评估完成: samples={len(samples)}, acc={avg_acc:.2f}%, avg_infer={avg_time:.3f}s")
 
 
