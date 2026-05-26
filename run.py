@@ -74,13 +74,13 @@ def main(cfg: DictConfig) -> None:
         cfg.task_filter,
     ]
     dataset_shared: list[str] = []
-    if script_key in ("vqa_train.py", "vqa_eval.py", "vqa_eval_emb.py", "vqa_eval_ours.py"):
+    if script_key in ("vqa_train.py", "vqa_eval.py", "vqa_eval_emb.py", "vqa_eval_ours.py", "vqa_eval_zzy.py"):
         dataset_shared += ["--model_name", str(cfg.model.name)]
         dataset_shared += ["--dataset", str(OmegaConf.select(cfg, "dataset", default="vsibench"))]
         frame_sampling_method = OmegaConf.select(cfg, "frame_sampling_method", default=None)
         if frame_sampling_method:
             dataset_shared += ["--frame_sampling_method", str(frame_sampling_method)]
-        if script_key != "vqa_eval_ours.py":
+        if script_key not in ("vqa_eval_ours.py", "vqa_eval_zzy.py"):
             focus_blip_model_name = OmegaConf.select(cfg, "focus_blip_model_name", default=None)
             if focus_blip_model_name:
                 dataset_shared += ["--focus_blip_model_name", str(focus_blip_model_name)]
@@ -101,7 +101,7 @@ def main(cfg: DictConfig) -> None:
             dataset_shared += ["--dataset_config", str(dataset_config)]
         if OmegaConf.select(cfg, "dataset_no_config", default=False):
             dataset_shared.append("--no_dataset_config")
-        if script_key in ("vqa_eval.py", "vqa_eval_ours.py"):
+        if script_key in ("vqa_eval.py", "vqa_eval_ours.py", "vqa_eval_zzy.py"):
             use_preprocessed_clip_frames = OmegaConf.select(cfg, "use_preprocessed_clip_frames", default=False)
             if bool(use_preprocessed_clip_frames):
                 dataset_shared.append("--use_preprocessed_clip_frames")
