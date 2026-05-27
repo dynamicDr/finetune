@@ -1024,7 +1024,12 @@ python run.py --multirun \
     seed=42 \
     slurm=hgpu_batch
 
-帮zzy实现了一个底座：
+我们已经把 vqa_eval_zzy.py 接进 run.py，作为你的独立评测入口。
+选帧 / 打分逻辑需要你自己实现和验证；目前vqa_eval_zzy是一个能跑通全流程的 CLIP top-k 占位（先读候选帧，再按 question+options 的 CLIP 相似度选 top-k，最后送 VLM 答题）。 说明 pipeline 是通的，
+你需要做的：
+0，连接至你的gpufarm3，cd finetune
+1，修改vqa_eval_zzy.py，把你的想法用vibecoding实现进去,注意整个过程，只修改vqa_eval_zzy.py，run.py，不要修改其他已有文件，也不要删除任何文件，杀死任何程序
+2，在base环境，跑以下这个指令（你可以让agent修改、增加超参数）：
 python run.py --multirun \
   hydra/launcher=submitit_slurm \
   script=vqa_eval_zzy.py \
@@ -1043,3 +1048,70 @@ python run.py --multirun \
   train_ratio=0 \
   seed=24 \
   slurm=default_4090
+
+  3,你的输出在outputs/multirun的最后一个文件夹里（参考当前时间戳）。准确率在eval_csv的最后一个文件（参考当前时间戳）。
+  4，如果要安装任何包，conda activate finetune, pip install XXX即可。
+
+  max_keywords 影响最大，5 个 keyword 始终优于 3 个
+info_aggressiveness 越高，准确率越低
+quota_prescreen_alpha 有轻微影响，3 略优于 5
+
+
+主方法：
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  script=vqa_eval_ours.py \
+  dataset=videomme \
+  dataset_name=lmms-lab/Video-MME \
+  dataset_no_config=true \
+  dataset_split=test \
+  video_dir=~/dataset/Video-MME \
+  frame_sampling_method=ours \
+  num_frames=16 \
+  model=qwen3_8b_instruct \
+  task_filter=short \
+  use_preprocessed_clip_frames=true \
+  train_ratio=0 \
+  seed=42 \
+  slurm=hgpu_batch \
+  quota_prescreen_alpha=2,4,6 \
+  max_keywords=5,7,9 \
+  info_aggressiveness=0,0.2,0.4
+
+
+测试baseline：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=bolt-clip,bolt-siglip2,aks-clip,aks-blip \
+    num_frames=16 \
+    num_samples=10 \
+    model=qwen3_8b_instruct \
+    task_filter=short \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=default_4090
+
+【zzy在跑】新增若干baselines：
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,aks-clip,aks-blip,siglip2 \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch

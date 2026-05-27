@@ -15,6 +15,8 @@ SUPPORTED_FRAME_SAMPLERS = (
     "clip",
     "siglip2",
     "qframe",
+    "bolt-clip",
+    "bolt-siglip2",
     "aks",
     "aks-blip",
     "aks-clip",
@@ -134,6 +136,22 @@ def sample_video_frames(
             options=options,
             answer=answer,
             random_seed=random_seed,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+        )
+    if method in {"bolt-clip", "bolt-siglip2"}:
+        from .bolt import sample_bolt_frames
+
+        bolt_feature_model = "clip" if method == "bolt-clip" else "siglip2"
+        return sample_bolt_frames(
+            video_path,
+            num_frames,
+            sample_id=sample_id,
+            question=question,
+            options=options,
+            answer=answer,
+            random_seed=random_seed,
+            extract_feature_model=bolt_feature_model,
             use_preprocessed_clip_frames=use_preprocessed_clip_frames,
             preprocessed_clip_dir=preprocessed_clip_dir,
         )

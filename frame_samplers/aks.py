@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from .clip import _format_question_and_options
+
 _AKS_MODEL_CACHE: dict[tuple[str, str], Any] = {}
 _AKS_PATCHED_MODULES: set[str] = set()
 
@@ -269,14 +271,6 @@ def meanstd(
     all_split_score = no_split_scores + all_split_score
     all_split_fn = no_split_fn + all_split_fn
     return all_split_score, all_split_fn
-
-
-def _format_question_and_options(question: str | None, options: list[str] | None) -> str:
-    _ = options
-    q = (question or "").strip()
-    if not q:
-        raise ValueError("AKS 需要提供 question。")
-    return q
 
 
 def _compose_query(
