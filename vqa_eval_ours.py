@@ -20,72 +20,33 @@ from transformers import AutoModel, AutoProcessor
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
-from utils import dump_verbose_round, init_verbose_run_dir, normalize_sample_id
-from vl_common import load_model_and_processor
+from utils import (
+    avg as _avg,
+    build_user_text,
+    build_user_text_with_subtitles,
+    calculate_mra,
+    collect_subtitles_for_frame_ids as _collect_subtitles_for_sample,
+    compute_accuracy_from_results as _compute_accuracy_from_results,
+    compute_score_counts_for_csv as _compute_score_counts_for_csv,
+    dump_verbose_round,
+    init_verbose_run_dir,
+    normalize_sample_id,
+)
+from vl_common import load_keyword_model_and_processor, load_model_and_processor
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
 PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"ours"}
 _CLIP_CACHE: dict[str, tuple[Any, Any, str]] = {}
+_OPENAI_CLIENT_CACHE: dict[tuple[str, str], Any] = {}
+_KEYWORD_LOCAL_MODEL_CACHE: dict[str, tuple[Any, Any]] = {}
 VERBOSE = True
 VERBOSE_OUTPUT_DIR = Path(__file__).resolve().parent / "verbose_eval_ours"
 _VERBOSE_RUN_DIR: Path | None = None
 
 
-# ==================== 基础工具与通用统计 ====================
+# ==================== 基础工具 ====================
 def _log(msg: str) -> None:
     print(f"[vqa_eval_ours] {msg}", flush=True)
-
-
-def build_user_text(question: str, options: list[str] | None) -> str:
-    if options:
-        return f"{question}\n\nOptions:\n" + "\n".join(options) + "\n\nDirectly answer with the option letter only. Do not explain."
-    return f"{question}\n\nPlease provide the numerical answer directly."
-
-
-def build_user_text_with_subtitles(question: str, options: list[str] | None, subtitles: list[str] | None) -> str:
-    options_text = "\n".join(options or [])
-    subtitle_text = "\n".join((subtitles or [])).strip() or "No subtitles available"
-    return (
-        "This video's subtitles are listed below:\n"
-        f"{subtitle_text}\n\n"
-        "Select the best answer to the following multiple-choice question based on the video. "
-        "Respond with only the letter (A, B, C, or D) of the correct option.\n"
-        f"{question}\n{options_text}\n"
-        "The best answer is:"
-    )
-
-
-def calculate_mra(pred: float, gt: float) -> float:
-    if gt == 0:
-        return 1.0 if pred == 0 else 0.0
-    return max(0.0, 1 - abs(pred - gt) / abs(gt))
-
-
-def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
-    avg_accuracy = 0.0
-    if task_filter in {"mcq", "short", "medium", "long"} and results["total"] > 0:
-        avg_accuracy = results["correct"] / results["total"] * 100
-    elif task_filter == "numeric" and results["mra_count"] > 0:
-        avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
-    elif task_filter == "all":
-        total_score = results["correct"] + results["mra_sum"]
-        total_count = results["total"] + results["mra_count"]
-        if total_count > 0:
-            avg_accuracy = total_score / total_count * 100
-    avg_inference_time = sum(results["inference_times"]) / len(results["inference_times"]) if results["inference_times"] else 0.0
-    return avg_accuracy, avg_inference_time
-
-
-def _compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int, float]:
-    if task_filter in {"mcq", "short", "medium", "long"}:
-        return int(results["total"]), float(results["correct"])
-    if task_filter == "numeric":
-        return int(results["mra_count"]), float(results["mra_sum"])
-    return int(results["total"] + results["mra_count"]), float(results["correct"] + results["mra_sum"])
-
-
-def _avg(xs: list[float]) -> float:
-    return sum(xs) / len(xs) if xs else 0.0
 
 
 # ==================== 候选帧读取与采样 ====================
@@ -184,105 +145,6 @@ def _collect_video_frames_at_fps(video_path: str, target_fps: float) -> tuple[li
     return frame_ids, images
 
 
-def _parse_subtitle_time(time_str: str) -> float:
-    h, m, s_ms = time_str.split(":")
-    s, ms = s_ms.split(",")
-    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
-
-
-def _load_srt_segments(subtitle_path: str) -> list[tuple[float, float, str]]:
-    p = Path(subtitle_path)
-    if not p.is_file():
-        return []
-    text = p.read_text(encoding="utf-8", errors="ignore")
-    blocks = re.split(r"\n\s*\n", text.strip())
-    segs: list[tuple[float, float, str]] = []
-    for block in blocks:
-        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
-        if len(lines) < 2:
-            continue
-        time_line_idx = 0 if "-->" in lines[0] else (1 if len(lines) > 1 and "-->" in lines[1] else -1)
-        if time_line_idx < 0:
-            continue
-        try:
-            ts0, ts1 = [x.strip() for x in lines[time_line_idx].split("-->")]
-            start_t = _parse_subtitle_time(ts0)
-            end_t = _parse_subtitle_time(ts1)
-        except Exception:
-            continue
-        content_lines = lines[time_line_idx + 1 :]
-        if not content_lines:
-            continue
-        raw = " ".join(content_lines)
-        cleaned = re.sub(r"<[^>]+>", "", raw).strip()
-        if cleaned:
-            segs.append((start_t, end_t, cleaned))
-    return segs
-
-
-def _resolve_subtitle_path(sample: VQASample, subtitles_dir: str | None) -> str | None:
-    explicit_dir = os.path.expanduser(subtitles_dir) if subtitles_dir else ""
-    video_path = Path(sample.video_path).expanduser().resolve()
-    video_stem = video_path.stem
-    meta_video_id = str(sample.metadata.get("videoID", "")).strip() if isinstance(sample.metadata, dict) else ""
-    candidates: list[Path] = []
-    subtitle_dir_names = ("subtitle", "subtitles", "subtitles/subtitle")
-
-    def _append_stem_files(base_dir: Path) -> None:
-        for stem in [meta_video_id, video_stem]:
-            if stem:
-                candidates.extend([base_dir / f"{stem}.srt", base_dir / f"{stem}.SRT"])
-
-    if explicit_dir:
-        base = Path(explicit_dir)
-        if base.is_dir():
-            _append_stem_files(base)
-            for subname in subtitle_dir_names:
-                _append_stem_files(base / subname)
-    for root in [video_path.parent, video_path.parent.parent, video_path.parent.parent.parent]:
-        for subname in subtitle_dir_names:
-            _append_stem_files(root / subname)
-    for p in candidates:
-        if p.is_file():
-            return str(p)
-    return None
-
-
-def _collect_subtitles_for_sample(
-    sample: VQASample,
-    sampled_frame_ids: list[int],
-    subtitles_dir: str | None,
-) -> tuple[list[str], list[str]]:
-    subtitle_path = _resolve_subtitle_path(sample, subtitles_dir=subtitles_dir)
-    if not subtitle_path or not sampled_frame_ids:
-        return [], ["" for _ in sampled_frame_ids]
-    cap = cv2.VideoCapture(sample.video_path)
-    if not cap.isOpened():
-        return [], ["" for _ in sampled_frame_ids]
-    fps = float(cap.get(cv2.CAP_PROP_FPS))
-    cap.release()
-    if fps <= 1e-6:
-        return [], ["" for _ in sampled_frame_ids]
-    segments = _load_srt_segments(subtitle_path)
-    if not segments:
-        return [], ["" for _ in sampled_frame_ids]
-    out: list[str] = []
-    seen: set[str] = set()
-    per_frame_subs: list[str] = []
-    for fid in sampled_frame_ids:
-        t = float(fid) / fps
-        matched = ""
-        for s0, s1, txt in segments:
-            if s0 <= t < s1:
-                matched = txt
-                if txt not in seen:
-                    seen.add(txt)
-                    out.append(txt)
-                break
-        per_frame_subs.append(matched)
-    return out, per_frame_subs
-
-
 def _to_feature_tensor(features: Any) -> torch.Tensor:
     if isinstance(features, torch.Tensor):
         return features
@@ -358,6 +220,268 @@ def _parse_visual_keyword_phrases(raw_text: str) -> list[str]:
     return out
 
 
+def _build_keyword_extraction_prompt(
+    question: str,
+    options: list[str] | None,
+    target_keywords: int,
+    prompt_version: int,
+) -> str:
+    target_keywords = max(1, int(target_keywords))
+    low_keywords = max(1, target_keywords - 1)
+    high_keywords = target_keywords + 1
+    options_text = "\n".join(options or [])
+    if int(prompt_version) == 0:
+        return (
+            "You are a visual element extractor for video question answering.\n"
+            "Task: From the question and options, extract all VISUALLY OBSERVABLE elements "
+            "that could appear in video frames.\n\n"
+            "Rules:\n"
+            "- Extract ONLY things that can be SEEN in a video frame: objects, scenes, "
+            "actions, or on-screen text.\n"
+            "- Do NOT extract abstract concepts such as reasons, causes, meanings, "
+            "intentions, or feelings.\n"
+            "- Each element must be a short DECLARATIVE phrase, e.g. \"a red cat\", "
+            "\"a railway under construction\", \"an ancient tomb being excavated\".\n"
+            "- Do NOT output single bare words (e.g. \"cat\") or questions.\n"
+            f"- Output around {target_keywords} keywords (preferred range: {low_keywords}-{high_keywords}).\n"
+            "- Output STRICTLY a JSON array of strings. No explanation, no markdown, "
+            "no extra text.\n\n"
+            f"Question:\n{question}\n\n"
+            f"Options:\n{options_text}"
+        )
+    if int(prompt_version) == 1:
+        return (
+            "You extract visual phrases to help CLIP retrieve relevant FRAMES from a video "
+            "for answering a multiple-choice question.\n\n"
+            "## Rules\n"
+            "- Each phrase describes something visible in a SINGLE FRAME (not a process).\n"
+            "- Each phrase is a concrete noun phrase, 2-7 words, e.g. \"a man holding a knife\".\n"
+            "- Start with a visual ANCHOR from the question (the persistent subject/scene), "
+            "then combine the anchor with each option's visual differentiator.\n"
+            "- SKIP options that are abstract (reasons, feelings, intentions) — CLIP cannot verify them.\n\n"
+            "## Avoid (CLIP is bad at these)\n"
+            "- Negations (\"no hat\"), counting (\"five birds\"), spatial directions (\"on the left\")\n"
+            "- Subtle emotions, abstract intent, process verbs (\"building\", \"being excavated\")\n"
+            "- Bare single words (\"cat\" → use \"a black cat\")\n\n"
+            "## Output\n"
+            f"JSON array of strings only. No markdown, no comments. Around {target_keywords} phrases "
+            f"(range: {low_keywords}-{high_keywords}).\n\n"
+            "## Examples\n"
+            "Q: What is the man doing in the kitchen?\n"
+            "Options: A.cutting vegetables  B.washing dishes  C.reading  D.talking on phone\n"
+            "Output: [\"a man in a kitchen\", \"a man cutting vegetables\", "
+            "\"a man washing dishes\", \"a man reading a book\", \"a man holding a phone\"]\n\n"
+            "Q: Why is the child crying?\n"
+            "Options: A.dropped ice cream  B.afraid of dog  C.tired  D.hurt knee\n"
+            "Output: [\"a crying child\", \"ice cream on the ground\", "
+            "\"a child near a dog\", \"a child with a hurt knee\"]\n"
+            "(\"tired\" skipped — not visually distinguishable)\n\n"
+            f"Q: {question}\n"
+            f"Options:\n{options_text}\n"
+            "Output:"
+        )
+    raise ValueError(f"keyword_prompt_version 仅支持 0 或 1，当前: {prompt_version}")
+
+
+def _dedup_keyword_phrases(kws_raw: list[str]) -> list[str]:
+    out_kws, seen = [], set()
+    for kw in kws_raw:
+        s = kw.strip().lower()
+        if not s:
+            continue
+        if s in seen:
+            continue
+        seen.add(s)
+        out_kws.append(s)
+    return out_kws
+
+
+_KEYWORD_EXTRACTOR_PROVIDERS: dict[str, dict[str, str]] = {
+    "poe": {
+        "base_url": "https://api.poe.com/v1",
+        "api_key_env": "POE_API_KEY",
+        "api_style": "responses",
+    },
+    "aio": {
+        "base_url": "https://api.aiohub.org/v1",
+        "api_key_env": "AIOHUB_API_KEY",
+        "api_style": "chat",
+    },
+}
+
+
+def _resolve_keyword_extractor(
+    extractor_model: str,
+    api_base_url: str,
+    api_key_env: str,
+) -> dict[str, str]:
+    """解析 keyword_extractor_model，例如 local-Qwen/Qwen3-VL-4B-Instruct / poe-gpt-5.2 / aio-gpt-5.2。"""
+    raw = str(extractor_model or "local").strip()
+    if not raw or raw.lower() == "local":
+        return {"mode": "local", "raw": raw, "local_model_path": ""}
+
+    lower = raw.lower()
+    for sep in ("-", "_", ":"):
+        token = f"local{sep}"
+        if lower.startswith(token):
+            local_model_path = raw[len(token) :].strip()
+            if not local_model_path:
+                raise ValueError(
+                    f"keyword_extractor_model={raw!r} 缺少模型名，例如 local-Qwen/Qwen3-VL-4B-Instruct"
+                )
+            return {"mode": "local", "raw": raw, "local_model_path": local_model_path}
+
+    provider: str | None = None
+    remote_model = raw
+    for prefix in _KEYWORD_EXTRACTOR_PROVIDERS:
+        for sep in ("-", "_", ":"):
+            token = f"{prefix}{sep}"
+            if lower.startswith(token):
+                provider = prefix
+                remote_model = raw[len(token) :].strip()
+                break
+        if provider is not None:
+            break
+
+    if provider is not None:
+        if not remote_model:
+            raise ValueError(f"keyword_extractor_model={raw!r} 缺少模型名，例如 {provider}-gpt-5.2")
+        spec = _KEYWORD_EXTRACTOR_PROVIDERS[provider]
+        return {
+            "mode": "remote",
+            "raw": raw,
+            "provider": provider,
+            "remote_model": remote_model,
+            "base_url": spec["base_url"],
+            "api_key_env": spec["api_key_env"],
+            "api_style": spec["api_style"],
+        }
+
+    return {
+        "mode": "remote",
+        "raw": raw,
+        "provider": "",
+        "remote_model": raw,
+        "base_url": str(api_base_url or "").strip() or _KEYWORD_EXTRACTOR_PROVIDERS["aio"]["base_url"],
+        "api_key_env": str(api_key_env or "").strip() or _KEYWORD_EXTRACTOR_PROVIDERS["aio"]["api_key_env"],
+        "api_style": "chat",
+    }
+
+
+def _read_api_key(api_key_env: str) -> str:
+    fallbacks: tuple[str, ...]
+    if api_key_env == "POE_API_KEY":
+        fallbacks = ("POE_API_KEY", "OPENAI_API_KEY")
+    elif api_key_env == "AIOHUB_API_KEY":
+        fallbacks = ("AIOHUB_API_KEY", "OPENAI_API_KEY")
+    else:
+        fallbacks = (api_key_env, "AIOHUB_API_KEY", "POE_API_KEY", "OPENAI_API_KEY")
+    for env in fallbacks:
+        val = os.getenv(env)
+        if val:
+            return val
+    env_hint = "、".join(fallbacks)
+    raise RuntimeError(f"缺少关键词提取 API key：请设置 {env_hint}")
+
+
+def _openai_chat_response_text(response: Any) -> str:
+    """从 OpenAI Chat Completions（或兼容网关）响应中取出 assistant 文本。"""
+    if response is None:
+        return ""
+    if isinstance(response, str):
+        return response.strip()
+    output_text = getattr(response, "output_text", None)
+    if output_text:
+        return str(output_text).strip()
+    choices = getattr(response, "choices", None)
+    if choices is None and isinstance(response, dict):
+        choices = response.get("choices")
+    if choices:
+        first = choices[0]
+        msg = getattr(first, "message", None)
+        if msg is None and isinstance(first, dict):
+            msg = first.get("message")
+        if msg is not None:
+            content = getattr(msg, "content", None)
+            if content is None and isinstance(msg, dict):
+                content = msg.get("content")
+            if content is not None:
+                return str(content).strip()
+    return str(response).strip()
+
+
+def _get_openai_compatible_client(api_key_env: str, base_url: str) -> Any:
+    api_key = _read_api_key(api_key_env)
+    cache_key = (api_key_env, base_url)
+    if cache_key not in _OPENAI_CLIENT_CACHE:
+        import certifi
+        import httpx
+        import openai
+
+        http_client = httpx.Client(
+            verify=certifi.where(),
+            timeout=httpx.Timeout(120.0, connect=30.0),
+        )
+        _OPENAI_CLIENT_CACHE[cache_key] = openai.OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            http_client=http_client,
+        )
+    return _OPENAI_CLIENT_CACHE[cache_key]
+
+
+def _get_local_keyword_model_and_processor(model_path: str) -> tuple[Any, Any]:
+    path = os.path.expanduser(str(model_path).strip())
+    if path not in _KEYWORD_LOCAL_MODEL_CACHE:
+        _log(f"加载关键词提取本地模型: {path}")
+        _KEYWORD_LOCAL_MODEL_CACHE[path] = load_keyword_model_and_processor(path)
+    return _KEYWORD_LOCAL_MODEL_CACHE[path]
+
+
+def _generate_local_keyword_text(kw_model: Any, kw_proc: Any, prompt_text: str, max_new_tokens: int) -> str:
+    if getattr(kw_proc, "image_processor", None) is not None:
+        content = [{"type": "text", "text": prompt_text}]
+        text = kw_proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
+        inputs = kw_proc(text=[text], padding=True, return_tensors="pt").to(kw_model.device)
+        decode_kwargs = {"skip_special_tokens": True, "clean_up_tokenization_spaces": False}
+    else:
+        text = kw_proc.apply_chat_template(
+            [{"role": "user", "content": prompt_text}],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        inputs = kw_proc(text, return_tensors="pt").to(kw_model.device)
+        decode_kwargs = {"skip_special_tokens": True}
+    with torch.no_grad():
+        out = kw_model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1)
+    seq = out[0][len(inputs.input_ids[0]):]
+    return kw_proc.decode(seq, **decode_kwargs).strip()
+
+
+def _call_remote_keyword_llm(
+    client: Any,
+    *,
+    api_style: str,
+    remote_model: str,
+    prompt_text: str,
+    max_new_tokens: int,
+) -> str:
+    if api_style == "responses":
+        # Poe 官方：https://api.poe.com/v1 + client.responses.create(..., input=...)
+        response = client.responses.create(model=remote_model, input=prompt_text)
+        output_text = getattr(response, "output_text", None)
+        if output_text is not None:
+            return str(output_text).strip()
+        return _openai_chat_response_text(response)
+    response = client.chat.completions.create(
+        model=remote_model,
+        messages=[{"role": "user", "content": prompt_text}],
+        temperature=0,
+        max_tokens=max_new_tokens,
+    )
+    return _openai_chat_response_text(response)
+
+
 def _extract_keywords_with_llm_text(
     model: Any,
     proc: Any,
@@ -365,48 +489,36 @@ def _extract_keywords_with_llm_text(
     options: list[str] | None,
     max_new_tokens: int,
     target_keywords: int,
+    prompt_version: int,
+    extractor_model: str,
+    api_base_url: str,
+    api_key_env: str,
 ) -> tuple[list[str], list[str]]:
-    target_keywords = max(1, int(target_keywords))
-    low_keywords = max(1, target_keywords - 1)
-    high_keywords = target_keywords + 1
-    options_text = "\n".join(options or [])
-    prompt = (
-        "You are a visual element extractor for video question answering.\n"
-        "Task: From the question and options, extract all VISUALLY OBSERVABLE elements "
-        "that could appear in video frames.\n\n"
-        "Rules:\n"
-        "- Extract ONLY things that can be SEEN in a video frame: objects, scenes, "
-        "actions, or on-screen text.\n"
-        "- Do NOT extract abstract concepts such as reasons, causes, meanings, "
-        "intentions, or feelings.\n"
-        "- Each element must be a short DECLARATIVE phrase, e.g. \"a red cat\", "
-        "\"a railway under construction\", \"an ancient tomb being excavated\".\n"
-        "- Do NOT output single bare words (e.g. \"cat\") or questions.\n"
-        f"- Output around {target_keywords} keywords (preferred range: {low_keywords}-{high_keywords}).\n"
-        "- Output STRICTLY a JSON array of strings. No explanation, no markdown, "
-        "no extra text.\n\n"
-        f"Question:\n{question}\n\n"
-        f"Options:\n{options_text}"
-    )
+    prompt = _build_keyword_extraction_prompt(question, options, target_keywords, prompt_version)
+    extractor_cfg = _resolve_keyword_extractor(extractor_model, api_base_url, api_key_env)
+
     def _ask_once(prompt_text: str) -> tuple[list[str], list[str]]:
-        content = [{"type": "text", "text": prompt_text}]
-        text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
-        inputs = proc(text=[text], padding=True, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1)
-        seq = out[0][len(inputs.input_ids[0]):]
-        resp = proc.decode(seq, skip_special_tokens=True, clean_up_tokenization_spaces=False).strip()
+        if extractor_cfg["mode"] == "local":
+            local_model_path = str(extractor_cfg.get("local_model_path") or "").strip()
+            if local_model_path:
+                kw_model, kw_proc = _get_local_keyword_model_and_processor(local_model_path)
+            else:
+                kw_model, kw_proc = model, proc
+            resp = _generate_local_keyword_text(kw_model, kw_proc, prompt_text, max_new_tokens)
+        else:
+            client = _get_openai_compatible_client(
+                api_key_env=extractor_cfg["api_key_env"],
+                base_url=extractor_cfg["base_url"],
+            )
+            resp = _call_remote_keyword_llm(
+                client,
+                api_style=extractor_cfg["api_style"],
+                remote_model=extractor_cfg["remote_model"],
+                prompt_text=prompt_text,
+                max_new_tokens=max_new_tokens,
+            )
         kws_raw_local = _parse_visual_keyword_phrases(resp)
-        out_kws_local, seen_local = [], set()
-        for kw in kws_raw_local:
-            s = kw.strip().lower()
-            if not s:
-                continue
-            if s in seen_local:
-                continue
-            seen_local.add(s)
-            out_kws_local.append(s)
-        return kws_raw_local, out_kws_local
+        return kws_raw_local, _dedup_keyword_phrases(kws_raw_local)
 
     kws_raw, out_kws = _ask_once(prompt)
     if out_kws:
@@ -511,13 +623,34 @@ def _allocate_counts_by_weights(weights: torch.Tensor, total: int) -> torch.Tens
     return base
 
 
+def _local_evidence_score(x: torch.Tensor) -> float:
+    """计算一维相似度曲线的局部证据度：减中位数基线后取 Hoyer 稀疏度。"""
+    x = x.detach().float().flatten()
+    n = int(x.numel())
+    if n <= 1:
+        return 0.0
+
+    x = x.clamp(min=0.0)
+    x = (x - torch.median(x)).clamp(min=0.0)
+    l2 = torch.sqrt(torch.sum(x * x))
+    if float(l2.item()) <= 0.0:
+        return 0.0
+
+    l1 = torch.sum(x)
+    denom = math.sqrt(float(n)) - 1.0
+    if denom <= 0.0:
+        return 0.0
+    score = (math.sqrt(float(n)) - float((l1 / l2).item())) / denom
+    return float(min(1.0, max(0.0, score)))
+
+
 def _compute_keyword_information(
     kws_rep: list[str],
     kw_emb_rep: torch.Tensor,
     img_emb: torch.Tensor,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
-    """合并后的关键词全部保留；用 info_aggressiveness 控制配额权重。"""
+    """合并后的关键词全部保留；用局部证据度作为关键词信息量。"""
     m = int(kw_emb_rep.shape[0])
     n = int(img_emb.shape[0])
     if m == 0 or n == 0:
@@ -526,69 +659,34 @@ def _compute_keyword_information(
             "kw_emb_use": kw_emb_rep[:0],
             "kw_weights": torch.empty((0,), device=img_emb.device),
             "rows": [],
-            "kw_info_use": kw_emb_rep[:0],
         }
 
     sims = kw_emb_rep @ img_emb.T  # (M, N)
-    peak = sims.max(dim=1).values
-    mean = sims.mean(dim=1)
-    std = sims.std(dim=1, unbiased=False).clamp(min=1e-6)
-    prominence_z = (peak - mean) / std
-
-    aggr = min(1.0, max(0.0, float(args.info_aggressiveness)))
-
-    # 单一超参映射到原 6 个信息量控制项
-    peak_floor = 0.10 + 0.20 * aggr
-    peak_ceiling = 0.45 + 0.30 * aggr
-    prominence_center = 1.0 + 1.2 * aggr
-    prominence_scale = 1.0 - 0.6 * aggr
-    entropy_temperature = 0.14 - 0.10 * aggr
-    mix_prominence = 0.2 + 0.6 * aggr
-
-    denom = max(1e-6, peak_ceiling - peak_floor)
-    peak_term = ((peak - peak_floor) / denom).clamp(min=0.0, max=1.0)
-
-    z_scale = max(1e-6, float(prominence_scale))
-    prominence_term = torch.sigmoid((prominence_z - prominence_center) / z_scale)
-
-    if n <= 1:
-        concentration_term = torch.ones_like(peak)
-    else:
-        temp = max(1e-3, float(entropy_temperature))
-        logits = (sims - mean.unsqueeze(1)) / temp
-        p = torch.softmax(logits, dim=1).clamp(min=1e-12)
-        ent = -(p * torch.log(p)).sum(dim=1)
-        concentration_term = (1.0 - ent / math.log(float(n))).clamp(min=0.0, max=1.0)
-
-    mix = float(mix_prominence)
-    mix = min(1.0, max(0.0, mix))
-    shape_term = mix * prominence_term + (1.0 - mix) * concentration_term
-    info = (peak_term * shape_term).clamp(min=0.0)
+    local_evidence = torch.tensor(
+        [_local_evidence_score(sims[i]) for i in range(m)],
+        dtype=kw_emb_rep.dtype,
+        device=kw_emb_rep.device,
+    ).clamp(min=0.0, max=1.0)
 
     kws_use = list(kws_rep)
     kw_emb_use = kw_emb_rep
-    if aggr <= 1e-12:
-        # 用户要求：aggressiveness=0 时关键词均分
-        kw_info = torch.ones((m,), device=kw_emb_rep.device)
-        kw_weights = torch.ones((m,), device=kw_emb_rep.device) / float(m)
-    else:
-        kw_info = info
-        s = float(kw_info.sum().item())
-        kw_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
+    kw_info = local_evidence
+    s = float(kw_info.sum().item())
+    info_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
+    uniform_weights = torch.ones_like(info_weights) / float(max(1, info_weights.numel()))
+    weight_strength = min(1.0, max(0.0, float(args.keyword_weight_strength)))
+    kw_weights = ((1.0 - weight_strength) * uniform_weights + weight_strength * info_weights).clamp(min=0.0)
+    ws = float(kw_weights.sum().item())
+    kw_weights = (kw_weights / ws) if ws > 1e-12 else uniform_weights
 
     rows = []
     for i, kw in enumerate(kws_rep):
         rows.append(
             {
                 "keyword": kw,
-                "peak": float(peak[i].item()),
-                "mean": float(mean[i].item()),
-                "std": float(std[i].item()),
-                "prominence_z": float(prominence_z[i].item()),
-                "peak_term": float(peak_term[i].item()),
-                "prominence_term": float(prominence_term[i].item()),
-                "concentration_term": float(concentration_term[i].item()),
-                "info": float(info[i].item()),
+                "local_evidence_score": float(local_evidence[i].item()),
+                "info": float(kw_info[i].item()),
+                "weight": float(kw_weights[i].item()) if kw_weights.numel() > i else 0.0,
                 "kept": True,
             }
         )
@@ -597,28 +695,7 @@ def _compute_keyword_information(
         "kws_use": kws_use,
         "kw_emb_use": kw_emb_use,
         "kw_weights": kw_weights,
-        "kw_info_use": kw_info,
         "rows": rows,
-        "mapped_params": {
-            "info_peak_floor": float(peak_floor),
-            "info_peak_ceiling": float(peak_ceiling),
-            "info_prominence_center": float(prominence_center),
-            "info_prominence_scale": float(prominence_scale),
-            "info_entropy_temperature": float(entropy_temperature),
-            "info_mix_prominence": float(mix_prominence),
-        },
-    }
-
-
-def _mapped_info_params_from_aggr(aggr_raw: float) -> dict[str, float]:
-    aggr = min(1.0, max(0.0, float(aggr_raw)))
-    return {
-        "info_peak_floor": float(0.10 + 0.20 * aggr),
-        "info_peak_ceiling": float(0.45 + 0.30 * aggr),
-        "info_prominence_center": float(1.0 + 1.2 * aggr),
-        "info_prominence_scale": float(1.0 - 0.6 * aggr),
-        "info_entropy_temperature": float(0.14 - 0.10 * aggr),
-        "info_mix_prominence": float(0.2 + 0.6 * aggr),
     }
 
 
@@ -789,6 +866,81 @@ def _submodular_cover_greedy_select(
     return selected
 
 
+def _quota_topk_select(
+    kw_sims: torch.Tensor,
+    kw_w: torch.Tensor,
+    budget: int,
+    candidate_idx: list[int],
+) -> list[int]:
+    """按关键词权重分配帧数；重复帧则按关键词权重顺序继续取该词的下一个 top 帧。"""
+    if kw_sims.ndim != 2 or budget <= 0:
+        return []
+    m = int(kw_sims.shape[0])
+    n = int(kw_sims.shape[1])
+    if m == 0 or n == 0:
+        return []
+
+    if kw_w.numel() != m:
+        kw_w = torch.ones((m,), device=kw_sims.device)
+    kw_w = kw_w.float().clamp(min=0.0)
+    if float(kw_w.sum().item()) <= 1e-12:
+        kw_w = torch.ones_like(kw_w)
+
+    cand = sorted({int(i) for i in candidate_idx if 0 <= int(i) < n})
+    if len(cand) < min(budget, n):
+        cand = list(range(n))
+    cand_set = set(cand)
+    max_pick = min(int(budget), len(cand))
+    quotas = _allocate_counts_by_weights(kw_w, max_pick)
+    keyword_order = [int(i) for i in torch.argsort(kw_w, descending=True).tolist()]
+    ranked_by_keyword: list[list[int]] = []
+    next_pos = [0 for _ in range(m)]
+    for j in range(m):
+        ranked_by_keyword.append(
+            [int(idx) for idx in torch.argsort(kw_sims[j], descending=True).tolist() if int(idx) in cand_set]
+        )
+
+    selected: list[int] = []
+    selected_set: set[int] = set()
+    def _take_next(j: int) -> int | None:
+        while next_pos[j] < len(ranked_by_keyword[j]):
+            idx = ranked_by_keyword[j][next_pos[j]]
+            next_pos[j] += 1
+            if idx in selected_set:
+                continue
+            return idx
+        return None
+
+    for j in keyword_order:
+        q = int(quotas[j].item())
+        if q <= 0:
+            continue
+        while q > 0 and len(selected) < max_pick:
+            idx = _take_next(j)
+            if idx is None:
+                break
+            selected.append(idx)
+            selected_set.add(idx)
+            q -= 1
+        if len(selected) >= max_pick:
+            break
+
+    while len(selected) < max_pick:
+        progressed = False
+        for j in keyword_order:
+            idx = _take_next(j)
+            if idx is None:
+                continue
+            selected.append(idx)
+            selected_set.add(idx)
+            progressed = True
+            if len(selected) >= max_pick:
+                break
+        if not progressed:
+            break
+    return selected
+
+
 def _build_image_keyword_scores(
     selected_idx: list[int],
     frame_ids: list[int],
@@ -811,6 +963,13 @@ def _build_image_keyword_scores(
         kw_scores = {kw: float(sims_cpu[i][j]) for i, kw in enumerate(kws_rep)}
         out.append({"index_in_pool": int(idx), "frame_id": int(frame_ids[idx]), "keyword_scores": kw_scores})
     return out
+
+
+def _build_question_options_visual_text(question: str, options: list[str] | None) -> str:
+    options_text = "\n".join(options or [])
+    if options_text:
+        return f"Question: {question}\nOptions:\n{options_text}"
+    return f"Question: {question}"
 
 
 # ==================== 单样本评估主流程 ====================
@@ -854,6 +1013,10 @@ def _eval_one_sample(
         options=sample.options,
         max_new_tokens=128,
         target_keywords=args.max_keywords,
+        prompt_version=int(args.keyword_prompt_version),
+        extractor_model=str(args.keyword_extractor_model),
+        api_base_url=str(args.keyword_extractor_api_base_url),
+        api_key_env=str(args.keyword_extractor_api_key_env),
     )
     if not kws:
         raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
@@ -864,7 +1027,6 @@ def _eval_one_sample(
     kws_use: list[str] = info_pack["kws_use"]
     kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
     kw_weights: torch.Tensor = info_pack["kw_weights"]
-    kw_info_use: torch.Tensor = info_pack["kw_info_use"]
     kw_frame_sims = (kw_emb_use @ img_emb.T) if kw_emb_use.shape[0] > 0 else torch.empty((0, img_emb.shape[0]), device=img_emb.device)
 
     if VERBOSE:
@@ -873,14 +1035,12 @@ def _eval_one_sample(
             keep_weight_map[kw] = float(kw_weights[i].item()) if kw_weights.numel() > i else 0.0
         for r in info_pack["rows"]:
             _log(
-                "sample={} kw='{}' info={:.4f} weight={:.4f} peak={:.4f} prom_z={:.3f} conc={:.3f}".format(
+                "sample={} kw='{}' info={:.4f} weight={:.4f} local_evidence={:.4f}".format(
                     sample.sample_id,
                     r["keyword"],
                     r["info"],
                     keep_weight_map.get(r["keyword"], 0.0),
-                    r["peak"],
-                    r["prominence_z"],
-                    r["concentration_term"],
+                    r["local_evidence_score"],
                 )
             )
     _log(f"sample={sample.sample_id} 关键词: llm={len(kws_after_text_dedup)} -> after_cap={len(kws_use)}")
@@ -894,25 +1054,40 @@ def _eval_one_sample(
     if kw_emb_use.shape[0] == 0:
         raise RuntimeError(f"样本无可用关键词: sample={sample.sample_id}")
 
-    candidate_idx = _build_quota_prescreen_candidates(
-        kw_sims=kw_frame_sims,
-        kw_w=kw_weights,
-        budget=budget,
-        alpha=int(args.quota_prescreen_alpha),
-    )
-    selected_idx = _submodular_cover_greedy_select(
-        kw_sims=kw_frame_sims,
-        kw_w=kw_weights,
-        budget=budget,
-        candidate_idx=candidate_idx,
-    )
+    frame_selection_mode = int(args.frame_selection_mode)
+    if frame_selection_mode == 1:
+        candidate_idx = _build_quota_prescreen_candidates(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            budget=budget,
+            alpha=int(args.quota_prescreen_alpha),
+        )
+        selected_idx = _submodular_cover_greedy_select(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            budget=budget,
+            candidate_idx=candidate_idx,
+        )
+        selection_method = "coverage_greedy"
+    elif frame_selection_mode == 0:
+        candidate_idx = list(range(int(kw_frame_sims.shape[1])))
+        selected_idx = _quota_topk_select(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            budget=budget,
+            candidate_idx=candidate_idx,
+        )
+        selection_method = "quota_topk"
+    else:
+        raise ValueError(f"frame_selection_mode 仅支持 1 或 0，当前: {frame_selection_mode}")
     if not selected_idx:
         raise RuntimeError(f"样本未能选出有效帧: sample={sample.sample_id}")
 
     selected_idx = sorted(selected_idx, key=lambda x: frame_ids[x])
+    alpha_log = int(args.quota_prescreen_alpha) if frame_selection_mode == 1 else "skipped"
     _log(
         f"sample={sample.sample_id} 候选池={len(candidate_idx) if candidate_idx else len(imgs)}, "
-        f"贪心选帧={len(selected_idx)}, alpha={int(args.quota_prescreen_alpha)}"
+        f"选帧={len(selected_idx)}, mode={frame_selection_mode}/{selection_method}, alpha={alpha_log}"
     )
 
     one_shot_frames = [imgs[i] for i in selected_idx]
@@ -924,7 +1099,25 @@ def _eval_one_sample(
     )
     prompt_use = build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt) if use_subtitles else prompt
     one_shot_out = _run_vlm_once(model, proc, one_shot_frames, prompt_use, max_new_tokens, model_mode)
-    one_shot_kw_scores = _build_image_keyword_scores(selected_idx, frame_ids, kws_use, kw_emb_use, img_emb)
+    verbose_keywords = list(kws_use)
+    verbose_kw_emb = kw_emb_use
+    verbose_keyword_rows = list(info_pack["rows"])
+    if VERBOSE:
+        question_options_label = "question + options"
+        question_options_text = _build_question_options_visual_text(sample.question, sample.options)
+        question_options_emb = _encode_texts([question_options_text], clip_proc, clip_model, clip_device, 1)
+        verbose_keywords.append(question_options_label)
+        verbose_kw_emb = torch.cat([verbose_kw_emb, question_options_emb], dim=0)
+        verbose_keyword_rows.append(
+            {
+                "keyword": question_options_label,
+                "local_evidence_score": 0.0,
+                "info": 0.0,
+                "weight": 0.0,
+                "used_for_selection": False,
+            }
+        )
+    all_frame_kw_scores = _build_image_keyword_scores(list(range(len(frame_ids))), frame_ids, verbose_keywords, verbose_kw_emb, img_emb)
     dump_verbose_round(
         verbose=VERBOSE,
         verbose_run_dir=_VERBOSE_RUN_DIR,
@@ -934,16 +1127,28 @@ def _eval_one_sample(
         question=sample.question,
         options=sample.options,
         gt_answer=sample.answer,
-        all_keywords=kws_use,
+        all_keywords=verbose_keywords,
         frame_ids=frame_ids,
         selected_idx=selected_idx,
         imgs=imgs,
-        image_keyword_scores=one_shot_kw_scores,
-        keyword_info_scores=info_pack["rows"],
+        image_keyword_scores=all_frame_kw_scores,
+        keyword_info_scores=verbose_keyword_rows,
         vlm_out=one_shot_out,
         raw_keywords_before_dedup=kws_raw,
-        keywords_after_info_filter=[{"keyword": kw, "info": float(kw_info_use[i].item())} for i, kw in enumerate(kws_use)],
         selected_frame_subtitles=selected_frame_subtitles,
+        selection_info={
+            "num_frames_budget": int(budget),
+            "candidate_pool_size": int(len(imgs)),
+            "candidate_pool_fps": float(args.candidate_pool_fps),
+            "quota_prescreen_alpha": int(args.quota_prescreen_alpha),
+            "max_keywords": int(args.max_keywords),
+            "keyword_prompt_version": int(args.keyword_prompt_version),
+            "keyword_extractor_model": str(args.keyword_extractor_model),
+            "keyword_weight_strength": float(args.keyword_weight_strength),
+            "frame_selection_mode": frame_selection_mode,
+            "frame_selection_method": selection_method,
+            "prescreen_candidate_count": int(len(candidate_idx) if candidate_idx else len(imgs)),
+        },
     )
     _log(f"sample={sample.sample_id} one-shot pred={one_shot_out['pred_answer']}, frames={len(selected_idx)}")
     return {
@@ -1059,12 +1264,28 @@ def parse_args():
         default=5,
         help="最大关键词数：不超过则全保留；超过则删除与其它词 CLIP 相似度最高的 (n-max_keywords) 个",
     )
+    p.add_argument("--keyword_prompt_version", type=int, choices=[0, 1], default=0, help="关键词抽取prompt版本：0=旧版，1=CLIP帧检索导向新版")
     p.add_argument(
-        "--info_aggressiveness",
-        type=float,
-        default=0.6,
-        help="信息量单一控制参数(0~1)：0时关键词均分配额，越大越偏向突出且集中的关键词",
+        "--keyword_extractor_model",
+        type=str,
+        default="local",
+        help="关键词抽取模型：local=复用 --model_path；local-{model}=指定本地模型（如 local-Qwen/Qwen3-VL-4B-Instruct）；"
+        "poe-gpt-5.2=Poe responses API；aio-gpt-5.2=aiohub chat API；无前缀时走 --keyword_extractor_api_*",
     )
+    p.add_argument(
+        "--keyword_extractor_api_base_url",
+        type=str,
+        default="https://api.aiohub.org/v1",
+        help="无前缀远程模型时的 OpenAI Chat Completions base_url（poe-/aio- 前缀会忽略此项）",
+    )
+    p.add_argument(
+        "--keyword_extractor_api_key_env",
+        type=str,
+        default="AIOHUB_API_KEY",
+        help="无前缀远程模型时的 API key 环境变量（poe-/aio- 前缀会忽略此项）",
+    )
+    p.add_argument("--keyword_weight_strength", type=float, default=1.0, help="关键词权重强度：0为所有关键词均分，1为完全使用info权重")
+    p.add_argument("--frame_selection_mode", type=int, choices=[0, 1], default=1, help="最终选帧模式：1=覆盖贪心，0=按关键词权重配额直接取top帧")
     p.add_argument("--coarse_uniform_ratio", type=float, default=0.0, help="coarse选帧中均匀抽样占比，其余预算按关键词信息量分配")
     return p.parse_args()
 
@@ -1090,13 +1311,10 @@ def _ours_csv_columns() -> list[str]:
         "candidate_pool_fps",
         "quota_prescreen_alpha",
         "max_keywords",
-        "info_aggressiveness",
-        "mapped_info_peak_floor",
-        "mapped_info_peak_ceiling",
-        "mapped_info_prominence_center",
-        "mapped_info_prominence_scale",
-        "mapped_info_entropy_temperature",
-        "mapped_info_mix_prominence",
+        "keyword_prompt_version",
+        "keyword_extractor_model",
+        "keyword_weight_strength",
+        "frame_selection_mode",
         "use_preprocessed_clip_frames",
         "preprocessed_clip_fps",
         "use_subtitles",
@@ -1106,7 +1324,6 @@ def _ours_csv_columns() -> list[str]:
 def _ours_csv_row(
     args: argparse.Namespace,
     *,
-    mapped_info_params: dict[str, float],
     num_samples: int,
     correct_count: float,
     accuracy_percent: float,
@@ -1138,13 +1355,10 @@ def _ours_csv_row(
         f"{float(args.candidate_pool_fps):g}",
         int(args.quota_prescreen_alpha),
         int(args.max_keywords),
-        f"{float(args.info_aggressiveness):g}",
-        f"{float(mapped_info_params.get('info_peak_floor', 0.0)):g}",
-        f"{float(mapped_info_params.get('info_peak_ceiling', 0.0)):g}",
-        f"{float(mapped_info_params.get('info_prominence_center', 0.0)):g}",
-        f"{float(mapped_info_params.get('info_prominence_scale', 0.0)):g}",
-        f"{float(mapped_info_params.get('info_entropy_temperature', 0.0)):g}",
-        f"{float(mapped_info_params.get('info_mix_prominence', 0.0)):g}",
+        int(args.keyword_prompt_version),
+        str(args.keyword_extractor_model),
+        f"{float(args.keyword_weight_strength):g}",
+        int(args.frame_selection_mode),
         bool(args.use_preprocessed_clip_frames),
         f"{float(args.preprocessed_clip_fps):g}",
         bool(args.use_subtitles),
@@ -1245,7 +1459,6 @@ def main():
         csv_columns,
         _ours_csv_row(
             args,
-            mapped_info_params=_mapped_info_params_from_aggr(float(args.info_aggressiveness)),
             num_samples=len(samples),
             correct_count=correct,
             accuracy_percent=avg_acc,

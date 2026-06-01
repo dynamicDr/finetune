@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import csv
 import os
-import re
 import time
 import warnings
 from datetime import datetime
@@ -16,6 +15,14 @@ from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from frame_samplers import sample_video_frames
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
+from utils import (
+    build_user_text,
+    build_user_text_with_subtitles,
+    calculate_mra,
+    collect_unique_subtitles_for_sample as _collect_subtitles_for_sample,
+    compute_accuracy_from_results as _compute_accuracy_from_results,
+    compute_score_counts_for_csv as _compute_score_counts_for_csv,
+)
 from vl_common import generate_response, load_model_and_processor
 
 MODE_MAX_NEW_TOKENS = {
@@ -35,180 +42,11 @@ PREPROCESSED_CLIP_COMPATIBLE_METHODS = {
     "bolt-siglip2",
 }
 
-
-def build_user_text(question: str, options: list[str] | None) -> str:
-    if options:
-        return (
-            f"{question}\n\nOptions:\n"
-            + "\n".join(options)
-            + "\n\nDirectly answer with the option letter only. Do not explain."
-        )
-    return f"{question}\n\nPlease provide the numerical answer directly."
-
-
-def build_user_text_with_subtitles(question: str, options: list[str] | None, subtitles: list[str] | None) -> str:
-    options_text = "\n".join(options or [])
-    subtitle_text = "\n".join((subtitles or [])).strip() or "No subtitles available"
-    return (
-        "This video's subtitles are listed below:\n"
-        f"{subtitle_text}\n\n"
-        "Select the best answer to the following multiple-choice question based on the video. "
-        "Respond with only the letter (A, B, C, or D) of the correct option.\n"
-        f"{question}\n{options_text}\n"
-        "The best answer is:"
-    )
-
-
-def _parse_subtitle_time(time_str: str) -> float:
-    h, m, s_ms = time_str.split(":")
-    s, ms = s_ms.split(",")
-    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
-
-
-def _load_srt_segments(subtitle_path: str) -> list[tuple[float, float, str]]:
-    p = Path(subtitle_path)
-    if not p.is_file():
-        return []
-    text = p.read_text(encoding="utf-8", errors="ignore")
-    blocks = re.split(r"\n\s*\n", text.strip())
-    segs: list[tuple[float, float, str]] = []
-    for block in blocks:
-        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
-        if len(lines) < 2:
-            continue
-        time_line_idx = 0 if "-->" in lines[0] else (1 if len(lines) > 1 and "-->" in lines[1] else -1)
-        if time_line_idx < 0:
-            continue
-        try:
-            ts0, ts1 = [x.strip() for x in lines[time_line_idx].split("-->")]
-            start_t = _parse_subtitle_time(ts0)
-            end_t = _parse_subtitle_time(ts1)
-        except Exception:
-            continue
-        content_lines = lines[time_line_idx + 1 :]
-        if not content_lines:
-            continue
-        raw = " ".join(content_lines)
-        cleaned = re.sub(r"<[^>]+>", "", raw).strip()
-        if cleaned:
-            segs.append((start_t, end_t, cleaned))
-    return segs
-
-
-def _resolve_subtitle_path(sample: VQASample, subtitles_dir: str | None) -> str | None:
-    explicit_dir = os.path.expanduser(subtitles_dir) if subtitles_dir else ""
-    video_path = Path(sample.video_path).expanduser().resolve()
-    video_stem = video_path.stem
-    meta_video_id = str(sample.metadata.get("videoID", "")).strip() if isinstance(sample.metadata, dict) else ""
-    candidates: list[Path] = []
-    subtitle_dir_names = ("subtitle", "subtitles", "subtitles/subtitle")
-
-    def _append_stem_files(base_dir: Path) -> None:
-        for stem in [meta_video_id, video_stem]:
-            if stem:
-                candidates.extend([base_dir / f"{stem}.srt", base_dir / f"{stem}.SRT"])
-
-    if explicit_dir:
-        base = Path(explicit_dir)
-        if base.is_dir():
-            _append_stem_files(base)
-            for subname in subtitle_dir_names:
-                _append_stem_files(base / subname)
-    for root in [video_path.parent, video_path.parent.parent, video_path.parent.parent.parent]:
-        for subname in subtitle_dir_names:
-            _append_stem_files(root / subname)
-    for p in candidates:
-        if p.is_file():
-            return str(p)
-    return None
-
-
-def _collect_subtitles_for_sample(
-    sample: VQASample,
-    num_frames: int,
-    frame_sampling_method: str,
-    random_seed: int | None,
-    subtitles_dir: str | None,
-) -> list[str]:
-    subtitle_path = _resolve_subtitle_path(sample, subtitles_dir=subtitles_dir)
-    if not subtitle_path:
-        return []
-    cap = cv2.VideoCapture(sample.video_path)
-    if not cap.isOpened():
-        return []
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = float(cap.get(cv2.CAP_PROP_FPS))
-    cap.release()
-    if total_frames <= 0 or fps <= 1e-6:
-        return []
-    k = min(max(1, int(num_frames)), total_frames)
-    if frame_sampling_method == "random":
-        import random as _random
-
-        rng = _random.Random(random_seed)
-        frame_indices = sorted(rng.sample(range(total_frames), k))
-    else:
-        frame_indices = [int(i * total_frames / k) for i in range(k)]
-    segs = _load_srt_segments(subtitle_path)
-    if not segs:
-        return []
-    out: list[str] = []
-    seen: set[str] = set()
-    for fid in frame_indices:
-        t = float(fid) / fps
-        for s0, s1, txt in segs:
-            if s0 <= t < s1:
-                if txt not in seen:
-                    seen.add(txt)
-                    out.append(txt)
-                break
-    return out
-
-
-def calculate_mra(pred: float, gt: float) -> float:
-    if gt == 0:
-        return 1.0 if pred == 0 else 0.0
-    return max(0.0, 1 - abs(pred - gt) / abs(gt))
-
-
-def _compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
-    avg_accuracy = 0.0
-    if task_filter in {"mcq", "short", "medium", "long"} and results["total"] > 0:
-        avg_accuracy = results["correct"] / results["total"] * 100
-    elif task_filter == "numeric" and results["mra_count"] > 0:
-        avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
-    elif task_filter == "all":
-        total_score = 0.0
-        total_count = 0
-        if results["total"] > 0:
-            total_score += results["correct"]
-            total_count += results["total"]
-        if results["mra_count"] > 0:
-            total_score += results["mra_sum"]
-            total_count += results["mra_count"]
-        if total_count > 0:
-            avg_accuracy = total_score / total_count * 100
-    avg_inference_time = (
-        sum(results["inference_times"]) / len(results["inference_times"]) if results["inference_times"] else 0.0
-    )
-    return avg_accuracy, avg_inference_time
-
-
 def _compute_avg_frame_sampling_time(results: dict) -> float:
     times = results.get("frame_sampling_times", [])
     if not times:
         return 0.0
     return sum(times) / len(times)
-
-
-def _compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int, float]:
-    if task_filter in {"mcq", "short", "medium", "long"}:
-        return int(results["total"]), float(results["correct"])
-    if task_filter == "numeric":
-        return int(results["mra_count"]), float(results["mra_sum"])
-    # all: 汇总离散正确数与数值题MRA分数
-    return int(results["total"] + results["mra_count"]), float(results["correct"] + results["mra_sum"])
-
 
 def log_to_csv(
     log_file: str,

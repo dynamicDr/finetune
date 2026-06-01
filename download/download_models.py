@@ -12,9 +12,9 @@ from huggingface_hub import snapshot_download
 MODEL_LIST = [
     # "Qwen/Qwen3-VL-30B-A3B-Instruct",
     # "Qwen/Qwen3-VL-8B-Instruct",
-    # "lmms-lab/LLaVA-OneVision-1.5-8B-Instruct",
-    "llava-hf/llava-onevision-qwen2-7b-ov-hf",
-    # "Qwen/Qwen3-VL-4B-Thinking",
+    # "Qwen/Qwen3.5-27B",
+    # "Qwen/Qwen3.5-35B-A3B",
+    "Qwen/Qwen3.5-122B-A10B",
     # "Qwen/Qwen3-VL-8B-Thinking",
     # "Qwen/Qwen3-VL-30B-A3B-Thinking",
     # "Qwen/Qwen3-VL-32B-Thinking",

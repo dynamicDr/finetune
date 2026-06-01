@@ -28,6 +28,22 @@ def _use_generic_vl_loader(model_id: str) -> bool:
     return any(hint in model_id_lower for hint in generic_model_hints)
 
 
+def _is_vl_model_id(model_id: str) -> bool:
+    model_id_lower = model_id.lower()
+    if _use_generic_vl_loader(model_id):
+        return True
+    vl_hints = (
+        "qwen2.5-vl",
+        "qwen2-vl",
+        "llava",
+        "openvla",
+        "internvl",
+        "-vl-",
+        "-vl/",
+    )
+    return any(h in model_id_lower for h in vl_hints)
+
+
 def split_indices(
     indices: list[int],
     seed: int,
@@ -192,6 +208,36 @@ def load_model_and_processor(
         flush=True,
     )
     return model, processor
+
+
+def load_text_model_and_processor(model_path: str):
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    model_path = os.path.expanduser(model_path)
+    print(f"[perf-debug][load-text] model_path={model_path}", flush=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        dtype=torch.bfloat16,
+        trust_remote_code=True,
+    )
+    processor = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    model = _move_model_to_target_device(model)
+    model.eval()
+    attn_impl = getattr(model.config, "_attn_implementation", None)
+    print(
+        "[perf-debug][model] "
+        f"dtype={model.dtype}, attn_impl={attn_impl}, device={next(model.parameters()).device}",
+        flush=True,
+    )
+    print(f"[perf-debug][processor] processor={type(processor).__name__}", flush=True)
+    return model, processor
+
+
+def load_keyword_model_and_processor(model_path: str):
+    """关键词提取：VL 模型走 VL loader，纯文本模型走 CausalLM loader。"""
+    if _is_vl_model_id(model_path):
+        return load_model_and_processor(model_path)
+    return load_text_model_and_processor(model_path)
 
 
 def generate_response(

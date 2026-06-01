@@ -124,6 +124,24 @@ def main(cfg: DictConfig) -> None:
             max_keywords = OmegaConf.select(cfg, "max_keywords", default=None)
             if max_keywords is not None and str(max_keywords).strip() not in ("", "null", "None"):
                 dataset_shared += ["--max_keywords", str(int(max_keywords))]
+            keyword_prompt_version = OmegaConf.select(cfg, "keyword_prompt_version", default=None)
+            if keyword_prompt_version is not None and str(keyword_prompt_version).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_prompt_version", str(int(keyword_prompt_version))]
+            keyword_extractor_model = OmegaConf.select(cfg, "keyword_extractor_model", default=None)
+            if keyword_extractor_model is not None and str(keyword_extractor_model).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_extractor_model", str(keyword_extractor_model)]
+            keyword_extractor_api_base_url = OmegaConf.select(cfg, "keyword_extractor_api_base_url", default=None)
+            if keyword_extractor_api_base_url is not None and str(keyword_extractor_api_base_url).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_extractor_api_base_url", str(keyword_extractor_api_base_url)]
+            keyword_extractor_api_key_env = OmegaConf.select(cfg, "keyword_extractor_api_key_env", default=None)
+            if keyword_extractor_api_key_env is not None and str(keyword_extractor_api_key_env).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_extractor_api_key_env", str(keyword_extractor_api_key_env)]
+            keyword_weight_strength = OmegaConf.select(cfg, "keyword_weight_strength", default=None)
+            if keyword_weight_strength is not None and str(keyword_weight_strength).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_weight_strength", str(float(keyword_weight_strength))]
+            frame_selection_mode = OmegaConf.select(cfg, "frame_selection_mode", default=None)
+            if frame_selection_mode is not None and str(frame_selection_mode).strip() not in ("", "null", "None"):
+                dataset_shared += ["--frame_selection_mode", str(int(frame_selection_mode))]
             ours_clip_model_id = OmegaConf.select(cfg, "ours_clip_model_id", default=None)
             if ours_clip_model_id is not None and str(ours_clip_model_id).strip() not in ("", "null", "None"):
                 dataset_shared += ["--ours_clip_model_id", str(ours_clip_model_id)]
@@ -136,9 +154,6 @@ def main(cfg: DictConfig) -> None:
             candidate_pool_fps = OmegaConf.select(cfg, "candidate_pool_fps", default=None)
             if candidate_pool_fps is not None and str(candidate_pool_fps).strip() not in ("", "null", "None"):
                 dataset_shared += ["--candidate_pool_fps", str(float(candidate_pool_fps))]
-            info_aggressiveness = OmegaConf.select(cfg, "info_aggressiveness", default=None)
-            if info_aggressiveness is not None and str(info_aggressiveness).strip() not in ("", "null", "None"):
-                dataset_shared += ["--info_aggressiveness", str(float(info_aggressiveness))]
             coarse_uniform_ratio = OmegaConf.select(cfg, "coarse_uniform_ratio", default=None)
             if coarse_uniform_ratio is not None and str(coarse_uniform_ratio).strip() not in ("", "null", "None"):
                 dataset_shared += ["--coarse_uniform_ratio", str(float(coarse_uniform_ratio))]

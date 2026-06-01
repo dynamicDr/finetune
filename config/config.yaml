@@ -25,7 +25,12 @@ subtitles_dir: ""
 # vqa_eval_ours.py 选帧与关键词超参数（run.py 会传给脚本）
 quota_prescreen_alpha: 3
 max_keywords: 5
-info_aggressiveness: 0.6
+keyword_prompt_version: 0
+keyword_extractor_model: local
+keyword_extractor_api_base_url: https://api.aiohub.org/v1
+keyword_extractor_api_key_env: AIOHUB_API_KEY
+keyword_weight_strength: 1.0
+frame_selection_mode: 1
 candidate_pool_fps: 1.0
 ours_clip_model_id: openai/clip-vit-base-patch32
 ours_clip_device: null
