@@ -139,6 +139,19 @@ def main(cfg: DictConfig) -> None:
             keyword_weight_strength = OmegaConf.select(cfg, "keyword_weight_strength", default=None)
             if keyword_weight_strength is not None and str(keyword_weight_strength).strip() not in ("", "null", "None"):
                 dataset_shared += ["--keyword_weight_strength", str(float(keyword_weight_strength))]
+            use_keyword_cache = OmegaConf.select(cfg, "use_keyword_cache", default=False)
+            if bool(use_keyword_cache):
+                dataset_shared.append("--use_keyword_cache")
+            keyword_cache_dir = OmegaConf.select(cfg, "keyword_cache_dir", default=None)
+            if keyword_cache_dir is not None and str(keyword_cache_dir).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_cache_dir", str(keyword_cache_dir)]
+            keyword_cache_number = OmegaConf.select(cfg, "keyword_cache_number", default=None)
+            if keyword_cache_number is None:
+                keyword_cache_number = OmegaConf.select(cfg, "cache_number", default=None)
+            if keyword_cache_number is not None and str(keyword_cache_number).strip() not in ("", "null", "None"):
+                dataset_shared += ["--keyword_cache_number", str(int(keyword_cache_number))]
+            elif bool(use_keyword_cache):
+                dataset_shared += ["--keyword_cache_number", "0"]
             frame_selection_mode = OmegaConf.select(cfg, "frame_selection_mode", default=None)
             if frame_selection_mode is not None and str(frame_selection_mode).strip() not in ("", "null", "None"):
                 dataset_shared += ["--frame_selection_mode", str(int(frame_selection_mode))]

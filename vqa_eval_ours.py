@@ -41,6 +41,7 @@ _OPENAI_CLIENT_CACHE: dict[tuple[str, str], Any] = {}
 _KEYWORD_LOCAL_MODEL_CACHE: dict[str, tuple[Any, Any]] = {}
 VERBOSE = True
 VERBOSE_OUTPUT_DIR = Path(__file__).resolve().parent / "verbose_eval_ours"
+_DEFAULT_KEYWORD_CACHE_DIR = Path.home() / "vqa_keyword_cache"
 _VERBOSE_RUN_DIR: Path | None = None
 
 
@@ -227,8 +228,6 @@ def _build_keyword_extraction_prompt(
     prompt_version: int,
 ) -> str:
     target_keywords = max(1, int(target_keywords))
-    low_keywords = max(1, target_keywords - 1)
-    high_keywords = target_keywords + 1
     options_text = "\n".join(options or [])
     if int(prompt_version) == 0:
         return (
@@ -243,7 +242,7 @@ def _build_keyword_extraction_prompt(
             "- Each element must be a short DECLARATIVE phrase, e.g. \"a red cat\", "
             "\"a railway under construction\", \"an ancient tomb being excavated\".\n"
             "- Do NOT output single bare words (e.g. \"cat\") or questions.\n"
-            f"- Output around {target_keywords} keywords (preferred range: {low_keywords}-{high_keywords}).\n"
+            f"- Output around {target_keywords} keywords.\n"
             "- Output STRICTLY a JSON array of strings. No explanation, no markdown, "
             "no extra text.\n\n"
             f"Question:\n{question}\n\n"
@@ -258,14 +257,13 @@ def _build_keyword_extraction_prompt(
             "- Each phrase is a concrete noun phrase, 2-7 words, e.g. \"a man holding a knife\".\n"
             "- Start with a visual ANCHOR from the question (the persistent subject/scene), "
             "then combine the anchor with each option's visual differentiator.\n"
-            "- SKIP options that are abstract (reasons, feelings, intentions) — CLIP cannot verify them.\n\n"
+            "- SKIP options that are abstract (reasons, feelings, intentions)\n\n"
             "## Avoid (CLIP is bad at these)\n"
             "- Negations (\"no hat\"), counting (\"five birds\"), spatial directions (\"on the left\")\n"
             "- Subtle emotions, abstract intent, process verbs (\"building\", \"being excavated\")\n"
             "- Bare single words (\"cat\" → use \"a black cat\")\n\n"
             "## Output\n"
-            f"JSON array of strings only. No markdown, no comments. Around {target_keywords} phrases "
-            f"(range: {low_keywords}-{high_keywords}).\n\n"
+            f"Output STRICTLY a JSON array of strings. No explanation, no markdown. Output no more than {target_keywords} keywords. "
             "## Examples\n"
             "Q: What is the man doing in the kitchen?\n"
             "Options: A.cutting vegetables  B.washing dishes  C.reading  D.talking on phone\n"
@@ -307,6 +305,11 @@ _KEYWORD_EXTRACTOR_PROVIDERS: dict[str, dict[str, str]] = {
         "api_key_env": "AIOHUB_API_KEY",
         "api_style": "chat",
     },
+    "or": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+        "api_style": "chat",
+    },
 }
 
 
@@ -315,7 +318,7 @@ def _resolve_keyword_extractor(
     api_base_url: str,
     api_key_env: str,
 ) -> dict[str, str]:
-    """解析 keyword_extractor_model，例如 local-Qwen/Qwen3-VL-4B-Instruct / poe-gpt-5.2 / aio-gpt-5.2。"""
+    """解析 keyword_extractor_model，例如 local-Qwen/... / poe-gpt-5.2 / aio-gpt-5.2 / or-openai/gpt-4o。"""
     raw = str(extractor_model or "local").strip()
     if not raw or raw.lower() == "local":
         return {"mode": "local", "raw": raw, "local_model_path": ""}
@@ -374,8 +377,10 @@ def _read_api_key(api_key_env: str) -> str:
         fallbacks = ("POE_API_KEY", "OPENAI_API_KEY")
     elif api_key_env == "AIOHUB_API_KEY":
         fallbacks = ("AIOHUB_API_KEY", "OPENAI_API_KEY")
+    elif api_key_env == "OPENROUTER_API_KEY":
+        fallbacks = ("OPENROUTER_API_KEY", "OPENAI_API_KEY")
     else:
-        fallbacks = (api_key_env, "AIOHUB_API_KEY", "POE_API_KEY", "OPENAI_API_KEY")
+        fallbacks = (api_key_env, "AIOHUB_API_KEY", "POE_API_KEY", "OPENROUTER_API_KEY", "OPENAI_API_KEY")
     for env in fallbacks:
         val = os.getenv(env)
         if val:
@@ -410,6 +415,34 @@ def _openai_chat_response_text(response: Any) -> str:
     return str(response).strip()
 
 
+_KEYWORD_API_NO_PROXY_HOSTS = (
+    "api.aiohub.org,aiohub.org,api.poe.com,openrouter.ai,localhost,127.0.0.1"
+)
+
+
+def _ensure_keyword_api_no_proxy_env() -> None:
+    """关键词远程 API 直连：避免集群 HTTP_PROXY 导致 ProxyError 503。"""
+    for key in ("NO_PROXY", "no_proxy"):
+        cur = os.environ.get(key, "")
+        parts = [p.strip() for p in cur.split(",") if p.strip()]
+        for host in _KEYWORD_API_NO_PROXY_HOSTS.split(","):
+            if host not in parts:
+                parts.append(host)
+        os.environ[key] = ",".join(parts)
+
+
+def _openrouter_default_headers() -> dict[str, str]:
+    """OpenRouter 可选 attribution 头（见 https://openrouter.ai/docs/quickstart）。"""
+    headers: dict[str, str] = {}
+    referer = os.getenv("OPENROUTER_HTTP_REFERER", "").strip()
+    title = os.getenv("OPENROUTER_APP_TITLE", "vqa_eval_ours").strip()
+    if referer:
+        headers["HTTP-Referer"] = referer
+    if title:
+        headers["X-OpenRouter-Title"] = title
+    return headers
+
+
 def _get_openai_compatible_client(api_key_env: str, base_url: str) -> Any:
     api_key = _read_api_key(api_key_env)
     cache_key = (api_key_env, base_url)
@@ -418,15 +451,22 @@ def _get_openai_compatible_client(api_key_env: str, base_url: str) -> Any:
         import httpx
         import openai
 
+        _ensure_keyword_api_no_proxy_env()
         http_client = httpx.Client(
             verify=certifi.where(),
             timeout=httpx.Timeout(120.0, connect=30.0),
+            trust_env=False,
         )
-        _OPENAI_CLIENT_CACHE[cache_key] = openai.OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            http_client=http_client,
-        )
+        client_kwargs: dict[str, Any] = {
+            "api_key": api_key,
+            "base_url": base_url,
+            "http_client": http_client,
+        }
+        if "openrouter.ai" in base_url:
+            default_headers = _openrouter_default_headers()
+            if default_headers:
+                client_kwargs["default_headers"] = default_headers
+        _OPENAI_CLIENT_CACHE[cache_key] = openai.OpenAI(**client_kwargs)
     return _OPENAI_CLIENT_CACHE[cache_key]
 
 
@@ -530,6 +570,179 @@ def _extract_keywords_with_llm_text(
         + "You MUST output a valid JSON array of visual phrases and include at least 1 keyword."
     )
     return _ask_once(retry_prompt)
+
+
+# ==================== 关键词磁盘缓存 ====================
+_KEYWORD_CACHE_DURATION_SUFFIXES = frozenset({"short", "medium", "long"})
+
+
+def _keyword_cache_dataset_key(dataset: str, task_type: str | None = None) -> str:
+    """Video-MME 等按 duration 分桶时，缓存目录为 videomme-short / videomme-medium / videomme-long。"""
+    ds = str(dataset or "dataset").strip()
+    tt = str(task_type or "").strip().lower()
+    if tt in _KEYWORD_CACHE_DURATION_SUFFIXES:
+        return f"{ds}-{tt}"
+    return ds
+
+
+def _sanitize_cache_component(text: str, *, max_len: int = 120) -> str:
+    s = re.sub(r"[^A-Za-z0-9_.\-]+", "_", str(text or "").strip()).strip("_")
+    if not s:
+        s = "default"
+    return s[:max_len]
+
+
+def _resolve_keyword_cache_root(cache_dir: str | None) -> Path:
+    raw = str(cache_dir or "").strip()
+    if raw:
+        return Path(os.path.expanduser(raw)).resolve()
+    return _DEFAULT_KEYWORD_CACHE_DIR.resolve()
+
+
+def _keyword_cache_run_dir(
+    cache_root: Path,
+    *,
+    dataset: str,
+    task_type: str | None = None,
+    extractor_model: str,
+    prompt_version: int,
+    target_keywords: int,
+    cache_number: int = 0,
+) -> Path:
+    """同一数据集(+duration) + 关键词抽取配置 + cache_number 共用一个缓存子目录。"""
+    ext = _sanitize_cache_component(extractor_model or "local")
+    ds = _sanitize_cache_component(_keyword_cache_dataset_key(dataset, task_type))
+    return (
+        cache_root
+        / ds
+        / ext
+        / f"pv{int(prompt_version)}_tk{int(target_keywords)}"
+        / f"cn{int(cache_number)}"
+    )
+
+
+def _keyword_cache_file(run_dir: Path, sample_id: str) -> Path:
+    sid = normalize_sample_id(sample_id)
+    return run_dir / f"{_sanitize_cache_component(sid, max_len=200)}.json"
+
+
+def _load_keyword_cache_entry(path: Path, *, sample_id: str) -> tuple[list[str], list[str]] | None:
+    if not path.is_file():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        _log(f"关键词缓存读取失败，将重新抽取: {path} ({e})")
+        return None
+    if not isinstance(data, dict):
+        return None
+    cached_sid = str(data.get("sample_id", "")).strip()
+    if cached_sid and normalize_sample_id(cached_sid) != normalize_sample_id(sample_id):
+        _log(f"关键词缓存 sample_id 不匹配，忽略: {path}")
+        return None
+    kws_raw = data.get("kws_raw")
+    kws = data.get("kws")
+    if not isinstance(kws_raw, list) or not isinstance(kws, list):
+        return None
+    kws_raw_out = [str(x).strip() for x in kws_raw if str(x).strip()]
+    kws_out = [str(x).strip() for x in kws if str(x).strip()]
+    if not kws_out:
+        return None
+    return kws_raw_out, kws_out
+
+
+def _save_keyword_cache_entry(
+    path: Path,
+    *,
+    sample_id: str,
+    dataset: str,
+    extractor_model: str,
+    prompt_version: int,
+    target_keywords: int,
+    kws_raw: list[str],
+    kws: list[str],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "sample_id": normalize_sample_id(sample_id),
+        "dataset": str(dataset),
+        "extractor_model": str(extractor_model),
+        "prompt_version": int(prompt_version),
+        "target_keywords": int(target_keywords),
+        "kws_raw": list(kws_raw),
+        "kws": list(kws),
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    tmp.replace(path)
+
+
+def _extract_keywords_with_optional_cache(
+    model: Any,
+    proc: Any,
+    *,
+    sample_id: str,
+    dataset: str,
+    task_type: str | None = None,
+    question: str,
+    options: list[str] | None,
+    max_new_tokens: int,
+    target_keywords: int,
+    prompt_version: int,
+    extractor_model: str,
+    api_base_url: str,
+    api_key_env: str,
+    use_cache: bool,
+    cache_dir: str | None,
+    cache_number: int = 0,
+) -> tuple[list[str], list[str]]:
+    cache_dataset_key = _keyword_cache_dataset_key(dataset, task_type)
+    cache_root = _resolve_keyword_cache_root(cache_dir)
+    run_dir = _keyword_cache_run_dir(
+        cache_root,
+        dataset=dataset,
+        task_type=task_type,
+        extractor_model=extractor_model,
+        prompt_version=prompt_version,
+        target_keywords=target_keywords,
+        cache_number=cache_number,
+    )
+    cache_path = _keyword_cache_file(run_dir, sample_id)
+
+    if use_cache:
+        cached = _load_keyword_cache_entry(cache_path, sample_id=sample_id)
+        if cached is not None:
+            kws_raw, kws = cached
+            _log(f"sample={sample_id} 关键词缓存命中 ({cache_path})")
+            return kws_raw, kws
+
+    kws_raw, kws = _extract_keywords_with_llm_text(
+        model=model,
+        proc=proc,
+        question=question,
+        options=options,
+        max_new_tokens=max_new_tokens,
+        target_keywords=target_keywords,
+        prompt_version=prompt_version,
+        extractor_model=extractor_model,
+        api_base_url=api_base_url,
+        api_key_env=api_key_env,
+    )
+    if use_cache and kws:
+        _save_keyword_cache_entry(
+            cache_path,
+            sample_id=sample_id,
+            dataset=cache_dataset_key,
+            extractor_model=extractor_model,
+            prompt_version=prompt_version,
+            target_keywords=target_keywords,
+            kws_raw=kws_raw,
+            kws=kws,
+        )
+        _log(f"sample={sample_id} 关键词已写入缓存 ({cache_path})")
+    return kws_raw, kws
 
 
 # ==================== 信息量计算与预算分配 ====================
@@ -1006,9 +1219,12 @@ def _eval_one_sample(
     t1 = time.perf_counter()
     img_emb = _encode_images(imgs, clip_proc, clip_model, clip_device, args.ours_clip_batch_size)
 
-    kws_raw, kws = _extract_keywords_with_llm_text(
+    kws_raw, kws = _extract_keywords_with_optional_cache(
         model=model,
         proc=proc,
+        sample_id=sample.sample_id,
+        dataset=str(args.dataset),
+        task_type=str(sample.task_type),
         question=sample.question,
         options=sample.options,
         max_new_tokens=128,
@@ -1017,6 +1233,9 @@ def _eval_one_sample(
         extractor_model=str(args.keyword_extractor_model),
         api_base_url=str(args.keyword_extractor_api_base_url),
         api_key_env=str(args.keyword_extractor_api_key_env),
+        use_cache=bool(args.use_keyword_cache),
+        cache_dir=str(args.keyword_cache_dir or ""),
+        cache_number=int(args.keyword_cache_number),
     )
     if not kws:
         raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
@@ -1270,21 +1489,40 @@ def parse_args():
         type=str,
         default="local",
         help="关键词抽取模型：local=复用 --model_path；local-{model}=指定本地模型（如 local-Qwen/Qwen3-VL-4B-Instruct）；"
-        "poe-gpt-5.2=Poe responses API；aio-gpt-5.2=aiohub chat API；无前缀时走 --keyword_extractor_api_*",
+        "poe-gpt-5.2=Poe responses API；aio-gpt-5.2=aiohub chat API；"
+        "or-openai/gpt-4o=OpenRouter chat API；无前缀时走 --keyword_extractor_api_*",
     )
     p.add_argument(
         "--keyword_extractor_api_base_url",
         type=str,
         default="https://api.aiohub.org/v1",
-        help="无前缀远程模型时的 OpenAI Chat Completions base_url（poe-/aio- 前缀会忽略此项）",
+        help="无前缀远程模型时的 OpenAI Chat Completions base_url（poe-/aio-/or- 前缀会忽略此项）",
     )
     p.add_argument(
         "--keyword_extractor_api_key_env",
         type=str,
         default="AIOHUB_API_KEY",
-        help="无前缀远程模型时的 API key 环境变量（poe-/aio- 前缀会忽略此项）",
+        help="无前缀远程模型时的 API key 环境变量（poe-/aio-/or- 前缀会忽略此项）",
     )
     p.add_argument("--keyword_weight_strength", type=float, default=1.0, help="关键词权重强度：0为所有关键词均分，1为完全使用info权重")
+    p.add_argument(
+        "--use_keyword_cache",
+        action="store_true",
+        help="使用关键词磁盘缓存：同一 dataset(+short/medium/long)+keyword_extractor_model+prompt+cache_number "
+        "下已跑过的样本直接读缓存，未命中则 LLM 抽取后写入（默认目录 ~/vqa_keyword_cache）",
+    )
+    p.add_argument(
+        "--keyword_cache_dir",
+        type=str,
+        default="",
+        help="关键词缓存根目录；为空时使用 ~/vqa_keyword_cache",
+    )
+    p.add_argument(
+        "--keyword_cache_number",
+        type=int,
+        default=0,
+        help="关键词缓存组编号：同一 dataset+extractor+prompt 下可维护多组缓存，选最优一组评测",
+    )
     p.add_argument("--frame_selection_mode", type=int, choices=[0, 1], default=1, help="最终选帧模式：1=覆盖贪心，0=按关键词权重配额直接取top帧")
     p.add_argument("--coarse_uniform_ratio", type=float, default=0.0, help="coarse选帧中均匀抽样占比，其余预算按关键词信息量分配")
     return p.parse_args()
@@ -1313,6 +1551,8 @@ def _ours_csv_columns() -> list[str]:
         "max_keywords",
         "keyword_prompt_version",
         "keyword_extractor_model",
+        "use_keyword_cache",
+        "keyword_cache_number",
         "keyword_weight_strength",
         "frame_selection_mode",
         "use_preprocessed_clip_frames",
@@ -1357,6 +1597,8 @@ def _ours_csv_row(
         int(args.max_keywords),
         int(args.keyword_prompt_version),
         str(args.keyword_extractor_model),
+        bool(args.use_keyword_cache),
+        int(args.keyword_cache_number),
         f"{float(args.keyword_weight_strength):g}",
         int(args.frame_selection_mode),
         bool(args.use_preprocessed_clip_frames),
@@ -1427,6 +1669,26 @@ def main():
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
 
     budget = max(1, int(args.num_frames))
+    if args.use_keyword_cache:
+        cache_root = _resolve_keyword_cache_root(args.keyword_cache_dir or None)
+        cache_task = str(args.task_filter) if str(args.task_filter) in _KEYWORD_CACHE_DURATION_SUFFIXES else None
+        cache_run = _keyword_cache_run_dir(
+            cache_root,
+            dataset=str(args.dataset),
+            task_type=cache_task,
+            extractor_model=str(args.keyword_extractor_model),
+            prompt_version=int(args.keyword_prompt_version),
+            target_keywords=int(args.max_keywords),
+            cache_number=int(args.keyword_cache_number),
+        )
+        if cache_task:
+            _log(f"关键词缓存已启用: {cache_run}")
+        else:
+            ds_key = _sanitize_cache_component(str(args.dataset))
+            _log(
+                f"关键词缓存已启用: {cache_root}/{ds_key}-{{short|medium|long}}/... "
+                f"(按样本 task_type 分目录)"
+            )
     _log(
         f"配置: candidate_pool_fps={float(args.candidate_pool_fps):g}, "
         f"budget={budget}, quota_prescreen_alpha={int(args.quota_prescreen_alpha)}"

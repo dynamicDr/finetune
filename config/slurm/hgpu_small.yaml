@@ -11,3 +11,5 @@ account: duanty
 setup:
   - source $HOME/miniconda3/etc/profile.d/conda.sh
   - conda activate finetune
+  - export NO_PROXY="api.aiohub.org,aiohub.org,api.poe.com,localhost,127.0.0.1"
+  - export no_proxy="$NO_PROXY"

@@ -30,6 +30,9 @@ keyword_extractor_model: local
 keyword_extractor_api_base_url: https://api.aiohub.org/v1
 keyword_extractor_api_key_env: AIOHUB_API_KEY
 keyword_weight_strength: 1.0
+use_keyword_cache: false
+keyword_cache_dir: ""
+keyword_cache_number: 0
 frame_selection_mode: 1
 candidate_pool_fps: 1.0
 ours_clip_model_id: openai/clip-vit-base-patch32
