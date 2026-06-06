@@ -9,6 +9,8 @@ from typing import Any
 import cv2
 from PIL import Image
 
+from utils import from_pretrained_local_first
+
 _VLM_CACHE: dict[str, Any] = {}
 
 
@@ -30,8 +32,8 @@ def _load_vlm(model_id: str, device: str | None):
         return _VLM_CACHE[cache_key]
 
     _log(f"loading model: model_id={model_id}, device={resolved_device}")
-    processor = AutoProcessor.from_pretrained(model_id)
-    model = AutoModel.from_pretrained(model_id).to(resolved_device).eval()
+    processor = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
+    model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(resolved_device).eval()
     _VLM_CACHE[cache_key] = (processor, model, resolved_device, torch)
     _log("model loaded and cached")
     return _VLM_CACHE[cache_key]

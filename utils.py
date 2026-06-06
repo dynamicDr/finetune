@@ -10,6 +10,36 @@ from typing import Any, Callable
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 
+_LOCAL_PRETRAINED_FALLBACK_EXC: tuple[type[BaseException], ...]
+try:
+    from huggingface_hub.errors import LocalEntryNotFoundError
+
+    _LOCAL_PRETRAINED_FALLBACK_EXC = (OSError, LocalEntryNotFoundError)
+except ImportError:
+    _LOCAL_PRETRAINED_FALLBACK_EXC = (OSError,)
+
+
+def from_pretrained_local_first(
+    loader: Callable[..., Any],
+    model_id: str,
+    *,
+    log: Callable[[str], None] | None = None,
+    **kwargs: Any,
+) -> Any:
+    """优先从本地 HuggingFace 缓存加载，仅在本地不可用时联网。"""
+    local_kwargs = {**kwargs, "local_files_only": True}
+    try:
+        obj = loader(model_id, **local_kwargs)
+        if log:
+            log(f"从本地缓存加载: {model_id}")
+        return obj
+    except _LOCAL_PRETRAINED_FALLBACK_EXC as exc:
+        if log:
+            log(f"本地缓存不可用，改为联网加载: {model_id} ({exc})")
+        net_kwargs = dict(kwargs)
+        net_kwargs.pop("local_files_only", None)
+        return loader(model_id, **net_kwargs)
+
 
 def build_user_text(question: str, options: list[str] | None) -> str:
     if options:

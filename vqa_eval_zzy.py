@@ -19,6 +19,7 @@ from transformers import AutoModel, AutoProcessor
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
+from utils import from_pretrained_local_first
 from vl_common import load_model_and_processor
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
@@ -237,7 +238,9 @@ def _load_clip(model_id: str, device: str | None) -> tuple[Any, Any, str]:
     d = device or ("cuda" if torch.cuda.is_available() else "cpu")
     key = f"{model_id}::{d}"
     if key not in _CLIP_CACHE:
-        _CLIP_CACHE[key] = (AutoProcessor.from_pretrained(model_id), AutoModel.from_pretrained(model_id).to(d).eval(), d)
+        proc = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
+        model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(d).eval()
+        _CLIP_CACHE[key] = (proc, model, d)
     return _CLIP_CACHE[key]
 
 

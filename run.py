@@ -170,6 +170,29 @@ def main(cfg: DictConfig) -> None:
             coarse_uniform_ratio = OmegaConf.select(cfg, "coarse_uniform_ratio", default=None)
             if coarse_uniform_ratio is not None and str(coarse_uniform_ratio).strip() not in ("", "null", "None"):
                 dataset_shared += ["--coarse_uniform_ratio", str(float(coarse_uniform_ratio))]
+            if bool(OmegaConf.select(cfg, "use_two_stage_sampling", default=False)):
+                dataset_shared.append("--use_two_stage_sampling")
+            two_stage_coarse_fps = OmegaConf.select(cfg, "two_stage_coarse_fps", default=None)
+            if two_stage_coarse_fps is not None and str(two_stage_coarse_fps).strip() not in ("", "null", "None"):
+                dataset_shared += ["--two_stage_coarse_fps", str(float(two_stage_coarse_fps))]
+            two_stage_fine_fps = OmegaConf.select(cfg, "two_stage_fine_fps", default=None)
+            if two_stage_fine_fps is not None and str(two_stage_fine_fps).strip() not in ("", "null", "None"):
+                dataset_shared += ["--two_stage_fine_fps", str(float(two_stage_fine_fps))]
+            two_stage_top_segments = OmegaConf.select(cfg, "two_stage_top_segments", default=None)
+            if two_stage_top_segments is not None and str(two_stage_top_segments).strip() not in ("", "null", "None"):
+                dataset_shared += ["--two_stage_top_segments", str(int(two_stage_top_segments))]
+            two_stage_window_sec = OmegaConf.select(cfg, "two_stage_window_sec", default=None)
+            if two_stage_window_sec is not None and str(two_stage_window_sec).strip() not in ("", "null", "None"):
+                dataset_shared += ["--two_stage_window_sec", str(float(two_stage_window_sec))]
+            two_stage_score_mode = OmegaConf.select(cfg, "two_stage_score_mode", default=None)
+            if two_stage_score_mode is not None and str(two_stage_score_mode).strip() not in ("", "null", "None"):
+                dataset_shared += ["--two_stage_score_mode", str(two_stage_score_mode)]
+            time_diversity_min_gap_frames = OmegaConf.select(cfg, "time_diversity_min_gap_frames", default=None)
+            if time_diversity_min_gap_frames is not None and str(time_diversity_min_gap_frames).strip() not in ("", "null", "None"):
+                dataset_shared += ["--time_diversity_min_gap_frames", str(int(time_diversity_min_gap_frames))]
+            time_diversity_mode = OmegaConf.select(cfg, "time_diversity_mode", default=None)
+            if time_diversity_mode is not None and str(time_diversity_mode).strip() not in ("", "null", "None"):
+                dataset_shared += ["--time_diversity_mode", str(time_diversity_mode)]
     model_snapshot = resolve_model_path(cfg.model.path)
 
     if script_key in ("train_vsibench.py", "vqa_train.py"):

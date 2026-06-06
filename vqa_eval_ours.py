@@ -29,6 +29,7 @@ from utils import (
     compute_accuracy_from_results as _compute_accuracy_from_results,
     compute_score_counts_for_csv as _compute_score_counts_for_csv,
     dump_verbose_round,
+    from_pretrained_local_first,
     init_verbose_run_dir,
     normalize_sample_id,
 )
@@ -119,7 +120,23 @@ def _pool_positions_at_fps(n_items: int, src_fps: float, target_fps: float) -> l
     return _frame_indices_by_target_fps(n_items, src_fps, target_fps)
 
 
-def _collect_video_frames_at_fps(video_path: str, target_fps: float) -> tuple[list[int], list[Image.Image]]:
+def _get_video_src_fps(video_path: str) -> float:
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"无法打开视频: {video_path}")
+    try:
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+        return fps if fps > 0 else 1.0
+    finally:
+        cap.release()
+
+
+def _collect_video_frames_at_fps(
+    video_path: str,
+    target_fps: float,
+    start_sec: float | None = None,
+    end_sec: float | None = None,
+) -> tuple[list[int], list[Image.Image]]:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"无法打开视频: {video_path}")
@@ -129,6 +146,10 @@ def _collect_video_frames_at_fps(video_path: str, target_fps: float) -> tuple[li
         cap.release()
         raise RuntimeError(f"视频帧数无效: {video_path}")
     idxs = _frame_indices_by_target_fps(frame_count, src_fps, target_fps)
+    if start_sec is not None or end_sec is not None:
+        start_f = int(max(0.0, float(start_sec or 0.0)) * src_fps) if src_fps > 0 else 0
+        end_f = int(max(0.0, float(end_sec)) * src_fps) if end_sec is not None and src_fps > 0 else frame_count - 1
+        idxs = [i for i in idxs if start_f <= i <= end_f]
     frame_ids, images = [], []
     try:
         for fid in idxs:
@@ -144,6 +165,256 @@ def _collect_video_frames_at_fps(video_path: str, target_fps: float) -> tuple[li
     if not images:
         raise RuntimeError(f"视频无可用候选帧: {video_path}")
     return frame_ids, images
+
+
+def _filter_preprocessed_frames_in_time_range(
+    frame_ids: list[int],
+    imgs: list[Image.Image],
+    video_fps: float,
+    start_sec: float | None,
+    end_sec: float | None,
+    src_fps: float,
+    target_fps: float,
+) -> tuple[list[int], list[Image.Image]]:
+    if not frame_ids:
+        return [], []
+    vf = float(video_fps) if video_fps > 0 else float(src_fps)
+    start_f = int(max(0.0, float(start_sec or 0.0)) * vf) if start_sec is not None else None
+    end_f = int(max(0.0, float(end_sec)) * vf) if end_sec is not None else None
+    fids, ims = [], []
+    for fid, img in zip(frame_ids, imgs):
+        if start_f is not None and fid < start_f:
+            continue
+        if end_f is not None and fid > end_f:
+            continue
+        fids.append(int(fid))
+        ims.append(img)
+    if not ims:
+        return [], []
+    keep = _pool_positions_at_fps(len(ims), src_fps, target_fps)
+    if keep:
+        fids = [fids[i] for i in keep]
+        ims = [ims[i] for i in keep]
+    return fids, ims
+
+
+def _merge_overlapping_time_windows(windows: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    if not windows:
+        return []
+    merged: list[tuple[float, float]] = []
+    for start, end in sorted(windows, key=lambda x: x[0]):
+        s = max(0.0, float(start))
+        e = max(s, float(end))
+        if not merged or s > merged[-1][1]:
+            merged.append((s, e))
+        else:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+    return merged
+
+
+def _uniform_midpoint_indices(n: int, k: int) -> list[int]:
+    if n <= 0 or k <= 0:
+        return []
+    k = min(int(k), n)
+    out: list[int] = []
+    seen: set[int] = set()
+    for i in range(k):
+        idx = int(math.floor(n * (i + 0.5) / k))
+        idx = max(0, min(n - 1, idx))
+        if idx not in seen:
+            seen.add(idx)
+            out.append(idx)
+    return sorted(out)
+
+
+def _backfill_uniform_to_budget(n: int, budget: int, selected: list[int]) -> list[int]:
+    if n <= 0 or budget <= 0:
+        return []
+    picked = sorted({int(i) for i in selected if 0 <= int(i) < n})
+    if len(picked) >= budget:
+        return picked[:budget]
+    picked_set = set(picked)
+    for idx in _uniform_midpoint_indices(n, n):
+        if idx in picked_set:
+            continue
+        picked.append(idx)
+        picked_set.add(idx)
+        if len(picked) >= budget:
+            break
+    if len(picked) < budget:
+        for idx in range(n):
+            if idx in picked_set:
+                continue
+            picked.append(idx)
+            picked_set.add(idx)
+            if len(picked) >= budget:
+                break
+    return sorted(picked)
+
+
+def _min_selected_pool_distance(idx: int, selected: list[int]) -> float:
+    """候选池 index 距离；1fps 候选池下约等于秒级间隔。"""
+    if not selected:
+        return float("inf")
+    return float(min(abs(int(idx) - int(s)) for s in selected))
+
+
+def _compute_coarse_frame_scores(
+    kw_sims: torch.Tensor,
+    kw_w: torch.Tensor,
+    score_mode: str,
+) -> torch.Tensor:
+    if kw_sims.ndim != 2 or kw_sims.shape[0] == 0:
+        return torch.empty((0,), device=kw_sims.device)
+    if score_mode == "weighted":
+        w = kw_w.float()
+        if w.numel() != kw_sims.shape[0]:
+            w = torch.ones((kw_sims.shape[0],), device=kw_sims.device)
+        w = w.clamp(min=0.0)
+        if float(w.sum().item()) <= 1e-12:
+            w = torch.ones_like(w)
+        return (kw_sims * w.unsqueeze(1)).sum(dim=0)
+    return kw_sims.max(dim=0).values
+
+
+def _locate_top_time_windows(
+    coarse_frame_ids: list[int],
+    frame_scores: torch.Tensor,
+    video_fps: float,
+    top_segments: int,
+    window_sec: float,
+) -> list[tuple[float, float]]:
+    if not coarse_frame_ids or frame_scores.numel() == 0 or top_segments <= 0:
+        return []
+    vf = float(video_fps) if video_fps > 0 else 1.0
+    half = max(0.0, float(window_sec))
+    windows: list[tuple[float, float]] = []
+    ranked = torch.argsort(frame_scores, descending=True).tolist()
+    for pos in ranked:
+        if len(windows) >= int(top_segments):
+            break
+        if pos < 0 or pos >= len(coarse_frame_ids):
+            continue
+        center = float(coarse_frame_ids[pos]) / vf
+        windows.append((max(0.0, center - half), center + half))
+    return _merge_overlapping_time_windows(windows)
+
+
+def _build_two_stage_candidate_pool(
+    sample: VQASample,
+    args: argparse.Namespace,
+    preprocessed_clip_dir: str | None,
+    kw_emb_for_locate: torch.Tensor,
+    kw_w_for_locate: torch.Tensor,
+    clip_proc: Any,
+    clip_model: Any,
+    clip_device: str,
+) -> tuple[list[int], list[Image.Image], dict[str, Any]]:
+    coarse_fps = float(args.two_stage_coarse_fps)
+    fine_fps = float(args.two_stage_fine_fps) if args.two_stage_fine_fps is not None else float(args.candidate_pool_fps)
+    if coarse_fps <= 0 or fine_fps <= 0:
+        raise ValueError(f"two_stage fps 必须 > 0，当前 coarse={coarse_fps}, fine={fine_fps}")
+    video_fps = _get_video_src_fps(sample.video_path)
+    meta: dict[str, Any] = {
+        "two_stage_coarse_fps": coarse_fps,
+        "two_stage_fine_fps": fine_fps,
+        "two_stage_top_segments": int(args.two_stage_top_segments),
+        "two_stage_window_sec": float(args.two_stage_window_sec),
+        "two_stage_score_mode": str(args.two_stage_score_mode),
+        "video_fps": float(video_fps),
+    }
+
+    if args.use_preprocessed_clip_frames:
+        coarse_ids, coarse_imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+        src_fps = float(args.preprocessed_clip_fps)
+        keep = _pool_positions_at_fps(len(coarse_imgs), src_fps, coarse_fps)
+        if keep:
+            coarse_ids, coarse_imgs = [coarse_ids[i] for i in keep], [coarse_imgs[i] for i in keep]
+    else:
+        coarse_ids, coarse_imgs = _collect_video_frames_at_fps(sample.video_path, coarse_fps)
+
+    coarse_emb = _encode_images(coarse_imgs, clip_proc, clip_model, clip_device, args.ours_clip_batch_size)
+    coarse_sims = kw_emb_for_locate @ coarse_emb.T if kw_emb_for_locate.shape[0] > 0 else torch.empty((0, coarse_emb.shape[0]), device=coarse_emb.device)
+    coarse_scores = _compute_coarse_frame_scores(coarse_sims, kw_w_for_locate, str(args.two_stage_score_mode))
+    windows = _locate_top_time_windows(
+        coarse_ids,
+        coarse_scores,
+        video_fps=video_fps,
+        top_segments=int(args.two_stage_top_segments),
+        window_sec=float(args.two_stage_window_sec),
+    )
+    meta["two_stage_windows_sec"] = windows
+    meta["two_stage_coarse_pool_size"] = int(len(coarse_imgs))
+
+    if not windows:
+        if args.use_preprocessed_clip_frames:
+            frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+            src_fps = float(args.preprocessed_clip_fps)
+            keep = _pool_positions_at_fps(len(imgs), src_fps, fine_fps)
+            if keep:
+                frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
+        else:
+            frame_ids, imgs = _collect_video_frames_at_fps(sample.video_path, fine_fps)
+        meta["two_stage_fine_pool_size"] = int(len(imgs))
+        meta["two_stage_fallback_full_video"] = True
+        return frame_ids, imgs, meta
+
+    fine_ids: list[int] = []
+    fine_imgs: list[Image.Image] = []
+    seen_fids: set[int] = set()
+    if args.use_preprocessed_clip_frames:
+        all_ids, all_imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+        src_fps = float(args.preprocessed_clip_fps)
+        for start_sec, end_sec in windows:
+            part_ids, part_imgs = _filter_preprocessed_frames_in_time_range(
+                all_ids,
+                all_imgs,
+                video_fps=video_fps,
+                start_sec=start_sec,
+                end_sec=end_sec,
+                src_fps=src_fps,
+                target_fps=fine_fps,
+            )
+            for fid, img in zip(part_ids, part_imgs):
+                if fid in seen_fids:
+                    continue
+                seen_fids.add(fid)
+                fine_ids.append(fid)
+                fine_imgs.append(img)
+    else:
+        for start_sec, end_sec in windows:
+            part_ids, part_imgs = _collect_video_frames_at_fps(
+                sample.video_path,
+                fine_fps,
+                start_sec=start_sec,
+                end_sec=end_sec,
+            )
+            for fid, img in zip(part_ids, part_imgs):
+                if fid in seen_fids:
+                    continue
+                seen_fids.add(fid)
+                fine_ids.append(fid)
+                fine_imgs.append(img)
+
+    if not fine_imgs:
+        if args.use_preprocessed_clip_frames:
+            frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+            src_fps = float(args.preprocessed_clip_fps)
+            keep = _pool_positions_at_fps(len(imgs), src_fps, fine_fps)
+            if keep:
+                frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
+        else:
+            frame_ids, imgs = _collect_video_frames_at_fps(sample.video_path, fine_fps)
+        meta["two_stage_fine_pool_size"] = int(len(imgs))
+        meta["two_stage_fallback_full_video"] = True
+        return frame_ids, imgs, meta
+
+    paired = sorted(zip(fine_ids, fine_imgs), key=lambda x: x[0])
+    fine_ids = [int(p[0]) for p in paired]
+    fine_imgs = [p[1] for p in paired]
+    meta["two_stage_fine_pool_size"] = int(len(fine_imgs))
+    meta["two_stage_fallback_full_video"] = False
+    return fine_ids, fine_imgs, meta
 
 
 def _to_feature_tensor(features: Any) -> torch.Tensor:
@@ -167,7 +438,9 @@ def _load_clip(model_id: str, device: str | None) -> tuple[Any, Any, str]:
     d = device or ("cuda" if torch.cuda.is_available() else "cpu")
     key = f"{model_id}::{d}"
     if key not in _CLIP_CACHE:
-        _CLIP_CACHE[key] = (AutoProcessor.from_pretrained(model_id), AutoModel.from_pretrained(model_id).to(d).eval(), d)
+        proc = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
+        model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(d).eval()
+        _CLIP_CACHE[key] = (proc, model, d)
     return _CLIP_CACHE[key]
 
 
@@ -1039,6 +1312,9 @@ def _submodular_cover_greedy_select(
     kw_w: torch.Tensor,
     budget: int,
     candidate_idx: list[int],
+    min_gap_frames: int = 0,
+    diversity_mode: str = "none",
+    seed_selected: list[int] | None = None,
 ) -> list[int]:
     """次模覆盖贪心：F(S)=sum_i w_i * max_{f in S} sim(f,k_i)。"""
     if kw_sims.ndim != 2 or budget <= 0:
@@ -1061,9 +1337,20 @@ def _submodular_cover_greedy_select(
     selected: list[int] = []
     selected_set: set[int] = set()
     covered = torch.zeros((m,), dtype=kw_sims.dtype, device=kw_sims.device)
+    gap = max(0, int(min_gap_frames))
+    div_mode = str(diversity_mode or "none").lower()
+    use_diversity = gap > 0 and div_mode in {"hard", "soft"}
 
-    max_pick = min(int(budget), len(cand))
-    for _ in range(max_pick):
+    for idx in seed_selected or []:
+        idx = int(idx)
+        if idx < 0 or idx >= n or idx in selected_set:
+            continue
+        selected.append(idx)
+        selected_set.add(idx)
+        covered = torch.maximum(covered, kw_sims[:, idx])
+
+    max_pick = min(int(budget), n)
+    for _ in range(max(0, max_pick - len(selected))):
         avail = [i for i in cand if i not in selected_set]
         if not avail:
             break
@@ -1071,7 +1358,16 @@ def _submodular_cover_greedy_select(
         sim_avail = kw_sims[:, avail_tensor]  # (M, C)
         delta = torch.maximum(covered.unsqueeze(1), sim_avail) - covered.unsqueeze(1)
         gains = (delta * kw_w.unsqueeze(1)).sum(dim=0)  # (C,)
+        if use_diversity:
+            for local_i, idx in enumerate(avail):
+                dist = _min_selected_pool_distance(idx, selected)
+                if div_mode == "hard" and dist < gap:
+                    gains[local_i] = -1e9
+                elif div_mode == "soft":
+                    gains[local_i] = gains[local_i] * min(1.0, dist / gap)
         best_local = int(torch.argmax(gains).item())
+        if float(gains[best_local].item()) <= -1e8:
+            break
         best_idx = int(avail[best_local])
         selected.append(best_idx)
         selected_set.add(best_idx)
@@ -1079,11 +1375,61 @@ def _submodular_cover_greedy_select(
     return selected
 
 
+def _select_keyword_frames(
+    kw_frame_sims: torch.Tensor,
+    kw_weights: torch.Tensor,
+    budget: int,
+    frame_selection_mode: int,
+    args: argparse.Namespace,
+    seed_selected: list[int] | None = None,
+) -> tuple[list[int], list[int], str]:
+    if budget <= 0:
+        return [], [], "skipped"
+    gap = max(0, int(args.time_diversity_min_gap_frames))
+    div_mode = str(args.time_diversity_mode or "none").lower()
+    if frame_selection_mode == 1:
+        candidate_idx = _build_quota_prescreen_candidates(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            budget=budget,
+            alpha=int(args.quota_prescreen_alpha),
+        )
+        selected_idx = _submodular_cover_greedy_select(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            budget=budget,
+            candidate_idx=candidate_idx,
+            min_gap_frames=gap,
+            diversity_mode=div_mode,
+            seed_selected=seed_selected,
+        )
+        return selected_idx, candidate_idx, "coverage_greedy"
+    if frame_selection_mode == 0:
+        candidate_idx = list(range(int(kw_frame_sims.shape[1])))
+        selected_idx = _quota_topk_select(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            budget=budget,
+            candidate_idx=candidate_idx,
+            min_gap_frames=gap,
+            diversity_mode=div_mode,
+            seed_selected=seed_selected,
+        )
+        selection_method = "quota_topk"
+        if gap > 0 and div_mode in {"hard", "soft"}:
+            selection_method = f"quota_topk+time_{div_mode}"
+        return selected_idx, candidate_idx, selection_method
+    raise ValueError(f"frame_selection_mode 仅支持 1 或 0，当前: {frame_selection_mode}")
+
+
 def _quota_topk_select(
     kw_sims: torch.Tensor,
     kw_w: torch.Tensor,
     budget: int,
     candidate_idx: list[int],
+    min_gap_frames: int = 0,
+    diversity_mode: str = "none",
+    seed_selected: list[int] | None = None,
 ) -> list[int]:
     """按关键词权重分配帧数；重复帧则按关键词权重顺序继续取该词的下一个 top 帧。"""
     if kw_sims.ndim != 2 or budget <= 0:
@@ -1115,14 +1461,52 @@ def _quota_topk_select(
 
     selected: list[int] = []
     selected_set: set[int] = set()
-    def _take_next(j: int) -> int | None:
+    gap = max(0, int(min_gap_frames))
+    div_mode = str(diversity_mode or "none").lower()
+    use_diversity = gap > 0 and div_mode in {"hard", "soft"}
+
+    for idx in seed_selected or []:
+        idx = int(idx)
+        if 0 <= idx < n and idx not in selected_set:
+            selected.append(idx)
+            selected_set.add(idx)
+
+    def _take_next_hard(j: int) -> int | None:
         while next_pos[j] < len(ranked_by_keyword[j]):
             idx = ranked_by_keyword[j][next_pos[j]]
             next_pos[j] += 1
             if idx in selected_set:
                 continue
+            if use_diversity and div_mode == "hard" and selected:
+                if _min_selected_pool_distance(idx, selected) < gap:
+                    continue
             return idx
         return None
+
+    def _take_next_soft(j: int) -> int | None:
+        best_idx: int | None = None
+        best_score = -1.0
+        best_pos: int | None = None
+        for pos in range(next_pos[j], len(ranked_by_keyword[j])):
+            idx = ranked_by_keyword[j][pos]
+            if idx in selected_set:
+                continue
+            dist = _min_selected_pool_distance(idx, selected) if selected else float("inf")
+            weight = 1.0 if not use_diversity else min(1.0, dist / gap)
+            score = float(kw_sims[j, idx].item()) * weight
+            if score > best_score:
+                best_score = score
+                best_idx = idx
+                best_pos = pos
+        if best_idx is None or best_pos is None:
+            return None
+        next_pos[j] = best_pos + 1
+        return best_idx
+
+    def _take_next(j: int) -> int | None:
+        if use_diversity and div_mode == "soft":
+            return _take_next_soft(j)
+        return _take_next_hard(j)
 
     for j in keyword_order:
         q = int(quotas[j].item())
@@ -1202,23 +1586,11 @@ def _eval_one_sample(
     use_subtitles: bool,
     subtitles_dir: str | None,
 ) -> dict[str, Any]:
-    t0 = time.perf_counter()
     pool_fps = float(args.candidate_pool_fps)
     if pool_fps <= 0:
         raise ValueError(f"candidate_pool_fps 必须 > 0，当前: {pool_fps}")
-    if args.use_preprocessed_clip_frames:
-        frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
-        src_fps = float(args.preprocessed_clip_fps)
-        keep = _pool_positions_at_fps(len(imgs), src_fps, pool_fps)
-        if keep:
-            frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
-    else:
-        frame_ids, imgs = _collect_video_frames_at_fps(sample.video_path, pool_fps)
-    frame_sampling_time = time.perf_counter() - t0
 
-    t1 = time.perf_counter()
-    img_emb = _encode_images(imgs, clip_proc, clip_model, clip_device, args.ours_clip_batch_size)
-
+    t_kw = time.perf_counter()
     kws_raw, kws = _extract_keywords_with_optional_cache(
         model=model,
         proc=proc,
@@ -1242,6 +1614,33 @@ def _eval_one_sample(
     kws_after_text_dedup = list(kws)
     kw_emb = _encode_texts(kws_after_text_dedup, clip_proc, clip_model, clip_device, 32)
     kws_rep, kw_emb_rep, _ = _merge_keywords(kws_after_text_dedup, kw_emb, args.max_keywords)
+    keyword_extract_time = time.perf_counter() - t_kw
+
+    t0 = time.perf_counter()
+    two_stage_meta: dict[str, Any] = {}
+    if bool(args.use_two_stage_sampling):
+        frame_ids, imgs, two_stage_meta = _build_two_stage_candidate_pool(
+            sample=sample,
+            args=args,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            kw_emb_for_locate=kw_emb_rep,
+            kw_w_for_locate=torch.ones((kw_emb_rep.shape[0],), device=kw_emb_rep.device),
+            clip_proc=clip_proc,
+            clip_model=clip_model,
+            clip_device=clip_device,
+        )
+    elif args.use_preprocessed_clip_frames:
+        frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+        src_fps = float(args.preprocessed_clip_fps)
+        keep = _pool_positions_at_fps(len(imgs), src_fps, pool_fps)
+        if keep:
+            frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
+    else:
+        frame_ids, imgs = _collect_video_frames_at_fps(sample.video_path, pool_fps)
+    frame_sampling_time = time.perf_counter() - t0
+
+    t1 = time.perf_counter()
+    img_emb = _encode_images(imgs, clip_proc, clip_model, clip_device, args.ours_clip_batch_size)
     info_pack = _compute_keyword_information(kws_rep, kw_emb_rep, img_emb, args)
     kws_use: list[str] = info_pack["kws_use"]
     kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
@@ -1274,31 +1673,37 @@ def _eval_one_sample(
         raise RuntimeError(f"样本无可用关键词: sample={sample.sample_id}")
 
     frame_selection_mode = int(args.frame_selection_mode)
-    if frame_selection_mode == 1:
-        candidate_idx = _build_quota_prescreen_candidates(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            alpha=int(args.quota_prescreen_alpha),
+    coarse_ratio = min(1.0, max(0.0, float(args.coarse_uniform_ratio)))
+    candidate_idx: list[int] = []
+    if coarse_ratio > 0.0:
+        k_uniform = int(round(budget * coarse_ratio))
+        k_kw = max(0, budget - k_uniform)
+        uniform_idx = _init_frames_uniform_plus_elements(
+            img_emb,
+            kw_emb_use,
+            kw_weights,
+            k_uniform,
+            1.0,
         )
-        selected_idx = _submodular_cover_greedy_select(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            candidate_idx=candidate_idx,
+        kw_selected, candidate_idx, selection_method = _select_keyword_frames(
+            kw_frame_sims=kw_frame_sims,
+            kw_weights=kw_weights,
+            budget=k_kw,
+            frame_selection_mode=frame_selection_mode,
+            args=args,
         )
-        selection_method = "coverage_greedy"
-    elif frame_selection_mode == 0:
-        candidate_idx = list(range(int(kw_frame_sims.shape[1])))
-        selected_idx = _quota_topk_select(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            candidate_idx=candidate_idx,
-        )
-        selection_method = "quota_topk"
+        selected_idx = sorted(set(uniform_idx).union(kw_selected))
+        if len(selected_idx) < budget:
+            selected_idx = _backfill_uniform_to_budget(len(imgs), budget, selected_idx)
+        selection_method = f"coarse_uniform+{selection_method}"
     else:
-        raise ValueError(f"frame_selection_mode 仅支持 1 或 0，当前: {frame_selection_mode}")
+        selected_idx, candidate_idx, selection_method = _select_keyword_frames(
+            kw_frame_sims=kw_frame_sims,
+            kw_weights=kw_weights,
+            budget=budget,
+            frame_selection_mode=frame_selection_mode,
+            args=args,
+        )
     if not selected_idx:
         raise RuntimeError(f"样本未能选出有效帧: sample={sample.sample_id}")
 
@@ -1306,7 +1711,10 @@ def _eval_one_sample(
     alpha_log = int(args.quota_prescreen_alpha) if frame_selection_mode == 1 else "skipped"
     _log(
         f"sample={sample.sample_id} 候选池={len(candidate_idx) if candidate_idx else len(imgs)}, "
-        f"选帧={len(selected_idx)}, mode={frame_selection_mode}/{selection_method}, alpha={alpha_log}"
+        f"选帧={len(selected_idx)}, mode={frame_selection_mode}/{selection_method}, "
+        f"alpha={alpha_log}, coarse_uniform_ratio={coarse_ratio:g}, "
+        f"two_stage={bool(args.use_two_stage_sampling)}, "
+        f"time_gap={int(args.time_diversity_min_gap_frames)}"
     )
 
     one_shot_frames = [imgs[i] for i in selected_idx]
@@ -1367,6 +1775,17 @@ def _eval_one_sample(
             "frame_selection_mode": frame_selection_mode,
             "frame_selection_method": selection_method,
             "prescreen_candidate_count": int(len(candidate_idx) if candidate_idx else len(imgs)),
+            "coarse_uniform_ratio": float(coarse_ratio),
+            "use_two_stage_sampling": bool(args.use_two_stage_sampling),
+            "two_stage_coarse_fps": float(args.two_stage_coarse_fps),
+            "two_stage_fine_fps": float(args.two_stage_fine_fps) if args.two_stage_fine_fps is not None else float(args.candidate_pool_fps),
+            "two_stage_top_segments": int(args.two_stage_top_segments),
+            "two_stage_window_sec": float(args.two_stage_window_sec),
+            "two_stage_score_mode": str(args.two_stage_score_mode),
+            "time_diversity_min_gap_frames": int(args.time_diversity_min_gap_frames),
+            "time_diversity_mode": str(args.time_diversity_mode),
+            "keyword_extract_time_sec": float(keyword_extract_time),
+            **two_stage_meta,
         },
     )
     _log(f"sample={sample.sample_id} one-shot pred={one_shot_out['pred_answer']}, frames={len(selected_idx)}")
@@ -1524,7 +1943,46 @@ def parse_args():
         help="关键词缓存组编号：同一 dataset+extractor+prompt 下可维护多组缓存，选最优一组评测",
     )
     p.add_argument("--frame_selection_mode", type=int, choices=[0, 1], default=1, help="最终选帧模式：1=覆盖贪心，0=按关键词权重配额直接取top帧")
-    p.add_argument("--coarse_uniform_ratio", type=float, default=0.0, help="coarse选帧中均匀抽样占比，其余预算按关键词信息量分配")
+    p.add_argument(
+        "--coarse_uniform_ratio",
+        type=float,
+        default=0.0,
+        help="均匀+关键词混合选帧：先按该比例均匀占预算，其余预算再走关键词选帧；0 表示关闭",
+    )
+    p.add_argument(
+        "--use_two_stage_sampling",
+        action="store_true",
+        help="两阶段候选池：0.25fps 粗定位 top 段，再在段内按 fine fps 精选候选帧",
+    )
+    p.add_argument("--two_stage_coarse_fps", type=float, default=0.25, help="两阶段粗采样 fps")
+    p.add_argument(
+        "--two_stage_fine_fps",
+        type=float,
+        default=None,
+        help="两阶段段内精采样 fps；为空时使用 candidate_pool_fps",
+    )
+    p.add_argument("--two_stage_top_segments", type=int, default=5, help="两阶段粗定位保留的时间段数量")
+    p.add_argument("--two_stage_window_sec", type=float, default=30.0, help="两阶段粗帧时间窗口半宽（秒）")
+    p.add_argument(
+        "--two_stage_score_mode",
+        type=str,
+        choices=["max", "weighted"],
+        default="max",
+        help="两阶段粗定位帧打分：max=关键词最大相似度，weighted=按关键词权重加权",
+    )
+    p.add_argument(
+        "--time_diversity_min_gap_frames",
+        type=int,
+        default=0,
+        help="时间多样性惩罚的最小候选池 index 间隔；mode=0/1 均生效，1fps 池下 3≈3 秒，0 表示关闭",
+    )
+    p.add_argument(
+        "--time_diversity_mode",
+        type=str,
+        choices=["none", "hard", "soft"],
+        default="soft",
+        help="时间多样性惩罚模式：hard=过近直接不可选，soft=按距离衰减 gain",
+    )
     return p.parse_args()
 
 
@@ -1555,6 +2013,15 @@ def _ours_csv_columns() -> list[str]:
         "keyword_cache_number",
         "keyword_weight_strength",
         "frame_selection_mode",
+        "coarse_uniform_ratio",
+        "use_two_stage_sampling",
+        "two_stage_coarse_fps",
+        "two_stage_fine_fps",
+        "two_stage_top_segments",
+        "two_stage_window_sec",
+        "two_stage_score_mode",
+        "time_diversity_min_gap_frames",
+        "time_diversity_mode",
         "use_preprocessed_clip_frames",
         "preprocessed_clip_fps",
         "use_subtitles",
@@ -1601,6 +2068,15 @@ def _ours_csv_row(
         int(args.keyword_cache_number),
         f"{float(args.keyword_weight_strength):g}",
         int(args.frame_selection_mode),
+        f"{float(args.coarse_uniform_ratio):g}",
+        bool(args.use_two_stage_sampling),
+        f"{float(args.two_stage_coarse_fps):g}",
+        f"{float(args.two_stage_fine_fps if args.two_stage_fine_fps is not None else args.candidate_pool_fps):g}",
+        int(args.two_stage_top_segments),
+        f"{float(args.two_stage_window_sec):g}",
+        str(args.two_stage_score_mode),
+        int(args.time_diversity_min_gap_frames),
+        str(args.time_diversity_mode),
         bool(args.use_preprocessed_clip_frames),
         f"{float(args.preprocessed_clip_fps):g}",
         bool(args.use_subtitles),
@@ -1691,7 +2167,10 @@ def main():
             )
     _log(
         f"配置: candidate_pool_fps={float(args.candidate_pool_fps):g}, "
-        f"budget={budget}, quota_prescreen_alpha={int(args.quota_prescreen_alpha)}"
+        f"budget={budget}, quota_prescreen_alpha={int(args.quota_prescreen_alpha)}, "
+        f"coarse_uniform_ratio={float(args.coarse_uniform_ratio):g}, "
+        f"use_two_stage_sampling={bool(args.use_two_stage_sampling)}, "
+        f"time_diversity_min_gap_frames={int(args.time_diversity_min_gap_frames)}"
     )
 
     model, proc = load_model_and_processor(resolved_model_path, use_lora=args.use_lora, base_model=args.base_model, merge_lora=args.merge_lora)
