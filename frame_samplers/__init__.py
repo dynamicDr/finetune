@@ -13,7 +13,9 @@ SUPPORTED_FRAME_SAMPLERS = (
     "sevila",
     "videoagent",
     "clip",
+    "clip-new",
     "siglip2",
+    "siglip2-new",
     "qframe",
     "bolt-clip",
     "bolt-siglip2",
@@ -110,6 +112,22 @@ def sample_video_frames(
             random_seed=random_seed,
             use_preprocessed_clip_frames=use_preprocessed_clip_frames,
             preprocessed_clip_dir=preprocessed_clip_dir,
+            use_segment_selection=True,
+        )
+    if method == "clip-new":
+        from .clip import sample_clip_frames
+
+        return sample_clip_frames(
+            video_path,
+            num_frames,
+            sample_id=sample_id,
+            question=question,
+            options=options,
+            answer=answer,
+            random_seed=random_seed,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            use_segment_selection=False,
         )
     if method == "siglip2":
         from .siglip2 import sample_siglip2_frames
@@ -124,6 +142,22 @@ def sample_video_frames(
             random_seed=random_seed,
             use_preprocessed_clip_frames=use_preprocessed_clip_frames,
             preprocessed_clip_dir=preprocessed_clip_dir,
+            use_segment_selection=True,
+        )
+    if method == "siglip2-new":
+        from .siglip2 import sample_siglip2_frames
+
+        return sample_siglip2_frames(
+            video_path,
+            num_frames,
+            sample_id=sample_id,
+            question=question,
+            options=options,
+            answer=answer,
+            random_seed=random_seed,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            use_segment_selection=False,
         )
     if method == "qframe":
         from .qframe import sample_qframe_frames

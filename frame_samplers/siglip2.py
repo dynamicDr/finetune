@@ -9,6 +9,8 @@ from typing import Any
 import cv2
 from PIL import Image
 
+from frame_samplers.score_select import select_frame_positions_from_scores
+
 _SIGLIP2_CACHE: dict[str, Any] = {}
 
 
@@ -207,6 +209,7 @@ def sample_siglip2_frames(
     min_frame_gap: int = 30,
     use_preprocessed_clip_frames: bool = False,
     preprocessed_clip_dir: str | None = None,
+    use_segment_selection: bool = True,
 ) -> list[Image.Image]:
     t0 = time.time()
     _ = random_seed
@@ -214,7 +217,8 @@ def sample_siglip2_frames(
     _log(
         "start sampling: "
         f"video_path={video_path}, num_frames={num_frames}, sample_every={sample_every}, "
-        f"batch_size={batch_size}, min_frame_gap={min_frame_gap}"
+        f"batch_size={batch_size}, min_frame_gap={min_frame_gap}, "
+        f"use_segment_selection={use_segment_selection}"
     )
 
     if num_frames <= 0:
@@ -296,26 +300,18 @@ def sample_siglip2_frames(
     top_pairs = [(frame_ids[i], float(scores_cpu[i].item())) for i in ranked[:topn]]
     _log(f"top-{topn} candidate frames by score={top_pairs}")
 
-    # 将候选帧按时间顺序均匀切分为 num_frames 段，每段选 1 帧（该段内 SigLIP2 分数最高）
     n_candidates = len(frame_ids)
-    n_segments = min(num_frames, n_candidates)
-    selected_positions: list[int] = []
-    for seg_idx in range(n_segments):
-        seg_start = int(seg_idx * n_candidates / n_segments)
-        seg_end = int((seg_idx + 1) * n_candidates / n_segments)
-        if seg_start >= seg_end:
-            continue
-        seg_scores = scores[seg_start:seg_end]
-        rel_best = int(torch.argmax(seg_scores).item())
-        best_pos = seg_start + rel_best
-        selected_positions.append(best_pos)
-
-    # 先按分段内 score 选，再按时间顺序返回
-    selected_positions = sorted(set(selected_positions), key=lambda i: frame_ids[i])
+    selected_positions = select_frame_positions_from_scores(
+        scores=scores,
+        frame_ids=frame_ids,
+        num_frames=num_frames,
+        use_segment_selection=use_segment_selection,
+    )
     selected = [images[i] for i in selected_positions]
     selected_frame_ids = [frame_ids[i] for i in selected_positions]
+    selection_mode = "segment" if use_segment_selection else "topk"
     _log(
-        f"segment selection: segments={n_segments}, candidates={n_candidates}, "
+        f"{selection_mode} selection: candidates={n_candidates}, "
         f"selected_positions={selected_positions}"
     )
 

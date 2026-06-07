@@ -1276,7 +1276,6 @@ python run.py --multirun \
     video_dir=~/dataset/Video-MME \
     frame_sampling_method=bolt-clip,bolt-siglip2 \
     num_frames=16,32 \
-    num_samples=10 \
     model=qwen3_8b_instruct \
     task_filter=short,medium,long \
     use_preprocessed_clip_frames=true \
@@ -1406,14 +1405,15 @@ python run.py --multirun \
   hydra.launcher.timeout_min=720 \
   slurm=default_4090
 
-# 三项全开组合（在各自消融最优值确定后使用；时间多样性需 frame_selection_mode=1）→ 共 1 个进程
+# mode=2 段独占配额 topk：在 mode=0 权重配额 + 段内 peak 上，将候选池均分为 num_frames 段，每段最多 1 帧
+# 与 mode=0 对照（long 视频）→ 共 2 个进程；无额外超参，复用 num_frames / max_keywords / keyword_weight_strength
 python run.py --multirun \
   dataset=videomme \
   dataset_name=lmms-lab/Video-MME \
   dataset_no_config=true \
   dataset_split=test \
   video_dir=~/dataset/Video-MME \
-  task_filter=long \
+  task_filter=medium,long \
   train_ratio=0 \
   seed=42 \
   script=vqa_eval_ours.py \
@@ -1427,40 +1427,28 @@ python run.py --multirun \
   use_keyword_cache=true \
   keyword_cache_number=0 \
   keyword_weight_strength=0.5 \
-  frame_selection_mode=1 \
-  coarse_uniform_ratio=0.25 \
-  use_two_stage_sampling=true \
-  time_diversity_min_gap_frames=3 \
-  time_diversity_mode=soft \
+  frame_selection_mode=0,2 \
   hydra/launcher=submitit_slurm \
   hydra.launcher.timeout_min=720 \
   slurm=default_4090
 
-
-  python run.py --multirun \
+新的 clip / siglip2 baseline（全局 top-k，不分段）：
+# clip-new / siglip2-new 复用 clip.py / siglip2.py，use_segment_selection=false
+# clip / siglip2 仍为分段选帧（默认 use_segment_selection=true）
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  hydra.launcher.timeout_min=720 \
+  script=vqa_eval.py \
   dataset=videomme \
   dataset_name=lmms-lab/Video-MME \
   dataset_no_config=true \
   dataset_split=test \
   video_dir=~/dataset/Video-MME \
-  task_filter=long \
-  train_ratio=0 \
-  seed=42 \
-  script=vqa_eval_ours.py \
-  frame_sampling_method=ours \
+  frame_sampling_method=clip-new,siglip2-new \
+  num_frames=16,32 \
   model=qwen3_8b_instruct \
-  num_frames=16 \
+  task_filter=short,medium,long \
   use_preprocessed_clip_frames=true \
-  max_keywords=10 \
-  keyword_prompt_version=0 \
-  keyword_extractor_model=poe-gpt-5.2 \
-  use_keyword_cache=true \
-  keyword_cache_number=0 \
-  keyword_weight_strength=0.5 \
-  frame_selection_mode=0 \
-  coarse_uniform_ratio=0 \
-  use_two_stage_sampling=true \
-  time_diversity_min_gap_frames=0 \
-  hydra/launcher=submitit_slurm \
-  hydra.launcher.timeout_min=720 \
-  slurm=default_4090
+  train_ratio=0.0 \
+  seed=42 \
+  slurm=hgpu_batch
