@@ -12,6 +12,8 @@ import torch
 from PIL import Image
 from transformers import AutoModel, AutoProcessor
 
+from utils import from_pretrained_local_first
+
 
 _CLIP_CACHE: dict[str, Any] = {}
 
@@ -69,8 +71,8 @@ def _load_clip(model_id: str, device: str | None):
     cache_key = f"{model_id}::{resolved_device}"
     if cache_key in _CLIP_CACHE:
         return _CLIP_CACHE[cache_key]
-    processor = AutoProcessor.from_pretrained(model_id)
-    model = AutoModel.from_pretrained(model_id).to(resolved_device).eval()
+    processor = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
+    model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(resolved_device).eval()
     _CLIP_CACHE[cache_key] = (processor, model, resolved_device)
     return _CLIP_CACHE[cache_key]
 

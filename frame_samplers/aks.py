@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from utils import from_pretrained_local_first
+
 from .clip import _format_question_and_options
 
 _AKS_MODEL_CACHE: dict[tuple[str, str], Any] = {}
@@ -101,8 +103,9 @@ def _load_clip(device: str):
         from transformers import CLIPModel, CLIPProcessor
     except ImportError as exc:
         raise ImportError("AKS-CLIP 依赖缺失：需要安装 transformers。") from exc
-    model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device).eval()
-    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    model_id = "openai/clip-vit-base-patch32"
+    model = from_pretrained_local_first(CLIPModel.from_pretrained, model_id, log=_log).to(device).eval()
+    processor = from_pretrained_local_first(CLIPProcessor.from_pretrained, model_id, log=_log)
     _AKS_MODEL_CACHE[key] = (model, processor)
     _log(f"loaded CLIP model on device={device}")
     return _AKS_MODEL_CACHE[key]

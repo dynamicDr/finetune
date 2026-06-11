@@ -39,6 +39,10 @@ class VQASample:
     options: list[str] | None = None
     task_type: str = "mcq"
     metadata: dict[str, Any] = field(default_factory=dict)
+    preprocess_key: str | None = None
+
+    def resolve_preprocess_key(self) -> str:
+        return self.preprocess_key or self.sample_id
 
 
 class BaseDataLoader(ABC):

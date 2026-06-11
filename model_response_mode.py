@@ -66,7 +66,7 @@ def parse_response_by_mode(
         answer_portion = answer_match.group(1).strip()
 
     if has_options:
-        match = re.search(r"\b([A-E])\b", answer_portion.upper())
+        match = re.search(r"\b([A-F])\b", answer_portion.upper())
         if match:
             return cot_text, answer_portion, match.group(1)
 

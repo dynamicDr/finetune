@@ -166,7 +166,7 @@ def main() -> None:
     for sample in tqdm(samples, desc="预处理进度"):
         success, n_frames = _save_preprocessed_frames(
             video_path=sample.video_path,
-            sample_id=sample.sample_id,
+            sample_id=sample.resolve_preprocess_key(),
             output_root=output_root,
             target_fps=args.fps,
             overwrite=args.overwrite,

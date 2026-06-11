@@ -11,7 +11,7 @@ from typing import Any
 
 from tqdm import tqdm
 
-from data_loaders import get_data_loader, list_supported_datasets
+from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from frame_samplers import sample_video_frames
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
@@ -172,7 +172,7 @@ def evaluate_vqa(
                 num_frames=num_frames,
                 method=frame_sampling_method,
                 random_seed=random_seed,
-                sample_id=sample.sample_id,
+                sample_id=sample.resolve_preprocess_key(),
                 question=sample.question,
                 options=sample.options,
                 answer=str(sample.answer),
@@ -337,7 +337,7 @@ def parse_args():
         "--task_filter",
         type=str,
         default="all",
-        choices=["all", "mcq", "numeric", "short", "medium", "long"],
+        help="all/mcq/numeric/generation，或数据集特定桶（如 videomme: short/medium/long；mlvu: plotQA/anomaly_reco/...）",
     )
     p.add_argument("--max_new_tokens", type=int, default=2048)
     p.add_argument(
@@ -374,6 +374,7 @@ def parse_args():
 def main():
     experiment_start_time = time.perf_counter()
     args = parse_args()
+    apply_dataset_cli_defaults(args)
     video_dir = os.path.expanduser(args.video_dir)
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)

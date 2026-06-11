@@ -12,13 +12,13 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-from data_loaders import get_data_loader
+from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
 from vl_common import load_model_and_processor
 
 
 def parse_args():
     p = argparse.ArgumentParser(description="按每秒1帧粗采样提取视频 embedding 并保存到本地")
-    p.add_argument("--dataset", type=str, default="videomme")
+    p.add_argument("--dataset", type=str, default="videomme", choices=list_supported_datasets())
     p.add_argument("--dataset_split", type=str, default="test")
     p.add_argument("--dataset_name", type=str, default="lmms-lab/Video-MME")
     p.add_argument("--dataset_config", type=str, default="full")
@@ -108,6 +108,7 @@ def extract_visual_embeddings(model, processor, frames: list[Image.Image]) -> to
 
 def main():
     args = parse_args()
+    apply_dataset_cli_defaults(args)
     video_dir = os.path.expanduser(args.video_dir)
     if args.output_dir:
         output_dir = Path(args.output_dir).expanduser().resolve()

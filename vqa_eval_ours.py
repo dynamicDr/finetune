@@ -17,7 +17,7 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
-from data_loaders import get_data_loader, list_supported_datasets
+from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from utils import (
@@ -1542,7 +1542,12 @@ def parse_args():
     p.add_argument("--num_frames", type=int, default=16, help="单轮推理的总选帧预算（默认16）")
     p.add_argument("--frame_sampling_method", type=str, default="ours", choices=["ours"])
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--task_filter", type=str, default="all", choices=["all", "mcq", "numeric", "short", "medium", "long"])
+    p.add_argument(
+        "--task_filter",
+        type=str,
+        default="all",
+        help="all/mcq/numeric/generation，或数据集特定桶（如 videomme: short/medium/long；mlvu: plotQA/anomaly_reco/...）",
+    )
     p.add_argument("--max_new_tokens", type=int, default=2048)
     p.add_argument("--ours_clip_model_id", type=str, default="openai/clip-vit-base-patch32")
     p.add_argument("--ours_clip_device", type=str, default=None)
@@ -1719,6 +1724,7 @@ def main():
     # ==================== 主入口与实验记录 ====================
     exp_t0 = time.perf_counter()
     args = parse_args()
+    apply_dataset_cli_defaults(args)
     global _VERBOSE_RUN_DIR
     _VERBOSE_RUN_DIR = init_verbose_run_dir(verbose=VERBOSE, output_dir=VERBOSE_OUTPUT_DIR, log_fn=_log)
     video_dir = os.path.expanduser(args.video_dir)

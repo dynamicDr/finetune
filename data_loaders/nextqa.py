@@ -104,6 +104,7 @@ class NextQALoader(BaseDataLoader):
             return None
 
         qid = raw_sample.get("qid", index)
+        video_id = str(raw_sample.get("video", "")).strip()
         return VQASample(
             sample_id=f"nextqa_{qid}",
             video_path=video_path,
@@ -111,10 +112,11 @@ class NextQALoader(BaseDataLoader):
             answer=answer,
             options=options,
             task_type="mcq",
+            preprocess_key=f"nextqa_video_{video_id}" if video_id else None,
             metadata={
                 "source_index": index,
                 "qid": qid,
-                "video": raw_sample.get("video", ""),
+                "video": video_id,
                 "type": raw_sample.get("type", ""),
                 "dataset_name": self.dataset_name,
                 "dataset_config": self.dataset_config,

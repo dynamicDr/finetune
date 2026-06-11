@@ -817,6 +817,9 @@ sbatch single_run.sh sandbox/010_preprocess_clip_frames.py --dataset videomme --
 
 sbatch single_run.sh sandbox/010_preprocess_clip_frames.py --dataset egoschema --dataset_name lmms-lab/EgoSchema --dataset_config Subset --dataset_split test --video_dir ~/dataset/egoschema/videos/videos --fps 1
 
+sbatch single_run.sh sandbox/010_preprocess_clip_frames.py --dataset nextqa --dataset_name lmms-lab/NExTQA --dataset_config MC --dataset_split test --video_dir ~/dataset/nextqa --fps 1 --no-overwrite
+# NExTQA 按 video_id 去重预处理（约 5440 个视频，非 8564 题）；跑 clip 类 baseline 前必须先执行
+
 
 icassp回来了，继续工作，粗采样成功，试着跑一下测速。
 问题来了，怎么感觉优化速度不是很大？但好歹会快点，先用着吧。
@@ -1449,6 +1452,82 @@ python run.py --multirun \
   model=qwen3_8b_instruct \
   task_filter=short,medium,long \
   use_preprocessed_clip_frames=true \
+  train_ratio=0.0 \
+  seed=42 \
+  slurm=hgpu_batch
+
+【zzy跑】 EgoSchema 全 baseline
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  hydra.launcher.timeout_min=720 \
+  script=vqa_eval.py \
+  dataset=egoschema \
+  dataset_name=lmms-lab/EgoSchema \
+  dataset_config=Subset \
+  dataset_split=test \
+  video_dir=/userhome/cs3/duanty/dataset/egoschema/videos/videos \
+  frame_sampling_method=uniform,clip,siglip2,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
+  num_frames=16,32 \
+  model=qwen3_8b_instruct \
+  task_filter=mcq \
+  use_preprocessed_clip_frames=true \
+  train_ratio=0.0 \
+  seed=42 \
+  slurm=hgpu_batch
+
+【dty跑】 model=llava_next_video_7b_hf  MME上全 baseline
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform,clip,siglip2,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
+    num_frames=16,32 \
+    model=llava_next_video_7b_hf \
+    task_filter=short,medium,long \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+【zzy跑】 NExTQA-MC 全 baseline（需先跑上方 nextqa 预处理）
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  hydra.launcher.timeout_min=720 \
+  script=vqa_eval.py \
+  dataset=nextqa \
+  dataset_name=lmms-lab/NExTQA \
+  dataset_config=MC \
+  dataset_split=test \
+  video_dir=/userhome/cs3/duanty/dataset/nextqa \
+  frame_sampling_method=uniform,clip,siglip2,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
+  num_frames=16,32 \
+  model=qwen3_8b_instruct \
+  task_filter=mcq \
+  use_preprocessed_clip_frames=true \
+  train_ratio=0.0 \
+  seed=42 \
+  slurm=hgpu_batch
+
+  【zzy跑】 MLVU-Test MCQ 跑一个 uniform 试试（不依赖预处理，可直接跑）
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  hydra.launcher.timeout_min=720 \
+  script=vqa_eval.py \
+  dataset=mlvu \
+  dataset_name=MLVU/MLVU_Test \
+  dataset_no_config=true \
+  dataset_split=test \
+  video_dir=/userhome/cs3/duanty/dataset/mlvu_test \
+  frame_sampling_method=uniform \
+  num_frames=16,32 \
+  model=qwen3_8b_instruct \
+  task_filter=mcq \
+  num_samples=all \
+  use_preprocessed_clip_frames=false \
   train_ratio=0.0 \
   seed=42 \
   slurm=hgpu_batch
