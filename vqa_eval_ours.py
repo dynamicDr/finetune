@@ -39,7 +39,7 @@ from utils import (
     init_verbose_run_dir,
     normalize_sample_id,
 )
-from vl_common import load_keyword_model_and_processor, load_model_and_processor
+from vl_common import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
 PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"ours"}
@@ -994,9 +994,8 @@ def _option_probs(proc: Any, logits: torch.Tensor) -> dict[str, float]:
 
 
 def _run_vlm_once(model: Any, proc: Any, frames: list[Image.Image], prompt: str, max_new_tokens: int, model_mode: str) -> dict[str, Any]:
-    content = [{"type": "image", "image": f} for f in frames] + [{"type": "text", "text": prompt}]
-    text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
-    inputs = proc(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+    inputs, _ = prepare_vlm_inputs(proc, frames, prompt, model=model)
+    inputs = inputs.to(model.device)
     t0 = time.perf_counter()
     with torch.no_grad():
         out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, return_dict_in_generate=True, output_scores=True)

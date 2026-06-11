@@ -28,6 +28,14 @@ def _use_generic_vl_loader(model_id: str) -> bool:
     return any(hint in model_id_lower for hint in generic_model_hints)
 
 
+def is_llava_next_video_inference(processor, model=None) -> bool:
+    """LLaVA-NeXT-Video 需走单路 video 输入，不能与 Qwen / OneVision 共用多图路径。"""
+    if type(processor).__name__ == "LlavaNextVideoProcessor":
+        return True
+    model_type = getattr(getattr(model, "config", None), "model_type", None)
+    return model_type == "llava_next_video"
+
+
 def _is_vl_model_id(model_id: str) -> bool:
     model_id_lower = model_id.lower()
     if _use_generic_vl_loader(model_id):
@@ -75,7 +83,117 @@ def collect_visual_token_ids(processor) -> list[int]:
         tid = tok.convert_tokens_to_ids(processor.image_token)
         if tid not in ids:
             ids.append(tid)
+    for token in ("<video>",):
+        tid = tok.convert_tokens_to_ids(token)
+        if tid is not None and tid != tok.unk_token_id and tid not in ids:
+            ids.append(tid)
     return ids
+
+
+def build_vlm_user_messages(
+    frames: list[Image.Image],
+    prompt: str,
+    processor,
+    *,
+    model=None,
+) -> list[dict[str, Any]]:
+    if is_llava_next_video_inference(processor, model=model):
+        content: list[dict[str, Any]] = []
+        if frames:
+            content.append({"type": "video", "video": frames})
+        content.append({"type": "text", "text": prompt})
+        return [{"role": "user", "content": content}]
+    content = [{"type": "image", "image": frame} for frame in frames]
+    content.append({"type": "text", "text": prompt})
+    return [{"role": "user", "content": content}]
+
+
+def prepare_vlm_inputs(
+    processor,
+    frames: list[Image.Image],
+    prompt: str,
+    *,
+    model=None,
+) -> tuple[Any, str]:
+    messages = build_vlm_user_messages(frames, prompt, processor, model=model)
+    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    if is_llava_next_video_inference(processor, model=model):
+        proc_kwargs: dict[str, Any] = {
+            "text": [text],
+            "return_tensors": "pt",
+            "padding": True,
+        }
+        if frames:
+            proc_kwargs["videos"] = [frames]
+        inputs = processor(**proc_kwargs)
+    else:
+        inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt")
+    return inputs, text
+
+
+def _log_vision_inputs(
+    processor,
+    inputs: Any,
+    frames: list[Image.Image],
+    *,
+    model=None,
+) -> None:
+    llava_video = is_llava_next_video_inference(processor, model=model)
+    print(
+        f"[perf-debug][vision-input] frames_count={len(frames)}, "
+        f"llava_next_video={llava_video}, input_keys={sorted(list(inputs.keys()))}",
+        flush=True,
+    )
+    pixel_values = inputs.get("pixel_values")
+    pixel_values_videos = inputs.get("pixel_values_videos")
+    if pixel_values is not None:
+        print(
+            "[perf-debug][vision-input] "
+            f"pixel_values.shape={tuple(pixel_values.shape)}, pixel_values.dtype={pixel_values.dtype}",
+            flush=True,
+        )
+    else:
+        print("[perf-debug][vision-input] pixel_values=None", flush=True)
+    if pixel_values_videos is not None:
+        print(
+            "[perf-debug][vision-input] "
+            f"pixel_values_videos.shape={tuple(pixel_values_videos.shape)}, "
+            f"pixel_values_videos.dtype={pixel_values_videos.dtype}",
+            flush=True,
+        )
+    else:
+        print("[perf-debug][vision-input] pixel_values_videos=None", flush=True)
+
+    image_grid_thw = inputs.get("image_grid_thw")
+    if image_grid_thw is not None:
+        print(
+            "[perf-debug][vision-input] "
+            f"image_grid_thw.shape={tuple(image_grid_thw.shape)}, image_grid_thw={image_grid_thw}",
+            flush=True,
+        )
+    else:
+        print("[perf-debug][vision-input] image_grid_thw=None", flush=True)
+
+    visual_token_ids = collect_visual_token_ids(processor)
+    if visual_token_ids and "input_ids" in inputs:
+        input_ids = inputs["input_ids"]
+        visual_token_count = int(sum((input_ids == tid).sum().item() for tid in visual_token_ids))
+        print(
+            "[perf-debug][vision-input] "
+            f"visual_token_ids={visual_token_ids}, visual_token_count={visual_token_count}",
+            flush=True,
+        )
+    else:
+        print(
+            "[perf-debug][vision-input] visual_token_ids unavailable or input_ids missing",
+            flush=True,
+        )
+    print(
+        "[perf-debug][inputs] "
+        f"input_ids.shape={tuple(inputs['input_ids'].shape)}, "
+        f"attention_mask.shape={tuple(inputs['attention_mask'].shape)}",
+        flush=True,
+    )
 
 
 def build_mcq_prompt(question: str, options: list[str]) -> str:
@@ -328,58 +446,11 @@ def generate_response(
 ) -> tuple[str, float, int, bool]:
     import time
 
-    content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
-    content.append({"type": "text", "text": prompt})
-    messages = [{"role": "user", "content": content}]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     t_proc_start = time.time()
-    inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt")
+    inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)
     inputs = inputs.to(model.device)
     processor_time = time.time() - t_proc_start
-    input_keys = sorted(list(inputs.keys()))
-    print(
-        f"[perf-debug][vision-input] frames_count={len(frames)}, input_keys={input_keys}",
-        flush=True,
-    )
-    pixel_values = inputs.get("pixel_values")
-    if pixel_values is not None:
-        print(
-            "[perf-debug][vision-input] "
-            f"pixel_values.shape={tuple(pixel_values.shape)}, pixel_values.dtype={pixel_values.dtype}",
-            flush=True,
-        )
-    else:
-        print("[perf-debug][vision-input] pixel_values=None", flush=True)
-
-    image_grid_thw = inputs.get("image_grid_thw")
-    if image_grid_thw is not None:
-        print(
-            "[perf-debug][vision-input] "
-            f"image_grid_thw.shape={tuple(image_grid_thw.shape)}, image_grid_thw={image_grid_thw}",
-            flush=True,
-        )
-    else:
-        print("[perf-debug][vision-input] image_grid_thw=None", flush=True)
-
-    visual_token_ids = collect_visual_token_ids(processor)
-    if visual_token_ids and "input_ids" in inputs:
-        input_ids = inputs["input_ids"]
-        visual_token_count = int(sum((input_ids == tid).sum().item() for tid in visual_token_ids))
-        print(
-            "[perf-debug][vision-input] "
-            f"visual_token_ids={visual_token_ids}, visual_token_count={visual_token_count}",
-            flush=True,
-        )
-    else:
-        print(
-            "[perf-debug][vision-input] visual_token_ids unavailable or input_ids missing",
-            flush=True,
-        )
-    print(
-        "[perf-debug][inputs] "
-        f"input_ids.shape={tuple(inputs['input_ids'].shape)}, attention_mask.shape={tuple(inputs['attention_mask'].shape)}",
-        flush=True,
-    )
+    _log_vision_inputs(processor, inputs, frames, model=model)
 
     gen_kwargs = {
         "max_new_tokens": max_new_tokens,
@@ -475,11 +546,10 @@ def generate_response_with_split_embedding(
 ) -> tuple[str, float, float, int, bool]:
     import time
 
-    content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
-    content.append({"type": "text", "text": prompt})
-    messages = [{"role": "user", "content": content}]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    model_inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+    if is_llava_next_video_inference(processor, model=model):
+        raise RuntimeError("LLaVA-NeXT-Video 不支持 split embedding 推理路径，请使用 generate_response。")
+    model_inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)
+    model_inputs = model_inputs.to(model.device)
 
     build_start = time.time()
     fused_embeds = _build_image_fused_embeds(model, model_inputs)
@@ -515,13 +585,12 @@ def generate_response_with_split_embedding_detailed(
     import time
 
     model_call_start = time.perf_counter()
-    content: list[dict[str, Any]] = [{"type": "image", "image": frame} for frame in frames]
-    content.append({"type": "text", "text": prompt})
-    messages = [{"role": "user", "content": content}]
-    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    if is_llava_next_video_inference(processor, model=model):
+        raise RuntimeError("LLaVA-NeXT-Video 不支持 split embedding 推理路径，请使用 generate_response。")
 
     processor_start = time.perf_counter()
-    model_inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+    model_inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)
+    model_inputs = model_inputs.to(model.device)
     processor_time = time.perf_counter() - processor_start
 
     embedding_start = time.perf_counter()

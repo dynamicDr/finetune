@@ -20,7 +20,7 @@ from data_loaders import dataset_uses_vl_pixel_limits, get_data_loader, list_sup
 from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from utils import build_user_text, build_user_text_with_subtitles, from_pretrained_local_first
-from vl_common import load_model_and_processor
+from vl_common import load_model_and_processor, prepare_vlm_inputs
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
 PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"zzy"}
@@ -239,9 +239,8 @@ def _encode_text(text: str, proc: Any, model: Any, device: str) -> torch.Tensor:
 
 
 def _run_vlm_once(model: Any, proc: Any, frames: list[Image.Image], prompt: str, max_new_tokens: int, model_mode: str) -> dict[str, Any]:
-    content = [{"type": "image", "image": f} for f in frames] + [{"type": "text", "text": prompt}]
-    text = proc.apply_chat_template([{"role": "user", "content": content}], tokenize=False, add_generation_prompt=True)
-    inputs = proc(text=[text], images=frames, padding=True, return_tensors="pt").to(model.device)
+    inputs, _ = prepare_vlm_inputs(proc, frames, prompt, model=model)
+    inputs = inputs.to(model.device)
     t0 = time.perf_counter()
     with torch.no_grad():
         out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, return_dict_in_generate=True, output_scores=True)
