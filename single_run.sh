@@ -272,8 +272,15 @@ echo "任务ID: $SLURM_JOB_ID"
 echo "GPU: $CUDA_VISIBLE_DEVICES"
 echo "=========================================="
 
-# 激活conda环境
-source $HOME/miniconda3/etc/profile.d/conda.sh
+# 激活conda环境（优先 miniconda，其次 anaconda）
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/miniconda3/etc/profile.d/conda.sh"
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    source "$HOME/anaconda3/etc/profile.d/conda.sh"
+else
+    echo "错误: 未找到 miniconda3 或 anaconda3"
+    exit 1
+fi
 conda activate finetune
 
 # 检查环境是否激活成功
