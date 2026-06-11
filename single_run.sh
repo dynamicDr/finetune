@@ -30,7 +30,7 @@
 #SBATCH --job-name=python_job
 #SBATCH --gres=gpu:1
 #SBATCH --partition=q-hgpu-batch
-#SBATCH --account=duanty
+#SBATCH --account=$USER
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=190G
 #SBATCH --mail-type=ALL
@@ -169,6 +169,7 @@ if [ "$SELF_SUBMIT" -eq 1 ] && [ -z "${SLURM_JOB_ID:-}" ]; then
             TIME_LIMIT="$cfg_timeout_min"
         fi
         if [ -z "$ACCOUNT" ] && [ -n "$cfg_account" ]; then
+            cfg_account="${cfg_account//'${oc.env:USER}'/$USER}"
             ACCOUNT="$cfg_account"
         fi
 
@@ -178,6 +179,10 @@ if [ "$SELF_SUBMIT" -eq 1 ] && [ -z "${SLURM_JOB_ID:-}" ]; then
                 GPU_TYPE="h800"
             fi
         fi
+    fi
+
+    if [ -z "$ACCOUNT" ]; then
+        ACCOUNT="${SLURM_ACCOUNT:-$USER}"
     fi
 
     SBATCH_CMD=(sbatch)
