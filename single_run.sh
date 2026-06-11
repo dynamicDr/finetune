@@ -30,7 +30,8 @@
 #SBATCH --job-name=python_job
 #SBATCH --gres=gpu:1
 #SBATCH --partition=q-hgpu-batch
-#SBATCH --account=$USER
+# 注意：本集群 #SBATCH 不会展开 $USER，写 --account=$USER 会提交失败。
+# 默认不传 account，由 Slurm 使用当前用户的默认关联；需要时用 sbatch --account=... 或 --account 覆盖。
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=190G
 #SBATCH --mail-type=ALL
@@ -170,7 +171,9 @@ if [ "$SELF_SUBMIT" -eq 1 ] && [ -z "${SLURM_JOB_ID:-}" ]; then
         fi
         if [ -z "$ACCOUNT" ] && [ -n "$cfg_account" ]; then
             cfg_account="${cfg_account//'${oc.env:USER}'/$USER}"
-            ACCOUNT="$cfg_account"
+            if [ "$cfg_account" != "null" ] && [ "$cfg_account" != "None" ]; then
+                ACCOUNT="$cfg_account"
+            fi
         fi
 
         if [ -z "$GPU_TYPE" ]; then
@@ -181,8 +184,8 @@ if [ "$SELF_SUBMIT" -eq 1 ] && [ -z "${SLURM_JOB_ID:-}" ]; then
         fi
     fi
 
-    if [ -z "$ACCOUNT" ]; then
-        ACCOUNT="${SLURM_ACCOUNT:-$USER}"
+    if [ -z "$ACCOUNT" ] && [ -n "${SLURM_ACCOUNT:-}" ]; then
+        ACCOUNT="$SLURM_ACCOUNT"
     fi
 
     SBATCH_CMD=(sbatch)
