@@ -19,7 +19,7 @@ from transformers import AutoModel, AutoProcessor
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
-from utils import from_pretrained_local_first
+from utils import build_user_text, build_user_text_with_subtitles, from_pretrained_local_first
 from vl_common import load_model_and_processor
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
@@ -29,29 +29,6 @@ _CLIP_CACHE: dict[str, tuple[Any, Any, str]] = {}
 
 def _log(msg: str) -> None:
     print(f"[vqa_eval_zzy] {msg}", flush=True)
-
-
-def build_user_text(question: str, options: list[str] | None) -> str:
-    if options:
-        return (
-            f"{question}\n\nOptions:\n"
-            + "\n".join(options)
-            + "\n\nDirectly answer with the option letter only. Do not explain."
-        )
-    return f"{question}\n\nPlease provide the numerical answer directly."
-
-
-def build_user_text_with_subtitles(question: str, options: list[str] | None, subtitles: list[str] | None) -> str:
-    options_text = "\n".join(options or [])
-    subtitle_text = "\n".join((subtitles or [])).strip() or "No subtitles available"
-    return (
-        "This video's subtitles are listed below:\n"
-        f"{subtitle_text}\n\n"
-        "Select the best answer to the following multiple-choice question based on the video. "
-        "Respond with only the letter (A, B, C, or D) of the correct option.\n"
-        f"{question}\n{options_text}\n"
-        "The best answer is:"
-    )
 
 
 def _parse_subtitle_time(time_str: str) -> float:

@@ -14,17 +14,8 @@ from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndByte
 from data_loaders import get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample
 from frame_samplers import sample_video_frames
+from utils import build_user_text
 from vl_common import collect_visual_token_ids
-
-
-def build_user_text(question: str, options: list[str] | None) -> str:
-    if options:
-        return (
-            f"{question}\n\nOptions:\n"
-            + "\n".join(options)
-            + "\n\nDirectly answer with the option letter only. Do not explain."
-        )
-    return f"{question}\n\nPlease provide the numerical answer directly."
 
 
 def build_training_examples(samples: list[VQASample]) -> list[dict[str, Any]]:

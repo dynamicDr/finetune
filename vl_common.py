@@ -79,12 +79,9 @@ def collect_visual_token_ids(processor) -> list[int]:
 
 
 def build_mcq_prompt(question: str, options: list[str]) -> str:
-    lines = [f"{chr(ord('A') + i)}. {opt}" for i, opt in enumerate(options)]
-    return (
-        f"{question}\n\nOptions:\n"
-        + "\n".join(lines)
-        + "\n\nDirectly answer with the option letter only. Do not explain."
-    )
+    from utils import build_user_text
+
+    return build_user_text(question, options)
 
 
 def load_model_and_processor(

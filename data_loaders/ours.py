@@ -37,27 +37,16 @@ def _to_feature_tensor(features: Any) -> torch.Tensor:
 
 
 def _format_question_and_options(question: str | None, options: list[str] | None) -> str:
+    from utils import format_labeled_options
+
     q = (question or "").strip()
     if not q:
         raise ValueError("ours 迭代方法需要 question。")
     if not options:
         raise ValueError("ours 迭代方法需要 options，且每个选项必须包含内容。")
-    normalized_options: list[str] = []
-    for i, raw_option in enumerate(options):
-        option_text = str(raw_option).strip()
-        if not option_text:
-            raise ValueError(f"ours 迭代方法选项不能为空：第 {i + 1} 个选项为空。")
-        if re.fullmatch(r"[A-Ea-e](?:[\.\)\:\-])?", option_text):
-            raise ValueError(f"ours 迭代方法选项不能只写字母：{option_text}")
-        prefixed = re.match(r"^([A-Ea-e])[\.\)\:\-]\s*(.*)$", option_text)
-        if prefixed:
-            content = prefixed.group(2).strip()
-            if not content:
-                raise ValueError(f"ours 迭代方法选项不能只写字母：{option_text}")
-            normalized_options.append(f"{prefixed.group(1).upper()}. {content}")
-            continue
-        normalized_options.append(f"{chr(ord('A') + i)}. {option_text}")
-    return f"{q}\nOptions:\n" + "\n".join(normalized_options)
+    if any(not str(opt).strip() for opt in options):
+        raise ValueError("ours 迭代方法选项不能为空。")
+    return f"{q}\nOptions:\n{format_labeled_options(options)}"
 
 
 def _build_clip_query(question: str | None, options: list[str] | None, answer: str | None) -> str:

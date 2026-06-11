@@ -41,21 +41,42 @@ def from_pretrained_local_first(
         return loader(model_id, **net_kwargs)
 
 
+_OPTION_LETTER_PREFIX_RE = re.compile(r"^([A-Za-z])[\.\)\:\-]\s*(.*)$", re.DOTALL)
+
+
+def format_labeled_options(options: list[str]) -> str:
+    """为 MCQ 选项加上 A. B. C. … 前缀，便于模型按字母作答。"""
+    lines: list[str] = []
+    for i, raw in enumerate(options):
+        text = str(raw).strip()
+        if not text:
+            continue
+        m = _OPTION_LETTER_PREFIX_RE.match(text)
+        if m:
+            text = m.group(2).strip() or text
+        lines.append(f"{chr(ord('A') + i)}. {text}")
+    return "\n".join(lines)
+
+
 def build_user_text(question: str, options: list[str] | None) -> str:
     if options:
-        return f"{question}\n\nOptions:\n" + "\n".join(options) + "\n\nDirectly answer with the option letter only. Do not explain."
+        return (
+            f"{question}\n\nOptions:\n"
+            f"{format_labeled_options(options)}\n\n"
+            "Directly answer with the option letter only. Do not explain."
+        )
     return f"{question}\n\nPlease provide the numerical answer directly."
 
 
 def build_user_text_with_subtitles(question: str, options: list[str] | None, subtitles: list[str] | None) -> str:
-    options_text = "\n".join(options or [])
+    options_text = format_labeled_options(options or []) if options else ""
     subtitle_text = "\n".join((subtitles or [])).strip() or "No subtitles available"
     return (
         "This video's subtitles are listed below:\n"
         f"{subtitle_text}\n\n"
         "Select the best answer to the following multiple-choice question based on the video. "
-        "Respond with only the letter (A, B, C, or D) of the correct option.\n"
-        f"{question}\n{options_text}\n"
+        "Respond with only the letter of the correct option.\n"
+        f"{question}\n\nOptions:\n{options_text}\n"
         "The best answer is:"
     )
 

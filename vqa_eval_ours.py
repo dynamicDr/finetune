@@ -24,6 +24,7 @@ from utils import (
     avg as _avg,
     build_user_text,
     build_user_text_with_subtitles,
+    format_labeled_options,
     calculate_mra,
     collect_subtitles_for_frame_ids as _collect_subtitles_for_sample,
     compute_accuracy_from_results as _compute_accuracy_from_results,
@@ -234,7 +235,7 @@ def _build_keyword_extraction_prompt(
     prompt_version: int,
 ) -> str:
     target_keywords = max(1, int(target_keywords))
-    options_text = "\n".join(options or [])
+    options_text = format_labeled_options(options or [])
     if int(prompt_version) == 0:
         return (
             "You are a visual element extractor for video question answering.\n"
@@ -1273,9 +1274,8 @@ def _build_image_keyword_scores(
 
 
 def _build_question_options_visual_text(question: str, options: list[str] | None) -> str:
-    options_text = "\n".join(options or [])
-    if options_text:
-        return f"Question: {question}\nOptions:\n{options_text}"
+    if options:
+        return f"Question: {question}\nOptions:\n{format_labeled_options(options)}"
     return f"Question: {question}"
 
 

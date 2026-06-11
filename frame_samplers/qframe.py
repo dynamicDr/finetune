@@ -171,10 +171,11 @@ def _build_query(question: str | None, options: list[str] | None) -> str:
         return "Find frames that best support answering the video question."
     if not options:
         return q
-    normalized_options = [str(opt).strip() for opt in options if str(opt).strip()]
-    if not normalized_options:
+    from utils import format_labeled_options
+
+    if any(not str(opt).strip() for opt in options):
         return q
-    return f"{q}\nOptions:\n" + "\n".join(normalized_options)
+    return f"{q}\nOptions:\n{format_labeled_options(options)}"
 
 
 def _encode_images_batched(images, processor, model, torch, device, batch_size=16):
