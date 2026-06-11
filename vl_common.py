@@ -84,11 +84,87 @@ def build_mcq_prompt(question: str, options: list[str]) -> str:
     return build_user_text(question, options)
 
 
+# Qwen VL 官方推荐：单图/单帧视觉 token 预算 256–1280（经 spatial merge 后）
+_DEFAULT_MAX_VISUAL_TOKENS = 1280
+_DEFAULT_MIN_VISUAL_TOKENS = 256
+
+
+def _vl_pixel_factor(model_id: str) -> int | None:
+    model_id_lower = model_id.lower()
+    if "qwen3-vl" in model_id_lower:
+        return 32
+    if "qwen2.5-vl" in model_id_lower or "qwen2-vl" in model_id_lower:
+        return 28
+    return None
+
+
+def _apply_processor_pixel_limits(
+    processor,
+    model_id: str,
+    *,
+    max_pixels: int | None = None,
+    min_pixels: int | None = None,
+) -> None:
+    """限制 Qwen VL processor 单帧/单图像素，避免超高分辨率视频帧 OOM。"""
+    factor = _vl_pixel_factor(model_id)
+    if factor is None:
+        return
+
+    max_px = (
+        max_pixels
+        if max_pixels is not None
+        else _DEFAULT_MAX_VISUAL_TOKENS * factor * factor
+    )
+    min_px = (
+        min_pixels
+        if min_pixels is not None
+        else _DEFAULT_MIN_VISUAL_TOKENS * factor * factor
+    )
+    size = {"longest_edge": max_px, "shortest_edge": min_px}
+
+    image_processor = getattr(processor, "image_processor", None)
+    if image_processor is not None:
+        image_processor.size = size
+
+
+def _log_processor_pixel_config(processor) -> None:
+    image_processor = getattr(processor, "image_processor", None)
+    if image_processor is None:
+        print(
+            f"[perf-debug][processor] processor={type(processor).__name__}, image_processor=None",
+            flush=True,
+        )
+        return
+
+    size = getattr(image_processor, "size", None)
+    if isinstance(size, dict):
+        longest_edge = size.get("longest_edge")
+        shortest_edge = size.get("shortest_edge")
+    elif size is not None:
+        longest_edge = getattr(size, "longest_edge", None)
+        shortest_edge = getattr(size, "shortest_edge", None)
+    else:
+        longest_edge = None
+        shortest_edge = None
+    min_pixels = getattr(image_processor, "min_pixels", None)
+    max_pixels = getattr(image_processor, "max_pixels", None)
+    print(
+        "[perf-debug][processor] "
+        f"processor={type(processor).__name__}, "
+        f"size.longest_edge={longest_edge}, size.shortest_edge={shortest_edge}, "
+        f"min_pixels={min_pixels}, max_pixels={max_pixels}",
+        flush=True,
+    )
+
+
 def load_model_and_processor(
     model_path: str,
     use_lora: bool = False,
     base_model: str | None = None,
     merge_lora: bool = False,
+    max_pixels: int | None = None,
+    min_pixels: int | None = None,
+    apply_pixel_limits: bool = False,
 ):
     model_path = os.path.expanduser(model_path)
     print(
@@ -134,14 +210,14 @@ def load_model_and_processor(
             f"dtype={model.dtype}, attn_impl={attn_impl}, device={next(model.parameters()).device}",
             flush=True,
         )
-        image_processor = getattr(processor, "image_processor", None)
-        min_pixels = getattr(image_processor, "min_pixels", None) if image_processor is not None else None
-        max_pixels = getattr(image_processor, "max_pixels", None) if image_processor is not None else None
-        print(
-            "[perf-debug][processor] "
-            f"processor={type(processor).__name__}, min_pixels={min_pixels}, max_pixels={max_pixels}",
-            flush=True,
-        )
+        if apply_pixel_limits:
+            _apply_processor_pixel_limits(
+                processor,
+                base_id,
+                max_pixels=max_pixels,
+                min_pixels=min_pixels,
+            )
+        _log_processor_pixel_config(processor)
         return model, processor
 
     if _use_generic_vl_loader(model_path):
@@ -159,14 +235,14 @@ def load_model_and_processor(
             f"dtype={model.dtype}, attn_impl={attn_impl}, device={next(model.parameters()).device}",
             flush=True,
         )
-        image_processor = getattr(processor, "image_processor", None)
-        min_pixels = getattr(image_processor, "min_pixels", None) if image_processor is not None else None
-        max_pixels = getattr(image_processor, "max_pixels", None) if image_processor is not None else None
-        print(
-            "[perf-debug][processor] "
-            f"processor={type(processor).__name__}, min_pixels={min_pixels}, max_pixels={max_pixels}",
-            flush=True,
-        )
+        if apply_pixel_limits:
+            _apply_processor_pixel_limits(
+                processor,
+                model_path,
+                max_pixels=max_pixels,
+                min_pixels=min_pixels,
+            )
+        _log_processor_pixel_config(processor)
         return model, processor
 
     if use_lora:
@@ -196,14 +272,20 @@ def load_model_and_processor(
         f"dtype={model.dtype}, attn_impl={attn_impl}, device={next(model.parameters()).device}",
         flush=True,
     )
-    image_processor = getattr(processor, "image_processor", None)
-    min_pixels = getattr(image_processor, "min_pixels", None) if image_processor is not None else None
-    max_pixels = getattr(image_processor, "max_pixels", None) if image_processor is not None else None
-    print(
-        "[perf-debug][processor] "
-        f"processor={type(processor).__name__}, min_pixels={min_pixels}, max_pixels={max_pixels}",
-        flush=True,
-    )
+    if use_lora and base_model:
+        pixel_limit_model_id = os.path.expanduser(base_model)
+    elif use_lora:
+        pixel_limit_model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+    else:
+        pixel_limit_model_id = model_path
+    if apply_pixel_limits:
+        _apply_processor_pixel_limits(
+            processor,
+            pixel_limit_model_id,
+            max_pixels=max_pixels,
+            min_pixels=min_pixels,
+        )
+    _log_processor_pixel_config(processor)
     return model, processor
 
 

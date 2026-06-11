@@ -30,6 +30,20 @@ def list_supported_datasets() -> list[str]:
     return sorted(LOADER_REGISTRY.keys())
 
 
+def dataset_uses_vl_pixel_limits(
+    dataset: str,
+    dataset_split: str = "",
+    dataset_name: str = "",
+) -> bool:
+    """MLVU-Test 含超高分辨率 outlier 视频，需限制 processor 单帧像素防 OOM。"""
+    key = dataset.strip().lower()
+    split = dataset_split.strip().lower()
+    name = dataset_name.strip().lower()
+    if key == "mlvu" and split == "test":
+        return True
+    return "mlvu_test" in name.replace("-", "_")
+
+
 def apply_dataset_cli_defaults(args: Any) -> None:
     """当用户只改 --dataset 时，自动补齐常用 video_dir / dataset_name / split。"""
     key = str(getattr(args, "dataset", "")).strip().lower()

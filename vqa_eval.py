@@ -11,7 +11,12 @@ from typing import Any
 
 from tqdm import tqdm
 
-from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
+from data_loaders import (
+    apply_dataset_cli_defaults,
+    dataset_uses_vl_pixel_limits,
+    get_data_loader,
+    list_supported_datasets,
+)
 from data_loaders.base import VQASample, sample_matches_task_filter
 from frame_samplers import sample_video_frames
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
@@ -466,11 +471,22 @@ def main():
         flush=True,
     )
 
+    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+        args.dataset,
+        args.dataset_split,
+        args.dataset_name,
+    )
+    if apply_pixel_limits:
+        print(
+            "[vqa_eval] MLVU-Test：启用 processor max_pixels 限制（防超高分辨率 OOM）",
+            flush=True,
+        )
     model, processor = load_model_and_processor(
         resolved_model_path,
         use_lora=args.use_lora,
         base_model=args.base_model,
         merge_lora=args.merge_lora,
+        apply_pixel_limits=apply_pixel_limits,
     )
     results = evaluate_vqa(
         model=model,

@@ -17,7 +17,12 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
-from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
+from data_loaders import (
+    apply_dataset_cli_defaults,
+    dataset_uses_vl_pixel_limits,
+    get_data_loader,
+    list_supported_datasets,
+)
 from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from utils import (
@@ -1792,7 +1797,23 @@ def main():
         f"quota_prescreen_alpha={int(args.quota_prescreen_alpha)}"
     )
 
-    model, proc = load_model_and_processor(resolved_model_path, use_lora=args.use_lora, base_model=args.base_model, merge_lora=args.merge_lora)
+    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+        args.dataset,
+        args.dataset_split,
+        args.dataset_name,
+    )
+    if apply_pixel_limits:
+        print(
+            "[vqa_eval_ours] MLVU-Test：启用 processor max_pixels 限制（防超高分辨率 OOM）",
+            flush=True,
+        )
+    model, proc = load_model_and_processor(
+        resolved_model_path,
+        use_lora=args.use_lora,
+        base_model=args.base_model,
+        merge_lora=args.merge_lora,
+        apply_pixel_limits=apply_pixel_limits,
+    )
     results = evaluate_vqa(
         model,
         proc,

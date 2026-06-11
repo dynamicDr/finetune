@@ -12,7 +12,12 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
+from data_loaders import (
+    apply_dataset_cli_defaults,
+    dataset_uses_vl_pixel_limits,
+    get_data_loader,
+    list_supported_datasets,
+)
 from vl_common import load_model_and_processor
 
 
@@ -143,7 +148,15 @@ def main():
     if args.max_videos is not None:
         unique_video_paths = unique_video_paths[: args.max_videos]
 
-    model, processor = load_model_and_processor(args.model_path)
+    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+        args.dataset,
+        args.dataset_split,
+        args.dataset_name,
+    )
+    model, processor = load_model_and_processor(
+        args.model_path,
+        apply_pixel_limits=apply_pixel_limits,
+    )
 
     index_items: list[dict[str, Any]] = []
     success = 0
