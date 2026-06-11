@@ -848,6 +848,59 @@ def _allocate_counts_by_weights(weights: torch.Tensor, total: int) -> torch.Tens
     return base
 
 
+def _allocate_adaptive_quotas(
+    weights: torch.Tensor,
+    local_evidence: torch.Tensor,
+    budget: int,
+    gamma: float,
+) -> torch.Tensor:
+    """按权重与 Hoyer LE 分配每关键词帧配额：尖峰词配额小，平缓词配额大。"""
+    budget = int(budget)
+    m = int(weights.numel())
+    if budget <= 0 or m == 0:
+        return torch.zeros((m,), dtype=torch.long, device=weights.device)
+
+    w = weights.float().clamp(min=0.0)
+    le = local_evidence.float().clamp(min=0.0, max=1.0)
+    if le.numel() != m:
+        le = torch.zeros_like(w)
+
+    raw = w * (1.0 + float(gamma) * (1.0 - le))
+    s = float(raw.sum().item())
+    if s <= 1e-12:
+        raw = torch.ones_like(w)
+        s = float(m)
+
+    if budget >= m:
+        quotas = torch.ones((m,), dtype=torch.long, device=weights.device)
+        extra = budget - m
+        if extra > 0:
+            quotas = quotas + _allocate_counts_by_weights(raw, extra)
+        return quotas
+
+    proportional = budget * raw / s
+    quotas = torch.round(proportional).to(torch.long).clamp(min=1)
+    diff = budget - int(quotas.sum().item())
+    if diff == 0:
+        return quotas
+
+    frac = proportional - quotas.float()
+    order = torch.argsort(frac, descending=(diff > 0))
+    guard = 0
+    while diff != 0 and guard < m * 4:
+        i = int(order[guard % m].item())
+        if diff > 0:
+            quotas[i] += 1
+            diff -= 1
+        elif int(quotas[i].item()) > 1:
+            quotas[i] -= 1
+            diff += 1
+        guard += 1
+    if diff != 0:
+        return _allocate_counts_by_weights(raw, budget)
+    return quotas
+
+
 def _local_evidence_score(x: torch.Tensor) -> float:
     """计算一维相似度曲线的局部证据度：减中位数基线后取 Hoyer 稀疏度。"""
     x = x.detach().float().flatten()
@@ -920,6 +973,7 @@ def _compute_keyword_information(
         "kws_use": kws_use,
         "kw_emb_use": kw_emb_use,
         "kw_weights": kw_weights,
+        "local_evidence": local_evidence,
         "rows": rows,
     }
 
@@ -964,6 +1018,7 @@ def _build_quota_prescreen_candidates(
     kw_w: torch.Tensor,
     budget: int,
     alpha: int,
+    quotas: torch.Tensor | None = None,
 ) -> list[int]:
     """按关键词配额做软预筛：每词取 top-(alpha*q_i)，并集去重。"""
     if kw_sims.ndim != 2 or kw_sims.shape[0] == 0 or budget <= 0:
@@ -973,7 +1028,12 @@ def _build_quota_prescreen_candidates(
     if kw_w.numel() != m:
         kw_w = torch.ones((m,), device=kw_sims.device)
     kw_w = kw_w.float().clamp(min=0.0)
-    quotas = _allocate_counts_by_weights(kw_w, budget)
+    if quotas is None:
+        quotas = _allocate_counts_by_weights(kw_w, budget)
+    else:
+        quotas = quotas.to(device=kw_sims.device, dtype=torch.long)
+        if quotas.numel() != m:
+            quotas = _allocate_counts_by_weights(kw_w, budget)
     alpha = max(1, int(alpha))
     picked: set[int] = set()
     for j in range(m):
@@ -1034,9 +1094,78 @@ def _submodular_cover_greedy_select(
     return selected
 
 
+def _topq_mean_similarity(sims: list[float], q: int) -> float:
+    if not sims or q <= 0:
+        return 0.0
+    k = min(int(q), len(sims))
+    top = sorted(sims, reverse=True)[:k]
+    return float(sum(top)) / k
+
+
+def _sparsity_adaptive_quota_select(
+    kw_sims: torch.Tensor,
+    kw_w: torch.Tensor,
+    quotas: torch.Tensor,
+    budget: int,
+    candidate_idx: list[int],
+) -> list[int]:
+    """Lazy greedy: F(S) = sum_i w_i * mean(top_{q_i} sims_i(S))."""
+    if kw_sims.ndim != 2 or budget <= 0:
+        return []
+    m = int(kw_sims.shape[0])
+    n = int(kw_sims.shape[1])
+    if m == 0 or n == 0:
+        return []
+
+    if kw_w.numel() != m:
+        kw_w = torch.ones((m,), device=kw_sims.device)
+    kw_w = kw_w.float().clamp(min=0.0)
+    if float(kw_w.sum().item()) <= 1e-12:
+        kw_w = torch.ones_like(kw_w)
+
+    if quotas.numel() != m:
+        quotas = _allocate_counts_by_weights(kw_w, budget)
+    quotas = quotas.long()
+
+    cand = sorted({int(i) for i in candidate_idx if 0 <= int(i) < n})
+    if len(cand) < min(budget, n):
+        cand = list(range(n))
+
+    max_pick = min(int(budget), n)
+    selected: list[int] = []
+    selected_set: set[int] = set()
+    kw_selected_sims: list[list[float]] = [[] for _ in range(m)]
+
+    for _ in range(max_pick):
+        best_idx = -1
+        best_gain = -1.0
+        for f in cand:
+            if f in selected_set:
+                continue
+            gain = 0.0
+            sim_f = kw_sims[:, f]
+            for i in range(m):
+                qi = int(quotas[i].item())
+                old_m = _topq_mean_similarity(kw_selected_sims[i], qi)
+                new_m = _topq_mean_similarity(kw_selected_sims[i] + [float(sim_f[i].item())], qi)
+                gain += float(kw_w[i].item()) * (new_m - old_m)
+            if gain > best_gain:
+                best_gain = gain
+                best_idx = f
+        if best_idx < 0:
+            break
+        selected.append(best_idx)
+        selected_set.add(best_idx)
+        sim_best = kw_sims[:, best_idx]
+        for i in range(m):
+            kw_selected_sims[i].append(float(sim_best[i].item()))
+    return selected
+
+
 def _select_keyword_frames(
     kw_frame_sims: torch.Tensor,
     kw_weights: torch.Tensor,
+    kw_local_evidence: torch.Tensor,
     budget: int,
     frame_selection_mode: int,
     args: argparse.Namespace,
@@ -1067,115 +1196,28 @@ def _select_keyword_frames(
         )
         return selected_idx, candidate_idx, "quota_topk"
     if frame_selection_mode == 2:
-        candidate_idx = list(range(int(kw_frame_sims.shape[1])))
-        selected_idx = _segment_quota_topk_select(
+        adaptive_quotas = _allocate_adaptive_quotas(
+            kw_weights,
+            kw_local_evidence,
+            budget,
+            float(args.quota_gamma),
+        )
+        candidate_idx = _build_quota_prescreen_candidates(
             kw_sims=kw_frame_sims,
             kw_w=kw_weights,
             budget=budget,
+            alpha=int(args.quota_prescreen_alpha),
+            quotas=adaptive_quotas,
         )
-        return selected_idx, candidate_idx, "segment_quota_topk"
+        selected_idx = _sparsity_adaptive_quota_select(
+            kw_sims=kw_frame_sims,
+            kw_w=kw_weights,
+            quotas=adaptive_quotas,
+            budget=budget,
+            candidate_idx=candidate_idx,
+        )
+        return selected_idx, candidate_idx, "sparsity_adaptive_quota"
     raise ValueError(f"frame_selection_mode 仅支持 0/1/2，当前: {frame_selection_mode}")
-
-
-def _build_time_segments(n_candidates: int, n_segments: int) -> list[tuple[int, int]]:
-    """将按时间排序的候选池均分为 n_segments 段（与 clip.py 分段逻辑一致）。"""
-    if n_candidates <= 0:
-        return []
-    n_segments = max(1, min(int(n_segments), int(n_candidates)))
-    segments: list[tuple[int, int]] = []
-    for seg_idx in range(n_segments):
-        seg_start = int(seg_idx * n_candidates / n_segments)
-        seg_end = int((seg_idx + 1) * n_candidates / n_segments)
-        if seg_start >= seg_end:
-            continue
-        segments.append((seg_start, seg_end))
-    return segments
-
-
-def _segment_quota_topk_select(
-    kw_sims: torch.Tensor,
-    kw_w: torch.Tensor,
-    budget: int,
-) -> list[int]:
-    """段独占配额 topk：按关键词权重分配时间段，每段内对该词取 CLIP peak。"""
-    if kw_sims.ndim != 2 or budget <= 0:
-        return []
-    m = int(kw_sims.shape[0])
-    n = int(kw_sims.shape[1])
-    if m == 0 or n == 0:
-        return []
-
-    if kw_w.numel() != m:
-        kw_w = torch.ones((m,), device=kw_sims.device)
-    kw_w = kw_w.float().clamp(min=0.0)
-    if float(kw_w.sum().item()) <= 1e-12:
-        kw_w = torch.ones_like(kw_w)
-
-    max_pick = min(int(budget), n)
-    segments = _build_time_segments(n, min(max_pick, n))
-    if not segments:
-        return []
-
-    num_seg = len(segments)
-    best_idx = torch.zeros((m, num_seg), dtype=torch.long, device=kw_sims.device)
-    best_score = torch.zeros((m, num_seg), dtype=kw_sims.dtype, device=kw_sims.device)
-    for s, (seg_start, seg_end) in enumerate(segments):
-        seg_sims = kw_sims[:, seg_start:seg_end]
-        rel_best = seg_sims.argmax(dim=1)
-        best_idx[:, s] = seg_start + rel_best
-        best_score[:, s] = seg_sims.gather(1, rel_best.unsqueeze(1)).squeeze(1)
-
-    quotas = _allocate_counts_by_weights(kw_w, max_pick)
-    keyword_order = [int(i) for i in torch.argsort(kw_w, descending=True).tolist()]
-    assigned_segments: set[int] = set()
-    selected: list[int] = []
-    selected_set: set[int] = set()
-
-    def _try_assign(j: int, seg_id: int) -> bool:
-        if seg_id in assigned_segments:
-            return False
-        idx = int(best_idx[j, seg_id].item())
-        if idx in selected_set:
-            return False
-        selected.append(idx)
-        selected_set.add(idx)
-        assigned_segments.add(seg_id)
-        return True
-
-    def _segments_for_keyword(j: int) -> list[int]:
-        return sorted(
-            (s for s in range(num_seg) if s not in assigned_segments),
-            key=lambda s: float(best_score[j, s].item()),
-            reverse=True,
-        )
-
-    for j in keyword_order:
-        q = int(quotas[j].item())
-        if q <= 0:
-            continue
-        for seg_id in _segments_for_keyword(j):
-            if q <= 0 or len(selected) >= max_pick:
-                break
-            if _try_assign(j, seg_id):
-                q -= 1
-        if len(selected) >= max_pick:
-            break
-
-    while len(selected) < max_pick:
-        progressed = False
-        for j in keyword_order:
-            for seg_id in _segments_for_keyword(j):
-                if _try_assign(j, seg_id):
-                    progressed = True
-                    if len(selected) >= max_pick:
-                        break
-                if len(selected) >= max_pick:
-                    break
-            if len(selected) >= max_pick:
-                break
-        if not progressed:
-            break
-    return selected
 
 
 def _quota_topk_select(
@@ -1348,6 +1390,7 @@ def _eval_one_sample(
     kws_use: list[str] = info_pack["kws_use"]
     kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
     kw_weights: torch.Tensor = info_pack["kw_weights"]
+    kw_local_evidence: torch.Tensor = info_pack["local_evidence"]
     kw_frame_sims = (kw_emb_use @ img_emb.T) if kw_emb_use.shape[0] > 0 else torch.empty((0, img_emb.shape[0]), device=img_emb.device)
 
     if VERBOSE:
@@ -1379,6 +1422,7 @@ def _eval_one_sample(
     selected_idx, candidate_idx, selection_method = _select_keyword_frames(
         kw_frame_sims=kw_frame_sims,
         kw_weights=kw_weights,
+        kw_local_evidence=kw_local_evidence,
         budget=budget,
         frame_selection_mode=frame_selection_mode,
         args=args,
@@ -1390,7 +1434,7 @@ def _eval_one_sample(
     if frame_selection_mode == 1:
         mode_log = f"alpha={int(args.quota_prescreen_alpha)}"
     elif frame_selection_mode == 2:
-        mode_log = f"segments={min(budget, len(imgs))}"
+        mode_log = f"gamma={float(args.quota_gamma):g}, alpha={int(args.quota_prescreen_alpha)}"
     else:
         mode_log = "alpha=skipped"
     _log(
@@ -1450,6 +1494,7 @@ def _eval_one_sample(
             "candidate_pool_size": int(len(imgs)),
             "candidate_pool_fps": float(args.candidate_pool_fps),
             "quota_prescreen_alpha": int(args.quota_prescreen_alpha),
+            "quota_gamma": float(args.quota_gamma),
             "max_keywords": int(args.max_keywords),
             "keyword_prompt_version": int(args.keyword_prompt_version),
             "keyword_extractor_model": str(args.keyword_extractor_model),
@@ -1574,6 +1619,12 @@ def parse_args():
     )
     p.add_argument("--quota_prescreen_alpha", type=int, default=3, help="配额软预筛系数 alpha：每个关键词预筛 top-(alpha*q_i) 帧")
     p.add_argument(
+        "--quota_gamma",
+        type=float,
+        default=1.0,
+        help="mode2 稀疏自适应配额系数 gamma：raw_q_i = w_i * (1 + gamma * (1 - LE_i))",
+    )
+    p.add_argument(
         "--max_keywords",
         type=int,
         default=5,
@@ -1624,7 +1675,7 @@ def parse_args():
         type=int,
         choices=[0, 1, 2],
         default=1,
-        help="最终选帧模式：1=覆盖贪心，0=配额topk，2=段独占配额topk（mode0+时间分段）",
+        help="最终选帧模式：1=覆盖贪心，0=配额topk，2=稀疏自适应配额 sparsity_adaptive_quota",
     )
     return p.parse_args()
 
@@ -1649,6 +1700,7 @@ def _ours_csv_columns() -> list[str]:
         "lora_path",
         "candidate_pool_fps",
         "quota_prescreen_alpha",
+        "quota_gamma",
         "max_keywords",
         "keyword_prompt_version",
         "keyword_extractor_model",
@@ -1695,6 +1747,7 @@ def _ours_csv_row(
         lora_path,
         f"{float(args.candidate_pool_fps):g}",
         int(args.quota_prescreen_alpha),
+        f"{float(args.quota_gamma):g}",
         int(args.max_keywords),
         int(args.keyword_prompt_version),
         str(args.keyword_extractor_model),
@@ -1794,7 +1847,8 @@ def main():
     _log(
         f"配置: candidate_pool_fps={float(args.candidate_pool_fps):g}, "
         f"budget={budget}, frame_selection_mode={int(args.frame_selection_mode)}, "
-        f"quota_prescreen_alpha={int(args.quota_prescreen_alpha)}"
+        f"quota_prescreen_alpha={int(args.quota_prescreen_alpha)}, "
+        f"quota_gamma={float(args.quota_gamma):g}"
     )
 
     apply_pixel_limits = dataset_uses_vl_pixel_limits(

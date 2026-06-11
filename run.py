@@ -121,6 +121,9 @@ def main(cfg: DictConfig) -> None:
             quota_prescreen_alpha = OmegaConf.select(cfg, "quota_prescreen_alpha", default=None)
             if quota_prescreen_alpha is not None and str(quota_prescreen_alpha).strip() not in ("", "null", "None"):
                 dataset_shared += ["--quota_prescreen_alpha", str(int(quota_prescreen_alpha))]
+            quota_gamma = OmegaConf.select(cfg, "quota_gamma", default=None)
+            if quota_gamma is not None and str(quota_gamma).strip() not in ("", "null", "None"):
+                dataset_shared += ["--quota_gamma", str(float(quota_gamma))]
             max_keywords = OmegaConf.select(cfg, "max_keywords", default=None)
             if max_keywords is not None and str(max_keywords).strip() not in ("", "null", "None"):
                 dataset_shared += ["--max_keywords", str(int(max_keywords))]
@@ -152,7 +155,7 @@ def main(cfg: DictConfig) -> None:
                 dataset_shared += ["--keyword_cache_number", str(int(keyword_cache_number))]
             elif bool(use_keyword_cache):
                 dataset_shared += ["--keyword_cache_number", "0"]
-            # 0=配额topk，1=覆盖贪心，2=段独占配额topk（mode0+clip式时间分段）
+            # 0=配额topk，1=覆盖贪心，2=稀疏自适应配额 sparsity_adaptive_quota
             frame_selection_mode = OmegaConf.select(cfg, "frame_selection_mode", default=None)
             if frame_selection_mode is not None and str(frame_selection_mode).strip() not in ("", "null", "None"):
                 dataset_shared += ["--frame_selection_mode", str(int(frame_selection_mode))]

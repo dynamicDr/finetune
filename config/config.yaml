@@ -24,6 +24,7 @@ use_subtitles: false
 subtitles_dir: ""
 # vqa_eval_ours.py 选帧与关键词超参数（run.py 会传给脚本）
 quota_prescreen_alpha: 3
+quota_gamma: 1.0
 max_keywords: 5
 keyword_prompt_version: 0
 keyword_extractor_model: local
