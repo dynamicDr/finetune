@@ -49,18 +49,6 @@ class MLVULoader(BaseDataLoader):
         self.dataset_config = None if no_dataset_config else dataset_config
         self._video_index: dict[str, str] | None = None
 
-    def _include_by_task(self, sample: VQASample) -> bool:
-        tf = self.task_filter
-        if tf == "all":
-            return True
-        if tf == "mcq":
-            return sample.options is not None
-        if tf == "generation":
-            return sample.options is None
-        if tf == "numeric":
-            return sample.options is None
-        return sample.task_type == tf
-
     def _dataset_root(self) -> Path:
         return Path(os.path.expanduser(self.video_dir))
 

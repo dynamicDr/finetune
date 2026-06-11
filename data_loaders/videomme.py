@@ -36,11 +36,6 @@ class VideoMMELoader(BaseDataLoader):
         self.video_roots = [p for p in dict.fromkeys(candidates) if os.path.isdir(p)]
         self._video_index: dict[str, str] | None = None
 
-    def _include_by_task(self, sample: VQASample) -> bool:
-        if self.task_filter in {"all", "mcq"}:
-            return True
-        return sample.task_type == self.task_filter
-
     def _local_parquet_candidates(self) -> list[str]:
         base_video_dir = os.path.expanduser(self.video_dir)
         parent_video_dir = os.path.dirname(base_video_dir.rstrip("/"))

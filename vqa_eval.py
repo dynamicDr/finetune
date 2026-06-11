@@ -12,7 +12,7 @@ from typing import Any
 from tqdm import tqdm
 
 from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
-from data_loaders.base import VQASample
+from data_loaders.base import VQASample, sample_matches_task_filter
 from frame_samplers import sample_video_frames
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from utils import (
@@ -160,8 +160,7 @@ def evaluate_vqa(
 
     pbar = tqdm(samples, desc="评估进度")
     for i, sample in enumerate(pbar):
-        # 按 task_filter 显式过滤样本，避免不匹配类型产生无效计算
-        if task_filter != "all" and sample.task_type != task_filter:
+        if not sample_matches_task_filter(sample, task_filter):
             continue
 
         random_seed = (seed + i) if frame_sampling_method == "random" else None

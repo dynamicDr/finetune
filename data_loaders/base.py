@@ -45,6 +45,18 @@ class VQASample:
         return self.preprocess_key or self.sample_id
 
 
+def sample_matches_task_filter(sample: VQASample, task_filter: str) -> bool:
+    """与各 DataLoader._include_by_task 一致：mcq=有选项，generation/numeric=无选项，其余按 task_type。"""
+    tf = str(task_filter).strip()
+    if tf == "all":
+        return True
+    if tf == "mcq":
+        return sample.options is not None
+    if tf in {"generation", "numeric"}:
+        return sample.options is None
+    return sample.task_type == tf
+
+
 class BaseDataLoader(ABC):
     def __init__(
         self,
@@ -67,9 +79,7 @@ class BaseDataLoader(ABC):
         """Convert one raw row to unified VQASample; return None to skip."""
 
     def _include_by_task(self, sample: VQASample) -> bool:
-        if self.task_filter == "all":
-            return True
-        return sample.task_type == self.task_filter
+        return sample_matches_task_filter(sample, self.task_filter)
 
     def _convert_all(self, split: str) -> list[VQASample]:
         dataset = self.load_raw_dataset(split)

@@ -18,7 +18,7 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
 from data_loaders import apply_dataset_cli_defaults, get_data_loader, list_supported_datasets
-from data_loaders.base import VQASample
+from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from utils import (
     avg as _avg,
@@ -1485,7 +1485,7 @@ def evaluate_vqa(
     res = {"correct": 0, "total": 0, "mra_sum": 0.0, "mra_count": 0, "inference_times": [], "frame_sampling_times": [], "embedding_build_times": [], "selected_frame_counts": [], "over_max_tokens_count": 0}
     pbar = tqdm(samples, desc="评估进度(ours semantic refinement)")
     for s in pbar:
-        if args.task_filter != "all" and s.task_type != args.task_filter:
+        if not sample_matches_task_filter(s, args.task_filter):
             continue
         out = _eval_one_sample(
             model,
