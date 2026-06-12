@@ -28,12 +28,48 @@ def _use_generic_vl_loader(model_id: str) -> bool:
     return any(hint in model_id_lower for hint in generic_model_hints)
 
 
+def _is_llava_video_qwen_model_id(model_id: str) -> bool:
+    lowered = model_id.lower()
+    return "llava-video-7b-qwen2" in lowered or (
+        "lmms-lab" in lowered and "llava-video" in lowered and "qwen2" in lowered
+    )
+
+
+class LlavaVideoQwenProcessor:
+    """lmms-lab/LLaVA-Video-7B-Qwen2 原始权重推理包装（依赖 LLaVA-NeXT 包）。"""
+
+    is_llava_video_qwen = True
+
+    def __init__(self, tokenizer, image_processor, conv_template: str = "chatml_direct"):
+        self.tokenizer = tokenizer
+        self.image_processor = image_processor
+        self.conv_template = conv_template
+
+    def batch_decode(
+        self,
+        token_ids,
+        skip_special_tokens: bool = True,
+        clean_up_tokenization_spaces: bool = False,
+    ):
+        return self.tokenizer.batch_decode(
+            token_ids,
+            skip_special_tokens=skip_special_tokens,
+            clean_up_tokenization_spaces=clean_up_tokenization_spaces,
+        )
+
+
+def is_llava_video_qwen_inference(processor, model=None) -> bool:
+    return getattr(processor, "is_llava_video_qwen", False)
+
+
 def is_llava_next_video_inference(processor, model=None) -> bool:
-    """LLaVA-NeXT-Video 需走单路 video 输入，不能与 Qwen / OneVision 共用多图路径。"""
+    """LLaVA-NeXT-Video HF 权重需走单路 video 输入，不能与 Qwen / OneVision 共用多图路径。"""
+    if is_llava_video_qwen_inference(processor, model=model):
+        return False
     if type(processor).__name__ == "LlavaNextVideoProcessor":
         return True
     model_type = getattr(getattr(model, "config", None), "model_type", None)
-    return model_type == "llava_next_video"
+    return model_type in ("llava_next_video", "llava_next_video2")
 
 
 def _is_vl_model_id(model_id: str) -> bool:
@@ -290,6 +326,10 @@ def load_model_and_processor(
         f"model_path={model_path}, use_lora={use_lora}, base_model={base_model}, merge_lora={merge_lora}",
         flush=True,
     )
+    if _is_llava_video_qwen_model_id(model_path):
+        if use_lora:
+            raise ValueError("lmms-lab/LLaVA-Video-7B-Qwen2 暂不支持 LoRA 评测。")
+        return load_llava_video_qwen_model_and_processor(model_path)
     if use_lora and base_model:
         from peft import PeftModel
 
@@ -407,6 +447,53 @@ def load_model_and_processor(
     return model, processor
 
 
+def load_llava_video_qwen_model_and_processor(model_path: str):
+    try:
+        from llava.constants import IMAGE_TOKEN_INDEX
+        from llava.conversation import conv_templates
+        from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
+        from llava.model.builder import load_pretrained_model
+        from llava.model.language_model.llava_qwen import LlavaQwenConfig
+        from transformers import AutoConfig
+    except ImportError as exc:
+        raise ImportError(
+            "lmms-lab/LLaVA-Video-7B-Qwen2 需要安装 LLaVA-NeXT："
+            "pip install git+https://github.com/LLaVA-VL/LLaVA-NeXT.git"
+        ) from exc
+
+    model_path = os.path.expanduser(model_path)
+    AutoConfig.register("llava_qwen", LlavaQwenConfig)
+    model_name = "llava_qwen" if "qwen" in model_path.lower() else get_model_name_from_path(model_path)
+    print(
+        "[perf-debug][load-llava-video] "
+        f"model_path={model_path}, model_name={model_name}, conv_template=chatml_direct",
+        flush=True,
+    )
+    tokenizer, model, image_processor, _ = load_pretrained_model(
+        model_path,
+        None,
+        model_name,
+        device_map=None,
+        torch_dtype=torch.bfloat16,
+    )
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = 151643
+    model = _move_model_to_target_device(model)
+    model.eval()
+    processor = LlavaVideoQwenProcessor(tokenizer, image_processor)
+    # 触发一次轻量校验，确保 llava 依赖可用。
+    _ = conv_templates[processor.conv_template]
+    _ = tokenizer_image_token
+    _ = IMAGE_TOKEN_INDEX
+    print(
+        "[perf-debug][model] "
+        f"dtype={model.dtype}, device={next(model.parameters()).device}, "
+        f"processor={type(processor).__name__}",
+        flush=True,
+    )
+    return model, processor
+
+
 def load_text_model_and_processor(model_path: str):
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -437,6 +524,78 @@ def load_keyword_model_and_processor(model_path: str):
     return load_text_model_and_processor(model_path)
 
 
+def _generate_response_llava_video_qwen(
+    model,
+    processor: LlavaVideoQwenProcessor,
+    frames: list[Image.Image],
+    prompt: str,
+    max_new_tokens: int,
+) -> tuple[str, float, int, bool]:
+    import time
+
+    from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+    from llava.conversation import SeparatorStyle, conv_templates
+    from llava.mm_utils import KeywordsStoppingCriteria, tokenizer_image_token
+
+    t_proc_start = time.time()
+    videos = []
+    if frames:
+        pixel_values = processor.image_processor.preprocess(frames, return_tensors="pt")["pixel_values"]
+        pixel_values = pixel_values.to(model.device, dtype=model.dtype)
+        videos.append(pixel_values)
+
+    qs = prompt
+    if videos:
+        qs = DEFAULT_IMAGE_TOKEN * len(videos) + "\n" + qs
+
+    conv = conv_templates[processor.conv_template].copy()
+    conv.append_message(conv.roles[0], qs)
+    conv.append_message(conv.roles[1], None)
+    prompt_text = conv.get_prompt()
+
+    input_ids = tokenizer_image_token(
+        prompt_text,
+        processor.tokenizer,
+        IMAGE_TOKEN_INDEX,
+        return_tensors="pt",
+    ).unsqueeze(0).to(model.device)
+    pad_token_id = processor.tokenizer.pad_token_id
+    if pad_token_id is None:
+        pad_token_id = 151643
+    attention_mask = input_ids.ne(pad_token_id).long()
+
+    stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
+    stopping_criteria = KeywordsStoppingCriteria([stop_str], processor.tokenizer, input_ids)
+    processor_time = time.time() - t_proc_start
+    prompt_len = int(input_ids.shape[1])
+
+    start_time = time.time()
+    with torch.no_grad():
+        output_ids = model.generate(
+            inputs=input_ids,
+            images=videos if videos else None,
+            attention_mask=attention_mask,
+            modalities="video" if videos else None,
+            do_sample=False,
+            num_beams=1,
+            max_new_tokens=max_new_tokens,
+            use_cache=True,
+            stopping_criteria=[stopping_criteria],
+        )
+    inference_time = time.time() - start_time
+
+    generated_ids_trimmed = output_ids[:, prompt_len:]
+    response = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True)[0]
+    generated_token_count = int(generated_ids_trimmed.shape[1]) if generated_ids_trimmed.numel() else 0
+    hit_max_tokens = generated_token_count >= max_new_tokens
+    print(
+        "[perf-debug][timing-split] "
+        f"processor={processor_time:.2f}s, generate={inference_time:.2f}s",
+        flush=True,
+    )
+    return response, inference_time, generated_token_count, hit_max_tokens
+
+
 def generate_response(
     model,
     processor,
@@ -445,6 +604,15 @@ def generate_response(
     max_new_tokens: int = 1024,
 ) -> tuple[str, float, int, bool]:
     import time
+
+    if is_llava_video_qwen_inference(processor, model=model):
+        return _generate_response_llava_video_qwen(
+            model,
+            processor,
+            frames,
+            prompt,
+            max_new_tokens,
+        )
 
     t_proc_start = time.time()
     inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)
@@ -546,8 +714,8 @@ def generate_response_with_split_embedding(
 ) -> tuple[str, float, float, int, bool]:
     import time
 
-    if is_llava_next_video_inference(processor, model=model):
-        raise RuntimeError("LLaVA-NeXT-Video 不支持 split embedding 推理路径，请使用 generate_response。")
+    if is_llava_next_video_inference(processor, model=model) or is_llava_video_qwen_inference(processor, model=model):
+        raise RuntimeError("LLaVA 视频模型不支持 split embedding 推理路径，请使用 generate_response。")
     model_inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)
     model_inputs = model_inputs.to(model.device)
 
@@ -585,8 +753,8 @@ def generate_response_with_split_embedding_detailed(
     import time
 
     model_call_start = time.perf_counter()
-    if is_llava_next_video_inference(processor, model=model):
-        raise RuntimeError("LLaVA-NeXT-Video 不支持 split embedding 推理路径，请使用 generate_response。")
+    if is_llava_next_video_inference(processor, model=model) or is_llava_video_qwen_inference(processor, model=model):
+        raise RuntimeError("LLaVA 视频模型不支持 split embedding 推理路径，请使用 generate_response。")
 
     processor_start = time.perf_counter()
     model_inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)

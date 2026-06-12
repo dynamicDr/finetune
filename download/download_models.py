@@ -14,11 +14,15 @@ MODEL_LIST = [
     # "Qwen/Qwen3-VL-8B-Instruct",
     # "Qwen/Qwen3.5-27B",
     # "Qwen/Qwen3.5-35B-A3B",
-    "Qwen/Qwen3.5-122B-A10B",
+    # "Qwen/Qwen3.5-122B-A10B",
     # "Qwen/Qwen3-VL-8B-Thinking",
     # "Qwen/Qwen3-VL-30B-A3B-Thinking",
     # "Qwen/Qwen3-VL-32B-Thinking",
+    # LLaVA-Video baseline（需 pip install git+https://github.com/LLaVA-VL/LLaVA-NeXT.git）
+    "lmms-lab/LLaVA-Video-7B-Qwen2",
 ]
+
+LLAVA_VIDEO_7B_QWEN2 = "lmms-lab/LLaVA-Video-7B-Qwen2"
 
 def download_one(model_id: str) -> None:
     print(f"\n[{MODEL_LIST.index(model_id) + 1}/{len(MODEL_LIST)}] 下载模型: {model_id}")
@@ -31,15 +35,25 @@ def download_one(model_id: str) -> None:
     print(f"✓ 完成: {model_id}")
 
 
+def download_llava_video_7b_qwen2() -> None:
+    """下载 LLaVA-Video-7B-Qwen2 baseline 到 HF 缓存。"""
+    download_one(LLAVA_VIDEO_7B_QWEN2)
+
+
 def main() -> None:
     print(f"批量下载 {len(MODEL_LIST)} 个模型到缓存目录...")
     print(f"缓存路径: $HOME/.cache/huggingface/hub\n")
-    
+
     for model_id in MODEL_LIST:
         download_one(model_id)
-    
+
     print("\n✓ 所有模型已下载并缓存完成。")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "llava_video_7b_qwen2":
+        download_llava_video_7b_qwen2()
+    else:
+        main()
