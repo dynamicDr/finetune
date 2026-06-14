@@ -1,2 +1,2 @@
 name: lmms-lab/LLaVA-Video-7B-Qwen2
-path: ${oc.env:HOME}/.cache/huggingface/hub/models--lmms-lab--LLaVA-Video-7B-Qwen2
+path: ${oc.env:HF_HUB_ROOT,/userhome/cs3/duanty/.cache/huggingface/hub}/models--lmms-lab--LLaVA-Video-7B-Qwen2
