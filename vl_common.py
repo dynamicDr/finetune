@@ -500,7 +500,7 @@ def load_llava_video_qwen_model_and_processor(model_path: str):
         None,
         model_name,
         device_map=None,
-        torch_dtype=torch.bfloat16,
+        torch_dtype="bfloat16",
     )
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = 151643
