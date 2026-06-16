@@ -1669,3 +1669,42 @@ python run.py --multirun \
   hydra/launcher=submitit_slurm \
   hydra.launcher.timeout_min=720 \
   slurm=hgpu_batch
+
+【zzy跑】 model=llava_onevision_qwen2_7b_ov_hf  MME上全 uniform short/medium（对标论文 OV baseline）
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform \
+    num_frames=16,32 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    task_filter=short,medium \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+【zzy跑】 model=qwen3_8b_instruct  MME上全 uniform short/medium
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset_name=lmms-lab/Video-MME \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+

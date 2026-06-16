@@ -36,8 +36,9 @@ def _is_llava_video_qwen_model_id(model_id: str) -> bool:
 
 
 def _patch_llava_transformers_compat() -> None:
-    """LLaVA-NeXT 仍从 modeling_utils 导入已在 transformers 5.x 移除/迁移的辅助函数。"""
+    """LLaVA-NeXT 面向 transformers 4.x；在 5.x 下补齐少量 API 差异。"""
     import transformers.modeling_utils as modeling_utils
+    from transformers.configuration_utils import PretrainedConfig
     from transformers.pytorch_utils import apply_chunking_to_forward, prune_linear_layer
 
     if not hasattr(modeling_utils, "apply_chunking_to_forward"):
@@ -56,6 +57,53 @@ def _patch_llava_transformers_compat() -> None:
             return heads, index
 
         modeling_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
+
+    # llava_qwen.__init__ 里 config.rope_scaling = None 会在 tf5 清空 rope_parameters。
+    if not getattr(PretrainedConfig, "_finetune_rope_none_patch", False):
+        _orig_rope_setter = PretrainedConfig.rope_scaling.fset
+
+        def _rope_scaling_setter(self, value):
+            if value is None and getattr(self, "rope_parameters", None):
+                return
+            _orig_rope_setter(self, value)
+
+        PretrainedConfig.rope_scaling = property(PretrainedConfig.rope_scaling.fget, _rope_scaling_setter)
+        PretrainedConfig._finetune_rope_none_patch = True
+
+    # llava 自带 SigLipVisionConfig.from_pretrained 仍调用已移除的 _set_token_in_kwargs。
+    from llava.model.multimodal_encoder import siglip_encoder
+
+    if not hasattr(siglip_encoder.SigLipVisionConfig, "_set_token_in_kwargs"):
+        siglip_encoder.SigLipVisionConfig._set_token_in_kwargs = classmethod(lambda cls, kwargs: None)
+
+
+def _llava_load_device_map() -> str | None:
+    device = _target_device()
+    if device.type == "cuda":
+        return f"cuda:{device.index or 0}"
+    return None
+
+
+def _build_llava_video_qwen_overwrite_config() -> dict[str, Any]:
+    """对齐 AKS llava_vid.py；delay_load 避免 transformers 5 meta-init 嵌套加载 vision tower。"""
+    return {
+        "mm_spatial_pool_stride": 2,
+        "mm_spatial_pool_mode": "average",
+        "mm_pooling_position": "before",
+        "mm_newline_position": "grid",
+        "delay_load": True,
+        # checkpoint 的 mm_tunable_parts 含 mm_vision_tower 时会在 __init__ 强加载 vision，触发 meta device 报错。
+        "mm_tunable_parts": "mm_mlp_adapter,mm_language_model",
+    }
+
+
+def _finalize_llava_video_qwen_model(model):
+    target = _target_device()
+    model = model.to(target)
+    vision_tower = model.get_vision_tower()
+    if vision_tower.is_loaded and getattr(vision_tower, "vision_tower", None) is not None:
+        vision_tower.vision_tower = vision_tower.vision_tower.to(device=target, dtype=model.dtype)
+    return model
 
 
 class LlavaVideoQwenProcessor:
@@ -471,6 +519,7 @@ def load_model_and_processor(
 
 
 def load_llava_video_qwen_model_and_processor(model_path: str):
+    """加载 lmms-lab/LLaVA-Video-7B-Qwen2，用法对齐 AKS evaluation/llava_vid.py。"""
     try:
         _patch_llava_transformers_compat()
         from llava.constants import IMAGE_TOKEN_INDEX
@@ -482,32 +531,36 @@ def load_llava_video_qwen_model_and_processor(model_path: str):
     except ImportError as exc:
         raise ImportError(
             "lmms-lab/LLaVA-Video-7B-Qwen2 需要安装 LLaVA-NeXT："
-            "pip install git+https://github.com/LLaVA-VL/LLaVA-NeXT.git。"
-            "若已安装仍报错，通常是 transformers>=5 与 LLaVA-NeXT 不兼容；"
-            "本项目已在 vl_common 中做兼容补丁，请确认使用的是最新代码。"
+            "pip install git+https://github.com/LLaVA-VL/LLaVA-NeXT.git"
         ) from exc
 
     model_path = os.path.expanduser(model_path)
     AutoConfig.register("llava_qwen", LlavaQwenConfig)
+    # HF snapshot 目录名不含 qwen，必须显式传 llava_qwen，否则 builder 走错分支。
     model_name = "llava_qwen" if "qwen" in model_path.lower() else get_model_name_from_path(model_path)
+    device_map = _llava_load_device_map()
+    overwrite_config = _build_llava_video_qwen_overwrite_config()
+    attn_implementation = "sdpa" if torch.__version__ >= "2.1.2" else "eager"
     print(
         "[perf-debug][load-llava-video] "
-        f"model_path={model_path}, model_name={model_name}, conv_template=chatml_direct",
+        f"model_path={model_path}, model_name={model_name}, device_map={device_map}, "
+        f"conv_template=chatml_direct, attn_implementation={attn_implementation}",
         flush=True,
     )
     tokenizer, model, image_processor, _ = load_pretrained_model(
         model_path,
         None,
         model_name,
-        device_map=None,
+        device_map=device_map,
         torch_dtype="bfloat16",
+        overwrite_config=overwrite_config,
+        attn_implementation=attn_implementation,
     )
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = 151643
-    model = _move_model_to_target_device(model)
+    model = _finalize_llava_video_qwen_model(model)
     model.eval()
     processor = LlavaVideoQwenProcessor(tokenizer, image_processor)
-    # 触发一次轻量校验，确保 llava 依赖可用。
     _ = conv_templates[processor.conv_template]
     _ = tokenizer_image_token
     _ = IMAGE_TOKEN_INDEX
@@ -611,8 +664,13 @@ def _generate_response_llava_video_qwen(
         )
     inference_time = time.time() - start_time
 
-    generated_ids_trimmed = output_ids[:, prompt_len:]
-    response = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True)[0]
+    # LLaVA-Qwen 的 generate 走 inputs_embeds，返回的 output_ids 通常只有新生成 token，
+    # 不能按 prompt_len 切片（否则会得到空串）。与 AKS llava_vid.py 一致，直接 decode 全序列。
+    if output_ids.shape[1] > prompt_len:
+        generated_ids_trimmed = output_ids[:, prompt_len:]
+    else:
+        generated_ids_trimmed = output_ids
+    response = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True)[0].strip()
     generated_token_count = int(generated_ids_trimmed.shape[1]) if generated_ids_trimmed.numel() else 0
     hit_max_tokens = generated_token_count >= max_new_tokens
     print(
