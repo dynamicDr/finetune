@@ -1641,7 +1641,7 @@ python run.py --multirun \
     use_preprocessed_clip_frames=true \
     train_ratio=0.0 \
     seed=42 \
-    slurm=hgpu_batch
+    slurm=default_4090
 
 
 【dty跑】跑一个目前最优的ours：

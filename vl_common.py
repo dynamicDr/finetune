@@ -35,6 +35,29 @@ def _is_llava_video_qwen_model_id(model_id: str) -> bool:
     )
 
 
+def _patch_llava_transformers_compat() -> None:
+    """LLaVA-NeXT 仍从 modeling_utils 导入已在 transformers 5.x 移除/迁移的辅助函数。"""
+    import transformers.modeling_utils as modeling_utils
+    from transformers.pytorch_utils import apply_chunking_to_forward, prune_linear_layer
+
+    if not hasattr(modeling_utils, "apply_chunking_to_forward"):
+        modeling_utils.apply_chunking_to_forward = apply_chunking_to_forward
+    if not hasattr(modeling_utils, "prune_linear_layer"):
+        modeling_utils.prune_linear_layer = prune_linear_layer
+    if not hasattr(modeling_utils, "find_pruneable_heads_and_indices"):
+        def find_pruneable_heads_and_indices(heads, n_heads, head_size, already_pruned_heads):
+            mask = torch.ones(n_heads, head_size)
+            heads = set(heads) - already_pruned_heads
+            for head in heads:
+                head = head - sum(1 for h in already_pruned_heads if h < head)
+                mask[head] = 0
+            mask = mask.view(-1).contiguous().eq(1)
+            index = torch.arange(len(mask))[mask].long()
+            return heads, index
+
+        modeling_utils.find_pruneable_heads_and_indices = find_pruneable_heads_and_indices
+
+
 class LlavaVideoQwenProcessor:
     """lmms-lab/LLaVA-Video-7B-Qwen2 原始权重推理包装（依赖 LLaVA-NeXT 包）。"""
 
@@ -449,6 +472,7 @@ def load_model_and_processor(
 
 def load_llava_video_qwen_model_and_processor(model_path: str):
     try:
+        _patch_llava_transformers_compat()
         from llava.constants import IMAGE_TOKEN_INDEX
         from llava.conversation import conv_templates
         from llava.mm_utils import get_model_name_from_path, tokenizer_image_token
@@ -458,7 +482,9 @@ def load_llava_video_qwen_model_and_processor(model_path: str):
     except ImportError as exc:
         raise ImportError(
             "lmms-lab/LLaVA-Video-7B-Qwen2 需要安装 LLaVA-NeXT："
-            "pip install git+https://github.com/LLaVA-VL/LLaVA-NeXT.git"
+            "pip install git+https://github.com/LLaVA-VL/LLaVA-NeXT.git。"
+            "若已安装仍报错，通常是 transformers>=5 与 LLaVA-NeXT 不兼容；"
+            "本项目已在 vl_common 中做兼容补丁，请确认使用的是最新代码。"
         ) from exc
 
     model_path = os.path.expanduser(model_path)
@@ -533,6 +559,7 @@ def _generate_response_llava_video_qwen(
 ) -> tuple[str, float, int, bool]:
     import time
 
+    _patch_llava_transformers_compat()
     from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
     from llava.conversation import SeparatorStyle, conv_templates
     from llava.mm_utils import KeywordsStoppingCriteria, tokenizer_image_token
