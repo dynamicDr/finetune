@@ -38,6 +38,7 @@ from utils import (
     from_pretrained_local_first,
     init_verbose_run_dir,
     normalize_sample_id,
+    write_verbose_frame_selection_manifest,
 )
 from vl_common import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs
 
@@ -952,7 +953,7 @@ def _compute_keyword_information(
     s = float(kw_info.sum().item())
     info_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
     uniform_weights = torch.ones_like(info_weights) / float(max(1, info_weights.numel()))
-    weight_strength = min(1.0, max(0.0, float(args.keyword_weight_strength)))
+    weight_strength = max(0.0, float(args.keyword_weight_strength))
     kw_weights = ((1.0 - weight_strength) * uniform_weights + weight_strength * info_weights).clamp(min=0.0)
     ws = float(kw_weights.sum().item())
     kw_weights = (kw_weights / ws) if ws > 1e-12 else uniform_weights
@@ -1093,6 +1094,65 @@ def _submodular_cover_greedy_select(
     return selected
 
 
+def _submodular_cover_greedy_select_with_init(
+    kw_sims: torch.Tensor,
+    kw_w: torch.Tensor,
+    budget: int,
+    candidate_idx: list[int],
+    init_selected: list[int],
+) -> list[int]:
+    """带初始化集合的次模覆盖贪心：
+    在 init_selected 基础上继续选，直到总数达到 budget。
+    F(S)=sum_i w_i * max_{f in S} sim(f,k_i)
+    """
+    if kw_sims.ndim != 2 or budget <= 0:
+        return list(init_selected)
+    m = int(kw_sims.shape[0])
+    n = int(kw_sims.shape[1])
+    if m == 0 or n == 0:
+        return list(init_selected)
+
+    if kw_w.numel() != m:
+        kw_w = torch.ones((m,), device=kw_sims.device)
+    kw_w = kw_w.float().clamp(min=0.0)
+    if float(kw_w.sum().item()) <= 1e-12:
+        kw_w = torch.ones_like(kw_w)
+
+    cand = sorted({int(i) for i in candidate_idx if 0 <= int(i) < n})
+    if len(cand) < min(budget, n):
+        cand = list(range(n))
+
+    selected = [int(i) for i in init_selected if 0 <= int(i) < n]
+    selected_set = set(selected)
+
+    covered = torch.zeros((m,), dtype=kw_sims.dtype, device=kw_sims.device)
+    if selected:
+        init_tensor = torch.tensor(selected, device=kw_sims.device, dtype=torch.long)
+        covered = kw_sims[:, init_tensor].max(dim=1).values
+
+    max_pick = min(int(budget), n)
+    while len(selected) < max_pick:
+        avail = [i for i in cand if i not in selected_set]
+        if not avail:
+            break
+        avail_tensor = torch.tensor(avail, device=kw_sims.device, dtype=torch.long)
+        sim_avail = kw_sims[:, avail_tensor]  # (M, C)
+        delta = torch.maximum(covered.unsqueeze(1), sim_avail) - covered.unsqueeze(1)
+        gains = (delta * kw_w.unsqueeze(1)).sum(dim=0)
+
+        best_local = int(torch.argmax(gains).item())
+        best_gain = float(gains[best_local].item())
+        if best_gain <= -1e8:
+            break
+
+        best_idx = int(avail[best_local])
+        selected.append(best_idx)
+        selected_set.add(best_idx)
+        covered = torch.maximum(covered, kw_sims[:, best_idx])
+
+    return selected
+
+
 def _topq_mean_similarity(sims: list[float], q: int) -> float:
     if not sims or q <= 0:
         return 0.0
@@ -1161,6 +1221,69 @@ def _sparsity_adaptive_quota_select(
     return selected
 
 
+def _ensure_keyword_min_coverage(
+    selected_idx: list[int],
+    kw_sims: torch.Tensor,
+    budget: int,
+    candidate_idx: list[int] | None = None,
+) -> list[int]:
+    """保证每个关键词在已选帧集合中至少有一帧 sim>0；预算满时替换贡献最低的帧。"""
+    if kw_sims.ndim != 2 or budget <= 0:
+        return list(selected_idx)
+    m = int(kw_sims.shape[0])
+    n = int(kw_sims.shape[1])
+    if m == 0 or n == 0:
+        return list(selected_idx)
+
+    cand = sorted({int(i) for i in (candidate_idx or list(range(n))) if 0 <= int(i) < n})
+    if not cand:
+        return list(selected_idx)
+
+    max_pick = min(int(budget), n)
+    selected = [int(i) for i in selected_idx if 0 <= int(i) < n]
+    selected_set = set(selected)
+
+    def _is_covered(kw_i: int) -> bool:
+        if not selected:
+            return False
+        return float(kw_sims[kw_i, selected].max().item()) > 1e-8
+
+    def _best_uncovered_frame(kw_i: int) -> int | None:
+        for idx in torch.argsort(kw_sims[kw_i], descending=True).tolist():
+            j = int(idx)
+            if j in cand and j not in selected_set:
+                return j
+        return None
+
+    def _replace_weakest(new_idx: int) -> None:
+        nonlocal selected, selected_set
+        if not selected:
+            selected = [new_idx]
+            selected_set = {new_idx}
+            return
+        worst_pos = min(
+            range(len(selected)),
+            key=lambda pos: float(kw_sims[:, selected[pos]].max().item()),
+        )
+        selected_set.discard(selected[worst_pos])
+        selected[worst_pos] = new_idx
+        selected_set.add(new_idx)
+
+    for kw_i in range(m):
+        if _is_covered(kw_i):
+            continue
+        pick = _best_uncovered_frame(kw_i)
+        if pick is None:
+            continue
+        if len(selected) < max_pick:
+            selected.append(pick)
+            selected_set.add(pick)
+        else:
+            _replace_weakest(pick)
+
+    return selected[:max_pick]
+
+
 def _select_keyword_frames(
     kw_frame_sims: torch.Tensor,
     kw_weights: torch.Tensor,
@@ -1178,6 +1301,30 @@ def _select_keyword_frames(
             budget=budget,
             alpha=int(args.quota_prescreen_alpha),
         )
+
+        if bool(getattr(args, "hybrid_anchor_in_mode1", False)):
+            n_frames = int(kw_frame_sims.shape[1])
+            max_pick = min(int(budget), n_frames)
+
+            anchor_budget = int(round(max_pick * float(args.hybrid_anchor_ratio)))
+            anchor_budget = max(1, min(anchor_budget, max_pick))
+
+            anchor_idx = _quota_topk_select(
+                kw_sims=kw_frame_sims,
+                kw_w=kw_weights,
+                budget=anchor_budget,
+                candidate_idx=list(range(n_frames)),
+            )
+
+            selected_idx = _submodular_cover_greedy_select_with_init(
+                kw_sims=kw_frame_sims,
+                kw_w=kw_weights,
+                budget=max_pick,
+                candidate_idx=candidate_idx,
+                init_selected=anchor_idx,
+            )
+            return selected_idx, candidate_idx, f"coverage_greedy+anchor_topk(r={float(args.hybrid_anchor_ratio):.2f})"
+
         selected_idx = _submodular_cover_greedy_select(
             kw_sims=kw_frame_sims,
             kw_w=kw_weights,
@@ -1429,6 +1576,15 @@ def _eval_one_sample(
     if not selected_idx:
         raise RuntimeError(f"样本未能选出有效帧: sample={sample.sample_id}")
 
+    if bool(args.ensure_keyword_min_coverage):
+        selected_idx = _ensure_keyword_min_coverage(
+            selected_idx,
+            kw_sims=kw_frame_sims,
+            budget=budget,
+            candidate_idx=candidate_idx,
+        )
+        selection_method = f"{selection_method}+min_kw_cover"
+
     selected_idx = sorted(selected_idx, key=lambda x: frame_ids[x])
     if frame_selection_mode == 1:
         mode_log = f"alpha={int(args.quota_prescreen_alpha)}"
@@ -1501,8 +1657,11 @@ def _eval_one_sample(
             "frame_selection_mode": frame_selection_mode,
             "frame_selection_method": selection_method,
             "prescreen_candidate_count": int(len(candidate_idx) if candidate_idx else len(imgs)),
+            "prescreen_frame_ids": sorted(int(frame_ids[i]) for i in candidate_idx) if candidate_idx else sorted(int(x) for x in frame_ids),
+            "ensure_keyword_min_coverage": bool(args.ensure_keyword_min_coverage),
             "keyword_extract_time_sec": float(keyword_extract_time),
         },
+        task_type=str(sample.task_type),
     )
     _log(f"sample={sample.sample_id} one-shot pred={one_shot_out['pred_answer']}, frames={len(selected_idx)}")
     return {
@@ -1650,7 +1809,12 @@ def parse_args():
         default="AIOHUB_API_KEY",
         help="无前缀远程模型时的 API key 环境变量（poe-/aio-/or- 前缀会忽略此项）",
     )
-    p.add_argument("--keyword_weight_strength", type=float, default=1.0, help="关键词权重强度：0为所有关键词均分，1为完全使用info权重")
+    p.add_argument(
+        "--keyword_weight_strength",
+        type=float,
+        default=1.0,
+        help="关键词权重强度：0=均分，1=纯 info 权重；>1 时进一步压低弱词（clamp 后归一化）",
+    )
     p.add_argument(
         "--use_keyword_cache",
         action="store_true",
@@ -1675,6 +1839,22 @@ def parse_args():
         choices=[0, 1, 2],
         default=1,
         help="最终选帧模式：1=覆盖贪心，0=配额topk，2=稀疏自适应配额 sparsity_adaptive_quota",
+    )
+    p.add_argument(
+        "--ensure_keyword_min_coverage",
+        action="store_true",
+        help="开启后保证每个关键词在已选帧中至少有一帧 sim>0；预算满时替换全局贡献最低的帧",
+    )
+    p.add_argument(
+        "--hybrid_anchor_ratio",
+        type=float,
+        default=0.5,
+        help="mode=1 混合策略时，先用 quota_topk 锁定的预算比例，例如 0.5 表示 16 帧里先锁 8 帧",
+    )
+    p.add_argument(
+        "--hybrid_anchor_in_mode1",
+        action="store_true",
+        help="开启后，mode=1 不再纯 coverage greedy，而是先锁定一部分 topk anchor，再用 coverage greedy 补剩余帧",
     )
     return p.parse_args()
 
@@ -1707,9 +1887,12 @@ def _ours_csv_columns() -> list[str]:
         "keyword_cache_number",
         "keyword_weight_strength",
         "frame_selection_mode",
+        "ensure_keyword_min_coverage",
         "use_preprocessed_clip_frames",
         "preprocessed_clip_fps",
         "use_subtitles",
+        "hybrid_anchor_in_mode1",
+        "hybrid_anchor_ratio",
     ]
 
 
@@ -1754,9 +1937,12 @@ def _ours_csv_row(
         int(args.keyword_cache_number),
         f"{float(args.keyword_weight_strength):g}",
         int(args.frame_selection_mode),
+        bool(args.ensure_keyword_min_coverage),
         bool(args.use_preprocessed_clip_frames),
         f"{float(args.preprocessed_clip_fps):g}",
         bool(args.use_subtitles),
+        bool(getattr(args, "hybrid_anchor_in_mode1", False)),
+        f"{float(getattr(args, 'hybrid_anchor_ratio', 0.0)):g}",
     ]
 
 
@@ -1784,6 +1970,36 @@ def main():
     apply_dataset_cli_defaults(args)
     global _VERBOSE_RUN_DIR
     _VERBOSE_RUN_DIR = init_verbose_run_dir(verbose=VERBOSE, output_dir=VERBOSE_OUTPUT_DIR, log_fn=_log)
+    write_verbose_frame_selection_manifest(
+        _VERBOSE_RUN_DIR,
+        {
+            "dataset": str(args.dataset),
+            "dataset_split": str(args.dataset_split),
+            "task_filter": str(args.task_filter),
+            "num_samples": str(args.num_samples),
+            "num_frames": int(args.num_frames),
+            "candidate_pool_fps": float(args.candidate_pool_fps),
+            "frame_selection_mode": int(args.frame_selection_mode),
+            "quota_prescreen_alpha": int(args.quota_prescreen_alpha),
+            "quota_gamma": float(args.quota_gamma),
+            "max_keywords": int(args.max_keywords),
+            "keyword_weight_strength": float(args.keyword_weight_strength),
+            "ensure_keyword_min_coverage": bool(args.ensure_keyword_min_coverage),
+            "hybrid_anchor_in_mode1": bool(getattr(args, "hybrid_anchor_in_mode1", False)),
+            "hybrid_anchor_ratio": float(getattr(args, "hybrid_anchor_ratio", 0.5)),
+            "keyword_extractor_model": str(args.keyword_extractor_model),
+            "keyword_prompt_version": int(args.keyword_prompt_version),
+            "index_file": "selected_frames_index.jsonl",
+            "index_schema": {
+                "sample_id": "样本 ID",
+                "selected_frame_ids": "按时间排序的选中帧 ID",
+                "selected_index_in_pool": "候选池中的帧下标",
+                "prescreen_frame_ids": "覆盖贪心预筛候选帧 ID（mode=1/2）",
+                "frame_selection_mode": "0=topk, 1=coverage, 2=sparsity_adaptive",
+                "verbose_detail_path": "单样本详细 info.json 相对路径",
+            },
+        },
+    )
     video_dir = os.path.expanduser(args.video_dir)
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)

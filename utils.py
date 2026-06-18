@@ -262,9 +262,97 @@ def init_verbose_run_dir(verbose: bool, output_dir: Path, log_fn: Callable[[str]
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = output_dir / ts
+    if run_dir.exists():
+        suffix = 1
+        while (output_dir / f"{ts}_{suffix}").exists():
+            suffix += 1
+        run_dir = output_dir / f"{ts}_{suffix}"
     run_dir.mkdir(parents=True, exist_ok=True)
     log_fn(f"verbose 已开启，日志目录: {run_dir}")
+    log_fn(f"verbose 选帧汇总: {run_dir / 'selected_frames_index.jsonl'}")
     return run_dir
+
+
+def write_verbose_frame_selection_manifest(verbose_run_dir: Path | None, manifest: dict[str, Any]) -> None:
+    if verbose_run_dir is None:
+        return
+    path = verbose_run_dir / "selected_frames_index.meta.json"
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+
+def append_verbose_frame_selection_index(
+    verbose_run_dir: Path | None,
+    *,
+    sample_id: str,
+    task_type: str | None,
+    question: str,
+    options: list[str] | None,
+    gt_answer: Any,
+    pred_answer: str,
+    is_correct: bool,
+    frame_ids: list[int],
+    selected_idx: list[int],
+    keywords: list[str],
+    selection_info: dict[str, Any] | None,
+    detail_rel_path: str,
+) -> None:
+    """向 run 目录追加一条选帧记录，便于跨样本对比 frame selection 行为。"""
+    if verbose_run_dir is None:
+        return
+
+    sel_info = dict(selection_info or {})
+    prescreen_ids = [int(x) for x in sel_info.get("prescreen_frame_ids", [])]
+    selected_frames = []
+    for order, idx in enumerate(selected_idx):
+        pool_idx = int(idx)
+        fid = int(frame_ids[pool_idx])
+        selected_frames.append(
+            {
+                "order": int(order),
+                "index_in_pool": pool_idx,
+                "frame_id": fid,
+            }
+        )
+
+    record = {
+        "sample_id": str(sample_id),
+        "task_type": str(task_type or ""),
+        "question": str(question),
+        "options": list(options or []),
+        "gt_answer": str(gt_answer),
+        "pred_answer": str(pred_answer),
+        "is_correct": bool(is_correct),
+        "keywords": list(keywords),
+        "candidate_pool_size": int(len(frame_ids)),
+        "selected_count": int(len(selected_idx)),
+        "selected_index_in_pool": [int(i) for i in selected_idx],
+        "selected_frame_ids": [int(frame_ids[i]) for i in selected_idx],
+        "selected_frames": selected_frames,
+        "prescreen_frame_ids": prescreen_ids,
+        "prescreen_candidate_count": int(sel_info.get("prescreen_candidate_count", len(prescreen_ids))),
+        "frame_selection_mode": sel_info.get("frame_selection_mode"),
+        "frame_selection_method": sel_info.get("frame_selection_method"),
+        "selection_config": {
+            k: sel_info.get(k)
+            for k in (
+                "num_frames_budget",
+                "candidate_pool_fps",
+                "quota_prescreen_alpha",
+                "quota_gamma",
+                "max_keywords",
+                "keyword_prompt_version",
+                "keyword_extractor_model",
+                "keyword_weight_strength",
+                "ensure_keyword_min_coverage",
+            )
+            if k in sel_info
+        },
+        "verbose_detail_path": str(detail_rel_path),
+    }
+    index_path = verbose_run_dir / "selected_frames_index.jsonl"
+    with index_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def dump_verbose_round(
@@ -286,6 +374,7 @@ def dump_verbose_round(
     raw_keywords_before_dedup: list[str] | None = None,
     selected_frame_subtitles: list[str] | None = None,
     selection_info: dict[str, Any] | None = None,
+    task_type: str | None = None,
 ) -> None:
     if not verbose or verbose_run_dir is None:
         return
@@ -383,6 +472,26 @@ def dump_verbose_round(
     }
     with (round_dir / "info.json").open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    detail_rel_path = f"{normalize_sample_id(sample_id)}/{stage}_round_{round_id:02d}/info.json"
+    selection_keywords = [str(item.get("keyword", "")) for item in (keyword_info_scores or []) if item.get("used_for_selection", True)]
+    if not selection_keywords:
+        selection_keywords = [str(kw) for kw in all_keywords if kw != "question + options"]
+    append_verbose_frame_selection_index(
+        verbose_run_dir,
+        sample_id=sample_id,
+        task_type=task_type,
+        question=question,
+        options=options,
+        gt_answer=gt_answer,
+        pred_answer=pred_answer,
+        is_correct=pred_answer.strip().upper() == gt_answer.strip().upper(),
+        frame_ids=frame_ids,
+        selected_idx=selected_idx,
+        keywords=selection_keywords,
+        selection_info=selection_info,
+        detail_rel_path=detail_rel_path,
+    )
 
 
 def _render_keyword_frame_score_image(

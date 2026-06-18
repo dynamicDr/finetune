@@ -1,0 +1,94 @@
+sample_id,task_type,question,num_candidate_frames,num_keywords_raw,num_keywords_used,coverage_selected_count,topk_selected_count,overlap_count,cov_only_count,topk_only_count,same_frame_percent,same_frame_summary,jaccard,overlap_ratio_cov,overlap_ratio_topk,coverage_frame_ids,topk_frame_ids,overlap_frame_ids,cov_only_frame_ids,topk_only_frame_ids,sample_index
+375-3,medium,"What is the difference of the woman when talking to the camera and when decorating the tree?
+
+Options:
+A. She wears glasses when decorating but does not when talking.
+B. She holds a ball when decorating but does not when talking.
+C. She wears glasses when decorating but does not when talking.
+D. None of the above.
+
+Directly answer with the option letter only. Do not explain.",887,1,1,16,16,8,8,8,50.0,50.0% 所选帧相同 (8/16),0.3333333333333333,0.5,0.5,"[8248, 8296, 8368, 8392, 8440, 8511, 8535, 8679, 9159, 9183, 10406, 10454, 10573, 11964, 12036, 12156]","[8296, 8440, 8679, 9159, 9183, 10573, 11964, 12036, 12180, 12276, 13331, 13475, 13930, 14841, 17670, 20116]","[8296, 8440, 8679, 9159, 9183, 10573, 11964, 12036]","[8248, 8368, 8392, 8511, 8535, 10406, 10454, 12156]","[12180, 12276, 13331, 13475, 13930, 14841, 17670, 20116]",1
+327-2,medium,"What is the exact order in which the video presents the following events?
+(a) Application of respiratory cells to cardiovascular cure therapy.
+(b) The use of nanorobots in cancer treatment.
+(c) Nanorobots for haemostasis.
+
+Options:
+A. (b)(a)(c).
+B. (a)(b)(c).
+C. (b)(c)(a).
+D. (c)(a)(b).
+
+Directly answer with the option letter only. Do not explain.",327,6,5,16,16,8,8,8,50.0,50.0% 所选帧相同 (8/16),0.3333333333333333,0.5,0.5,"[750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 4650, 4875, 6200, 6375]","[850, 925, 950, 975, 1025, 4475, 4625, 4650, 4800, 4875, 5925, 6375, 6400, 6425, 7975, 8050]","[850, 925, 950, 975, 1025, 4650, 4875, 6375]","[750, 775, 800, 825, 875, 900, 1000, 6200]","[4475, 4625, 4800, 5925, 6400, 6425, 7975, 8050]",2
+662-2,long,"What is the main message of the caller in the 911 recordings that appear in the video?
+
+Options:
+A. The caller's stepfather is killing everyone in the house. The caller also states that the stepfather has shot the caller's brothers.
+B. The callers see at least two children have been shot and a little girl running down the street as her stepfather is killing people in her house.
+C. The callers see at least two children being shot, and a little girl running down the street while her family is being shot.
+D. None of the above.
+
+Directly answer with the option letter only. Do not explain.",2239,3,3,16,16,10,6,6,62.5,62.5% 所选帧相同 (10/16),0.45454545454545453,0.625,0.625,"[0, 30, 60, 18432, 18492, 18521, 18551, 18581, 18701, 18731, 18761, 18791, 18881, 19001, 19391, 19421]","[0, 30, 60, 18432, 18492, 18521, 18731, 19001, 19391, 19421, 35844, 35874, 37972, 63057, 65065, 67073]","[0, 30, 60, 18432, 18492, 18521, 18731, 19001, 19391, 19421]","[18551, 18581, 18701, 18761, 18791, 18881]","[35844, 35874, 37972, 63057, 65065, 67073]",3
+712-3,long,"In the latter part of the video, why does Tony say, ""We had a great day today""?
+
+Options:
+A. Tony has learned how to drive.
+B. Diana's family has finally reunited.
+C. Diana found a job, Tony's business potential opening.
+D. They received £ 26000 in benefits and improved their living standards.
+
+Directly answer with the option letter only. Do not explain.",2666,2,2,16,16,9,7,7,56.25,56.2% 所选帧相同 (9/16),0.391304347826087,0.5625,0.5625,"[150, 175, 200, 225, 250, 275, 300, 325, 600, 625, 5250, 5625, 6700, 6725, 6750, 56775]","[150, 175, 200, 275, 300, 325, 600, 625, 30025, 41325, 52625, 55375, 56400, 56775, 56800, 60650]","[150, 175, 200, 275, 300, 325, 600, 625, 56775]","[225, 250, 5250, 5625, 6700, 6725, 6750]","[30025, 41325, 52625, 55375, 56400, 56800, 60650]",4
+379-2,medium,"According to the video, what is the blue item most likely to be?
+
+Options:
+A. A clipper.
+B. A peanut butter jar.
+C. A dremel.
+D. A rag.
+
+Directly answer with the option letter only. Do not explain.",833,2,2,16,16,5,11,11,31.25,31.2% 所选帧相同 (5/16),0.18518518518518517,0.3125,0.3125,"[330, 360, 599, 1528, 1558, 1618, 1648, 1708, 1828, 2128, 2877, 5634, 7163, 7283, 10699, 14655]","[330, 1558, 7163, 10519, 10669, 10699, 10729, 10759, 10789, 14655, 14715, 14925, 14955, 18132, 18282, 18941]","[330, 1558, 7163, 10699, 14655]","[360, 599, 1528, 1618, 1648, 1708, 1828, 2128, 2877, 5634, 7283]","[10519, 10669, 10729, 10759, 10789, 14715, 14925, 14955, 18132, 18282, 18941]",5
+338-2,medium,"In line with the video evidence, what is the main reason why central banks avoid simply printing more money during an economic crisis?
+
+Options:
+A. It can lead to severe inflation, devaluing the existing money supply and hurting the economy.
+B. It is logistically difficult and time-consuming to print large amounts of money.
+C. Governments prefer to use other economic policies like tax cuts and infrastructure projects.
+D. Central banks lack the authority to print money, as that is a government responsibility.
+
+Directly answer with the option letter only. Do not explain.",295,6,5,16,16,12,4,4,75.0,75.0% 所选帧相同 (12/16),0.6,0.75,0.75,"[48, 72, 96, 120, 144, 743, 1223, 1247, 1415, 1558, 1822, 2661, 2829, 3644, 3716, 3764]","[72, 120, 144, 1223, 1247, 1558, 1822, 2182, 2661, 2685, 2829, 3644, 3692, 3716, 3764, 5491]","[72, 120, 144, 1223, 1247, 1558, 1822, 2661, 2829, 3644, 3716, 3764]","[48, 96, 743, 1415]","[2182, 2685, 3692, 5491]",6
+354-3,medium,"What is Nuralagus rex doing in the video?
+
+Options:
+A. Flying.
+B. Eating.
+C. Walking.
+D. Hopping.
+
+Directly answer with the option letter only. Do not explain.",716,1,1,16,16,12,4,4,75.0,75.0% 所选帧相同 (12/16),0.6,0.75,0.75,"[432, 527, 575, 815, 839, 863, 887, 911, 935, 959, 983, 1007, 1031, 1055, 1079, 1391]","[815, 839, 863, 887, 911, 935, 959, 983, 1007, 1031, 1055, 1079, 12348, 12372, 12396, 15848]","[815, 839, 863, 887, 911, 935, 959, 983, 1007, 1031, 1055, 1079]","[432, 527, 575, 1391]","[12348, 12372, 12396, 15848]",7
+615-2,long,"According to what is shown in the video, what is not true about the design for local people after the disaster?
+
+Options:
+A. It gives local people a sense of identity.
+B. It is called the emotional sign system.
+C. Posters standing at every spot look similar in the scenery.
+D. The design contains the name of the street.
+
+Directly answer with the option letter only. Do not explain.",2457,2,2,16,16,8,8,8,50.0,50.0% 所选帧相同 (8/16),0.3333333333333333,0.5,0.5,"[432, 815, 11101, 11532, 11556, 11580, 12779, 12803, 12827, 12851, 12875, 12899, 12923, 12947, 36252, 38074]","[432, 12779, 12851, 12899, 12923, 12947, 12971, 24983, 25055, 25079, 25103, 36228, 36252, 36276, 38074, 55313]","[432, 12779, 12851, 12899, 12923, 12947, 36252, 38074]","[815, 11101, 11532, 11556, 11580, 12803, 12827, 12875]","[12971, 24983, 25055, 25079, 25103, 36228, 36276, 55313]",8
+649-1,long,"What event is the video primarily discussing?
+
+Options:
+A. A fundamental challenge to the Big Bang theory posed by JWST findings.
+B. Unveiling of an Earth-like planet's detailed atmosphere by the James Webb Space Telescope (JWST).
+C. The announcement of the deepest view into space ever captured by the Hubble Space Telescope.
+D. A surprising confirmation of the Big Bang theory through JWST observations.
+
+Directly answer with the option letter only. Do not explain.",2214,3,3,16,16,7,9,9,43.75,43.8% 所选帧相同 (7/16),0.28,0.4375,0.4375,"[4260, 4290, 4380, 6810, 8040, 11550, 11580, 11610, 11640, 11670, 12000, 18180, 18210, 18270, 33690, 59730]","[4290, 4380, 11550, 18210, 18270, 18360, 18390, 18870, 33690, 36450, 36480, 50520, 53460, 59730, 61830, 66390]","[4290, 4380, 11550, 18210, 18270, 33690, 59730]","[4260, 6810, 8040, 11580, 11610, 11640, 11670, 12000, 18180]","[18360, 18390, 18870, 36450, 36480, 50520, 53460, 61830, 66390]",9
+218-1,short,"If the man is 180cm tall, what is the estimated diameter of the pilates ball which the man is playing with?
+
+Options:
+A. About 200cm.
+B. About 150cm.
+C. About 100cm.
+D. About 50cm.
+
+Directly answer with the option letter only. Do not explain.",43,1,1,16,16,4,12,12,25.0,25.0% 所选帧相同 (4/16),0.14285714285714285,0.25,0.25,"[0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 1025]","[50, 150, 350, 375, 425, 450, 475, 500, 675, 775, 850, 900, 950, 975, 1000, 1025]","[50, 150, 350, 1025]","[0, 25, 75, 100, 125, 175, 200, 225, 250, 275, 300, 325]","[375, 425, 450, 475, 500, 675, 775, 850, 900, 950, 975, 1000]",10

@@ -35,6 +35,9 @@ use_keyword_cache: false
 keyword_cache_dir: ""
 keyword_cache_number: 0
 frame_selection_mode: 1
+ensure_keyword_min_coverage: false
+hybrid_anchor_in_mode1: false
+hybrid_anchor_ratio: 0.5
 candidate_pool_fps: 1.0
 ours_clip_model_id: openai/clip-vit-base-patch32
 ours_clip_device: null

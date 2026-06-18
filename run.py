@@ -159,6 +159,15 @@ def main(cfg: DictConfig) -> None:
             frame_selection_mode = OmegaConf.select(cfg, "frame_selection_mode", default=None)
             if frame_selection_mode is not None and str(frame_selection_mode).strip() not in ("", "null", "None"):
                 dataset_shared += ["--frame_selection_mode", str(int(frame_selection_mode))]
+            ensure_keyword_min_coverage = OmegaConf.select(cfg, "ensure_keyword_min_coverage", default=False)
+            if bool(ensure_keyword_min_coverage):
+                dataset_shared.append("--ensure_keyword_min_coverage")
+            hybrid_anchor_in_mode1 = OmegaConf.select(cfg, "hybrid_anchor_in_mode1", default=False)
+            if bool(hybrid_anchor_in_mode1):
+                dataset_shared.append("--hybrid_anchor_in_mode1")
+            hybrid_anchor_ratio = OmegaConf.select(cfg, "hybrid_anchor_ratio", default=None)
+            if hybrid_anchor_ratio is not None and str(hybrid_anchor_ratio).strip() not in ("", "null", "None"):
+                dataset_shared += ["--hybrid_anchor_ratio", str(float(hybrid_anchor_ratio))]
             ours_clip_model_id = OmegaConf.select(cfg, "ours_clip_model_id", default=None)
             if ours_clip_model_id is not None and str(ours_clip_model_id).strip() not in ("", "null", "None"):
                 dataset_shared += ["--ours_clip_model_id", str(ours_clip_model_id)]
