@@ -1,0 +1,26 @@
+# Video-MME | Qwen3-VL-8B | short/medium/long | uniform | 16帧
+# 只需 dataset=xxx；数据根目录见 data_loaders.DEFAULT_DATASET_ROOTS
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    frame_sampling_method=aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
+    seed=42 \
+    slurm=default_4090
+
+# MLVU-Test | Qwen3-VL-8B | mcq | uniform | 16帧
+# python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=mlvu \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=mcq \
+    frame_sampling_method=uniform \
+    seed=42 \
+    slurm=default_4090

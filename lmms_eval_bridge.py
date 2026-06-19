@@ -9,7 +9,10 @@ import gc
 import os
 import random
 import re
+from pathlib import Path
 from typing import Any
+
+import llava_transformers_compat  # noqa: F401  # must run before llava / lmms-eval llava_vid
 
 import torch
 from PIL import Image
@@ -18,6 +21,10 @@ from lmms_eval.models import get_model
 
 _DEFAULT_MAX_VISUAL_TOKENS = 1280
 _DEFAULT_MIN_VISUAL_TOKENS = 256
+# lmms-eval qwen2_vl / qwen2_5_vl / qwen3_vl 默认 processor 像素预算
+_QWEN_VL_OFFICIAL_MIN_PIXELS = 256 * 28 * 28
+_QWEN_VL_OFFICIAL_MAX_PIXELS = 1605632
+_QWEN_VL_OFFICIAL_SYSTEM_PROMPT = "You are a helpful assistant."
 _LLAVA_DEFAULT_MAX_IMAGE_EDGE = 768
 _LLAVA_DEFAULT_CONTEXT_LENGTH = 131072
 _LLAVA_TEXT_TOKEN_RESERVE = 2048
@@ -107,8 +114,8 @@ def _apply_processor_pixel_limits(
     if factor is None:
         return
 
-    max_px = max_pixels if max_pixels is not None else _DEFAULT_MAX_VISUAL_TOKENS * factor * factor
-    min_px = min_pixels if min_pixels is not None else _DEFAULT_MIN_VISUAL_TOKENS * factor * factor
+    max_px = max_pixels if max_pixels is not None else _QWEN_VL_OFFICIAL_MAX_PIXELS
+    min_px = min_pixels if min_pixels is not None else _QWEN_VL_OFFICIAL_MIN_PIXELS
     size = {"longest_edge": max_px, "shortest_edge": min_px}
 
     image_processor = getattr(processor, "image_processor", None)
@@ -155,6 +162,25 @@ def _is_llava_video_qwen_model_id(model_id: str) -> bool:
     )
 
 
+def _hub_id_from_hf_cache_path(model_path: str) -> str | None:
+    for part in Path(model_path).parts:
+        if not part.startswith("models--"):
+            continue
+        org, sep, name = part[len("models--") :].partition("--")
+        if sep and org and name:
+            return f"{org}/{name}"
+    return None
+
+
+def _resolve_llava_vid_pretrained(pretrained: str) -> str:
+    """Use a hub-style id so llava's get_model_name_from_path detects qwen/llava."""
+    expanded = os.path.expanduser(pretrained)
+    hub_id = _hub_id_from_hf_cache_path(expanded)
+    if hub_id is not None:
+        return hub_id
+    return expanded
+
+
 def _is_vl_model_id(model_id: str) -> bool:
     model_id_lower = model_id.lower()
     vl_hints = (
@@ -195,14 +221,10 @@ def resolve_lmms_model_name(model_id: str) -> str:
 
 
 def _qwen_pixel_budget(model_id: str, apply_pixel_limits: bool) -> tuple[int | None, int | None]:
-    if not apply_pixel_limits:
+    _ = apply_pixel_limits
+    if _vl_pixel_factor(model_id) is None:
         return None, None
-    factor = _vl_pixel_factor(model_id)
-    if factor is None:
-        return None, None
-    max_px = _DEFAULT_MAX_VISUAL_TOKENS * factor * factor
-    min_px = _DEFAULT_MIN_VISUAL_TOKENS * factor * factor
-    return min_px, max_px
+    return _QWEN_VL_OFFICIAL_MIN_PIXELS, _QWEN_VL_OFFICIAL_MAX_PIXELS
 
 
 class LlavaLegacyProcessor:
@@ -261,6 +283,18 @@ def is_llava_hf_video_inference(processor, model=None) -> bool:
     )
 
 
+def is_qwen_vl_inference(processor, model=None) -> bool:
+    if is_llava_video_qwen_inference(processor, model=model):
+        return False
+    if is_llava_hf_video_inference(processor, model=model):
+        return False
+    processor_name = type(processor).__name__
+    if "Qwen" in processor_name and "VL" in processor_name:
+        return True
+    model_type = getattr(getattr(model, "config", None), "model_type", None)
+    return model_type in {"qwen2_vl", "qwen2_5_vl", "qwen3_vl", "qwen3_vl_moe"}
+
+
 def _build_lmms_init_kwargs(
     lmms_model_name: str,
     pretrained: str,
@@ -281,6 +315,7 @@ def _build_lmms_init_kwargs(
             kwargs["min_pixels"] = min_px
         if max_px is not None:
             kwargs["max_pixels"] = max_px
+        kwargs["system_prompt"] = _QWEN_VL_OFFICIAL_SYSTEM_PROMPT
         if num_frames is not None:
             kwargs["max_num_frames"] = num_frames
     elif lmms_model_name == "llava_hf":
@@ -294,8 +329,6 @@ def _build_lmms_init_kwargs(
         kwargs["overwrite"] = True
         kwargs["torch_dtype"] = "bfloat16"
         kwargs["conv_template"] = "chatml_direct"
-        if "qwen" in pretrained.lower():
-            kwargs["model_name"] = "llava_qwen"
     elif lmms_model_name == "llava_onevision":
         if num_frames is not None:
             kwargs["max_frames_num"] = num_frames
@@ -336,6 +369,8 @@ def load_model_and_processor(
         raise ValueError("lmms-lab/LLaVA-Video-7B-Qwen2 暂不支持 LoRA 评测。")
 
     lmms_model_name = resolve_lmms_model_name(pretrained)
+    if lmms_model_name == "llava_vid":
+        pretrained = _resolve_llava_vid_pretrained(pretrained)
     print(
         "[perf-debug][load-lmms] "
         f"model_path={model_path}, lmms_model={lmms_model_name}, pretrained={pretrained}, "
@@ -383,7 +418,7 @@ def load_model_and_processor(
             min_pixels=min_pixels,
             num_frames=num_frames,
         )
-    elif apply_pixel_limits and lmms_model_name in {"qwen2_5_vl", "qwen3_vl", "qwen2_vl"}:
+    elif lmms_model_name in {"qwen2_5_vl", "qwen3_vl", "qwen2_vl"}:
         _apply_processor_pixel_limits(
             processor,
             pixel_limit_id,
@@ -438,7 +473,13 @@ def build_vlm_user_messages(
         return [{"role": "user", "content": content}]
     content = [{"type": "image", "image": frame} for frame in frames]
     content.append({"type": "text", "text": prompt})
-    return [{"role": "user", "content": content}]
+    user_message = {"role": "user", "content": content}
+    if is_qwen_vl_inference(processor, model=model):
+        return [
+            {"role": "system", "content": _QWEN_VL_OFFICIAL_SYSTEM_PROMPT},
+            user_message,
+        ]
+    return [user_message]
 
 
 def prepare_vlm_inputs(

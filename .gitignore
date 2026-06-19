@@ -40,3 +40,6 @@ build/
 
 # ---- IDE ----
 .idea/
+frame_samplers/AKS/
+frame_samplers/VideoAgent/
+

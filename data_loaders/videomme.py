@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import os
+import random
 import re
+import warnings
 from typing import Any
+
+from lmms_eval_official import resolve_videomme_video_path
 
 from .base import BaseDataLoader, VQASample, load_dataset
 
@@ -17,10 +21,12 @@ class VideoMMELoader(BaseDataLoader):
         dataset_name: str = "lmms-lab/Video-MME",
         dataset_config: str | None = None,
         no_dataset_config: bool = False,
+        use_official_eval: bool = True,
     ):
         super().__init__(video_dir=video_dir, seed=seed, train_ratio=train_ratio, task_filter=task_filter)
         self.dataset_name = dataset_name
         self.dataset_config = None if no_dataset_config else dataset_config
+        self.use_official_eval = use_official_eval
 
         base_video_dir = os.path.expanduser(video_dir)
         parent_video_dir = os.path.dirname(base_video_dir.rstrip("/"))
@@ -46,15 +52,21 @@ class VideoMMELoader(BaseDataLoader):
             os.path.join(parent_video_dir, "test-00000-of-00001.parquet"),
         ]
 
-    def load_raw_dataset(self, split: str):
+    def _load_local_parquet_records(self) -> list[dict[str, Any]] | None:
         local_parquet = next((p for p in self._local_parquet_candidates() if os.path.isfile(p)), None)
-        if local_parquet:
-            try:
-                import pandas as pd
-            except ImportError as exc:
-                raise ImportError("读取本地 Video-MME parquet 需要 pandas。") from exc
-            df = pd.read_parquet(local_parquet)
-            return df.to_dict(orient="records")
+        if not local_parquet:
+            return None
+        try:
+            import pandas as pd
+        except ImportError as exc:
+            raise ImportError("读取本地 Video-MME parquet 需要 pandas。") from exc
+        df = pd.read_parquet(local_parquet)
+        return df.to_dict(orient="records")
+
+    def load_raw_dataset(self, split: str):
+        local_records = self._load_local_parquet_records()
+        if local_records is not None:
+            return local_records
 
         kwargs: dict[str, Any] = {}
         if self.dataset_config:
@@ -116,25 +128,38 @@ class VideoMMELoader(BaseDataLoader):
             return m.group(1)
         return s
 
+    @staticmethod
+    def _raw_doc(raw_sample: Any) -> dict[str, Any]:
+        if hasattr(raw_sample, "items"):
+            return dict(raw_sample)
+        return dict(raw_sample)
+
     def to_vqa_sample(self, raw_sample: dict[str, Any], index: int) -> VQASample | None:
-        question = str(raw_sample.get("question", "")).strip()
+        doc = self._raw_doc(raw_sample)
+        question = str(doc.get("question", "")).strip()
         if not question:
             return None
 
-        options = self._extract_options(raw_sample)
+        options = self._extract_options(doc)
         if not options:
             return None
 
-        answer = self._normalize_answer(raw_sample.get("answer", ""))
+        if self.use_official_eval:
+            answer = str(doc.get("answer", "")).strip()
+            video_path = resolve_videomme_video_path(doc, video_dir=self.video_dir)
+            if not video_path:
+                video_path = self._resolve_video_path(doc)
+        else:
+            answer = self._normalize_answer(doc.get("answer", ""))
+            video_path = self._resolve_video_path(doc)
+
         if not answer:
             return None
-
-        video_path = self._resolve_video_path(raw_sample)
         if not video_path:
             return None
 
-        sample_id = str(raw_sample.get("question_id", "")).strip() or f"videomme_{index}"
-        duration = str(raw_sample.get("duration", "")).strip().lower()
+        sample_id = str(doc.get("question_id", "")).strip() or f"videomme_{index}"
+        duration = str(doc.get("duration", "")).strip().lower()
         if duration not in {"short", "medium", "long"}:
             duration = "short"
         return VQASample(
@@ -146,13 +171,83 @@ class VideoMMELoader(BaseDataLoader):
             task_type=duration,
             metadata={
                 "source_index": index,
-                "videoID": raw_sample.get("videoID", ""),
-                "video_id": raw_sample.get("video_id", ""),
-                "duration": raw_sample.get("duration", ""),
-                "domain": raw_sample.get("domain", ""),
-                "sub_category": raw_sample.get("sub_category", ""),
-                "task_type": raw_sample.get("task_type", ""),
+                "raw_doc": doc,
+                "videoID": doc.get("videoID", ""),
+                "video_id": doc.get("video_id", ""),
+                "duration": doc.get("duration", ""),
+                "domain": doc.get("domain", ""),
+                "sub_category": doc.get("sub_category", ""),
+                "task_type": doc.get("task_type", ""),
                 "dataset_name": self.dataset_name,
                 "dataset_config": self.dataset_config,
             },
         )
+
+    def get_eval_samples(
+        self,
+        sample_count: int | None = None,
+        sample_seed_offset: int = 1000,
+    ) -> list[VQASample]:
+        if not self.use_official_eval:
+            return super().get_eval_samples(
+                sample_count=sample_count,
+                sample_seed_offset=sample_seed_offset,
+            )
+
+        dataset = self.load_raw_dataset("test")
+        samples: list[VQASample] = []
+        need = sample_count
+        for i in range(len(dataset)):
+            sample = self.to_vqa_sample(dataset[i], i)
+            if sample is None or not self._include_by_task(sample):
+                continue
+            samples.append(sample)
+            if need is not None and len(samples) >= need:
+                break
+
+        if sample_count is not None and len(samples) > sample_count:
+            random.seed(self.seed + sample_seed_offset)
+            samples = random.sample(samples, sample_count)
+        return samples
+
+    def get_split_samples(
+        self,
+        split: str,
+        use_train_split: bool,
+        max_samples: int | None = None,
+        sample_count: int | None = None,
+        sample_seed_offset: int = 1000,
+    ) -> list[VQASample]:
+        if not self.use_official_eval:
+            return super().get_split_samples(
+                split=split,
+                use_train_split=use_train_split,
+                max_samples=max_samples,
+                sample_count=sample_count,
+                sample_seed_offset=sample_seed_offset,
+            )
+
+        if use_train_split or self.train_ratio > 0:
+            warnings.warn(
+                "官方 Video-MME 评测使用完整 test split，已忽略 train_ratio / use_train_split。",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+        dataset = self.load_raw_dataset(split)
+        samples: list[VQASample] = []
+        need = sample_count if sample_count is not None else max_samples
+        for i in range(len(dataset)):
+            sample = self.to_vqa_sample(dataset[i], i)
+            if sample is None or not self._include_by_task(sample):
+                continue
+            samples.append(sample)
+            if need is not None and len(samples) >= need:
+                break
+
+        if sample_count is not None and len(samples) > sample_count:
+            random.seed(self.seed + sample_seed_offset)
+            samples = random.sample(samples, sample_count)
+        elif max_samples is not None:
+            samples = samples[:max_samples]
+        return samples

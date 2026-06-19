@@ -236,6 +236,18 @@ class MLVULoader(BaseDataLoader):
             },
         )
 
+    def get_eval_samples(
+        self,
+        sample_count: int | None = None,
+        sample_seed_offset: int = 1000,
+    ) -> list[VQASample]:
+        return self.get_split_samples(
+            split="test",
+            use_train_split=False,
+            sample_count=sample_count,
+            sample_seed_offset=sample_seed_offset,
+        )
+
     def get_split_samples(
         self,
         split: str,

@@ -93,6 +93,19 @@ class BaseDataLoader(ABC):
             out.append(sample)
         return out
 
+    def get_eval_samples(
+        self,
+        sample_count: int | None = None,
+        sample_seed_offset: int = 1000,
+    ) -> list[VQASample]:
+        """加载 test split；sample_count 为 None 时取全部，否则随机抽 num_samples 条。"""
+        samples = self._convert_all("test")
+        if sample_count is not None:
+            random.seed(self.seed + sample_seed_offset)
+            k = min(sample_count, len(samples))
+            samples = random.sample(samples, k)
+        return samples
+
     def get_split_samples(
         self,
         split: str,

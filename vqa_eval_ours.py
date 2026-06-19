@@ -18,7 +18,6 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
 from data_loaders import (
-    apply_dataset_cli_defaults,
     should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
@@ -41,7 +40,14 @@ from utils import (
     normalize_sample_id,
     write_verbose_frame_selection_manifest,
 )
-from lmms_eval_bridge import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs
+from lmms_eval_bridge import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs, resolve_lmms_model_name
+from lmms_eval_official import (
+    aggregate_videomme,
+    build_videomme_prompt,
+    is_official_videomme_dataset,
+    resolve_videomme_max_new_tokens,
+    score_videomme,
+)
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
 PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"ours"}
@@ -1241,6 +1247,25 @@ def _eval_one_sample(
 
 
 # ==================== 数据集级评估 ====================
+def _build_eval_prompt(
+    sample: VQASample,
+    args: argparse.Namespace,
+    lmms_model_name: str,
+    *,
+    use_subtitles: bool,
+    num_frames: int,
+) -> str:
+    raw_doc = sample.metadata.get("raw_doc")
+    if is_official_videomme_dataset(args.dataset) and isinstance(raw_doc, dict):
+        return build_videomme_prompt(
+            raw_doc,
+            lmms_model_name,
+            use_subtitles=use_subtitles,
+            num_frames=num_frames,
+        )
+    return build_user_text(sample.question, sample.options)
+
+
 def evaluate_vqa(
     model: Any,
     proc: Any,
@@ -1252,14 +1277,34 @@ def evaluate_vqa(
     preprocessed_clip_dir: str | None,
     use_subtitles: bool,
     subtitles_dir: str | None,
+    lmms_model_name: str = "",
 ) -> dict[str, Any]:
+    use_official_videomme = is_official_videomme_dataset(args.dataset)
     clip_proc, clip_model, clip_device = _load_clip(args.ours_clip_model_id, args.ours_clip_device)
 
-    res = {"correct": 0, "total": 0, "mra_sum": 0.0, "mra_count": 0, "inference_times": [], "frame_sampling_times": [], "embedding_build_times": [], "selected_frame_counts": [], "over_max_tokens_count": 0}
+    res = {
+        "correct": 0,
+        "total": 0,
+        "mra_sum": 0.0,
+        "mra_count": 0,
+        "inference_times": [],
+        "frame_sampling_times": [],
+        "embedding_build_times": [],
+        "selected_frame_counts": [],
+        "over_max_tokens_count": 0,
+        "official_videomme_scores": [],
+    }
     pbar = tqdm(samples, desc="评估进度(ours semantic refinement)")
     for s in pbar:
         if not sample_matches_task_filter(s, args.task_filter):
             continue
+        prompt = _build_eval_prompt(
+            s,
+            args,
+            lmms_model_name,
+            use_subtitles=use_subtitles,
+            num_frames=budget,
+        )
         out = _eval_one_sample(
             model,
             proc,
@@ -1267,16 +1312,24 @@ def evaluate_vqa(
             clip_model,
             clip_device,
             s,
-            build_user_text(s.question, s.options),
+            prompt,
             args,
             max_new_tokens,
             model_mode,
             budget,
             preprocessed_clip_dir,
-            use_subtitles=use_subtitles,
+            use_subtitles=use_subtitles and not use_official_videomme,
             subtitles_dir=subtitles_dir,
         )
         pred = out["pred_answer"]
+        is_correct = False
+        if use_official_videomme:
+            raw_doc = s.metadata.get("raw_doc")
+            if isinstance(raw_doc, dict):
+                score_dict = score_videomme(raw_doc, str(out["response"]))
+                res["official_videomme_scores"].append(score_dict)
+                pred = score_dict.get("pred_answer", "")
+                is_correct = float(score_dict.get("score", 0.0)) == 1.0
         res["inference_times"].append(float(out["inference_time"]))
         res["frame_sampling_times"].append(float(out["frame_sampling_time"]))
         res["embedding_build_times"].append(float(out["embedding_build_time"]))
@@ -1284,7 +1337,9 @@ def evaluate_vqa(
         res["over_max_tokens_count"] += int(out["over_limit_count"])
         if s.options is not None:
             res["total"] += 1
-            if str(s.answer).strip().upper() == str(pred).strip().upper():
+            if not use_official_videomme:
+                is_correct = str(s.answer).strip().upper() == str(pred).strip().upper()
+            if is_correct:
                 res["correct"] += 1
         else:
             try:
@@ -1294,6 +1349,8 @@ def evaluate_vqa(
             res["mra_count"] += 1
         acc, t = _compute_accuracy_from_results(res, args.task_filter)
         pbar.set_postfix(Acc=f"{acc:.2f}%", AvgTime=f"{t:.2f}s")
+    if use_official_videomme and res["official_videomme_scores"]:
+        res["official_videomme_overall"] = aggregate_videomme(res["official_videomme_scores"])
     return res
 
 
@@ -1301,17 +1358,12 @@ def parse_args():
     # ==================== 命令行参数 ====================
     p = argparse.ArgumentParser(description="VQA ours: 粗看+关键词驱动精看")
     p.add_argument("--dataset", type=str, default="vsibench", choices=list_supported_datasets())
-    p.add_argument("--dataset_split", type=str, default="test")
-    p.add_argument("--dataset_name", type=str, default="nyu-visionx/VSI-Bench")
-    p.add_argument("--dataset_config", type=str, default="full")
-    p.add_argument("--no_dataset_config", action="store_true")
     p.add_argument("--model_path", type=str, default="Qwen/Qwen3-VL-4B-Thinking")
     p.add_argument("--model_name", type=str, default=None)
     p.add_argument("--use_lora", action="store_true")
     p.add_argument("--base_model", type=str, default=None)
     p.add_argument("--merge_lora", action="store_true")
-    p.add_argument("--video_dir", type=str, default="~/dataset/vsi_bench")
-    p.add_argument("--num_samples", type=str, default="10")
+    p.add_argument("--num_samples", type=str, default="10", help="评测样本数；all=全量 test")
     p.add_argument("--num_frames", type=int, default=16, help="单轮推理的总选帧预算（默认16）")
     p.add_argument("--frame_sampling_method", type=str, default="ours", choices=["ours"])
     p.add_argument("--seed", type=int, default=42)
@@ -1327,8 +1379,6 @@ def parse_args():
     p.add_argument("--ours_clip_batch_size", type=int, default=16)
     p.add_argument("--model_mode_config", type=str, default="config/model_response_modes.json")
     p.add_argument("--log_file", type=str, default="vqa_embedding_evaluation_log.csv")
-    p.add_argument("--train_ratio", type=float, default=0.8)
-    p.add_argument("--use_train_split", action="store_true")
     p.add_argument("--use_preprocessed_clip_frames", action="store_true")
     p.add_argument("--preprocessed_clip_fps", type=float, default=1.0)
     p.add_argument("--preprocessed_clip_dir", type=str, default="")
@@ -1490,14 +1540,12 @@ def main():
     # ==================== 主入口与实验记录 ====================
     exp_t0 = time.perf_counter()
     args = parse_args()
-    apply_dataset_cli_defaults(args)
     global _VERBOSE_RUN_DIR
     _VERBOSE_RUN_DIR = init_verbose_run_dir(verbose=VERBOSE, output_dir=VERBOSE_OUTPUT_DIR, log_fn=_log)
     write_verbose_frame_selection_manifest(
         _VERBOSE_RUN_DIR,
         {
             "dataset": str(args.dataset),
-            "dataset_split": str(args.dataset_split),
             "task_filter": str(args.task_filter),
             "num_samples": str(args.num_samples),
             "num_frames": int(args.num_frames),
@@ -1516,7 +1564,6 @@ def main():
             },
         },
     )
-    video_dir = os.path.expanduser(args.video_dir)
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
@@ -1526,8 +1573,8 @@ def main():
         raise ValueError("use_preprocessed_clip_frames 仅支持 ours。")
 
     sample_count = None if args.num_samples.lower() == "all" else int(args.num_samples)
-    loader = get_data_loader(args.dataset, video_dir=video_dir, seed=args.seed, train_ratio=args.train_ratio, task_filter=args.task_filter, dataset_name=args.dataset_name, dataset_config=args.dataset_config, no_dataset_config=args.no_dataset_config)
-    samples = loader.get_split_samples(split=args.dataset_split, use_train_split=args.use_train_split, sample_count=sample_count)
+    loader = get_data_loader(args.dataset, seed=args.seed, task_filter=args.task_filter)
+    samples = loader.get_eval_samples(sample_count=sample_count)
 
     resolved_model_path = os.path.expanduser(args.model_path)
     lora_path = ""
@@ -1553,6 +1600,14 @@ def main():
     if model_mode == "thinking":
         raise RuntimeError("本脚本仅支持 instruct 模式。请改用 instruct 模型或扩展实现。")
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
+    lmms_model_name = resolve_lmms_model_name(resolved_model_path)
+    if is_official_videomme_dataset(args.dataset):
+        effective_max_new_tokens = resolve_videomme_max_new_tokens()
+        print(
+            "[vqa_eval_ours] Video-MME 使用官方 lmms-eval 数据 / prompt / 打分；"
+            f"max_new_tokens={effective_max_new_tokens}, lmms_model={lmms_model_name}",
+            flush=True,
+        )
 
     budget = max(1, int(args.num_frames))
     if args.use_keyword_cache:
@@ -1583,8 +1638,6 @@ def main():
     apply_pixel_limits = should_apply_vl_pixel_limits(
         resolved_model_path,
         args.dataset,
-        args.dataset_split,
-        args.dataset_name,
     )
     if apply_pixel_limits:
         print(
@@ -1610,6 +1663,7 @@ def main():
         preprocessed_clip_dir,
         use_subtitles=bool(args.use_subtitles),
         subtitles_dir=(args.subtitles_dir.strip() if args.subtitles_dir.strip() else None),
+        lmms_model_name=lmms_model_name,
     )
 
     avg_acc, avg_time = _compute_accuracy_from_results(results, args.task_filter)
@@ -1638,6 +1692,12 @@ def main():
         ),
     )
     _log(f"评估完成: samples={len(samples)}, acc={avg_acc:.2f}%, avg_infer={avg_time:.3f}s")
+    if "official_videomme_overall" in results:
+        print(
+            f"官方 Video-MME Overall: {results['official_videomme_overall']:.1f}% "
+            f"(n={len(results['official_videomme_scores'])})",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

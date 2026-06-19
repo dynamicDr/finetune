@@ -62,16 +62,19 @@ def main(cfg: DictConfig) -> None:
         raise FileNotFoundError(name)
 
     shared = [
-        "--video_dir",
-        cfg.video_dir,
         "--num_frames",
         str(cfg.num_frames),
         "--seed",
         str(cfg.seed),
-        "--train_ratio",
-        str(cfg.train_ratio),
         "--task_filter",
         cfg.task_filter,
+    ]
+    legacy_shared = [
+        *shared,
+        "--video_dir",
+        cfg.video_dir,
+        "--train_ratio",
+        str(cfg.train_ratio),
     ]
     dataset_shared: list[str] = []
     if script_key in ("vqa_train.py", "vqa_eval.py", "vqa_eval_emb.py", "vqa_eval_ours.py", "vqa_eval_zzy.py"):
@@ -90,17 +93,18 @@ def main(cfg: DictConfig) -> None:
             focus_blip_batch_size = OmegaConf.select(cfg, "focus_blip_batch_size", default=None)
             if focus_blip_batch_size is not None and str(focus_blip_batch_size).strip() not in ("", "null", "None"):
                 dataset_shared += ["--focus_blip_batch_size", str(int(focus_blip_batch_size))]
-        dataset_split = OmegaConf.select(cfg, "dataset_split", default=None)
-        if dataset_split:
-            dataset_shared += ["--dataset_split", str(dataset_split)]
-        dataset_name = OmegaConf.select(cfg, "dataset_name", default=None)
-        if dataset_name:
-            dataset_shared += ["--dataset_name", str(dataset_name)]
-        dataset_config = OmegaConf.select(cfg, "dataset_config", default=None)
-        if dataset_config is not None and str(dataset_config).strip() not in ("", "null", "None"):
-            dataset_shared += ["--dataset_config", str(dataset_config)]
-        if OmegaConf.select(cfg, "dataset_no_config", default=False):
-            dataset_shared.append("--no_dataset_config")
+        if script_key in ("vqa_train.py", "vqa_eval_emb.py", "vqa_eval_zzy.py"):
+            dataset_split = OmegaConf.select(cfg, "dataset_split", default=None)
+            if dataset_split:
+                dataset_shared += ["--dataset_split", str(dataset_split)]
+            dataset_name = OmegaConf.select(cfg, "dataset_name", default=None)
+            if dataset_name:
+                dataset_shared += ["--dataset_name", str(dataset_name)]
+            dataset_config = OmegaConf.select(cfg, "dataset_config", default=None)
+            if dataset_config is not None and str(dataset_config).strip() not in ("", "null", "None"):
+                dataset_shared += ["--dataset_config", str(dataset_config)]
+            if OmegaConf.select(cfg, "dataset_no_config", default=False):
+                dataset_shared.append("--no_dataset_config")
         if script_key in ("vqa_eval.py", "vqa_eval_ours.py", "vqa_eval_zzy.py"):
             use_preprocessed_clip_frames = OmegaConf.select(cfg, "use_preprocessed_clip_frames", default=False)
             if bool(use_preprocessed_clip_frames):
@@ -164,6 +168,8 @@ def main(cfg: DictConfig) -> None:
             candidate_pool_fps = OmegaConf.select(cfg, "candidate_pool_fps", default=None)
             if candidate_pool_fps is not None and str(candidate_pool_fps).strip() not in ("", "null", "None"):
                 dataset_shared += ["--candidate_pool_fps", str(float(candidate_pool_fps))]
+    uses_builtin_dataset = script_key in ("vqa_eval.py", "vqa_eval_ours.py")
+    run_shared = shared if uses_builtin_dataset else legacy_shared
     model_snapshot = resolve_model_path(cfg.model.path)
 
     if script_key in ("train_vsibench.py", "vqa_train.py"):
@@ -172,7 +178,7 @@ def main(cfg: DictConfig) -> None:
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
         if not out or str(out).strip() in ("null", "~", ""):
             out = f"outputs/vsibench_train/{cfg.model.name}/{cfg.task_filter}_frames{cfg.num_frames}"
-        cmd = ["python", str(sp), "--model_path", model_snapshot, "--output_dir", str(out), *shared, *dataset_shared]
+        cmd = ["python", str(sp), "--model_path", model_snapshot, "--output_dir", str(out), *run_shared, *dataset_shared]
         ms = OmegaConf.select(cfg, "train.max_samples", default=None)
         if ms is not None and str(ms).strip() not in ("", "null", "None"):
             cmd += ["--max_samples", str(int(ms))]
@@ -180,7 +186,7 @@ def main(cfg: DictConfig) -> None:
         out = OmegaConf.select(cfg, "train.output_dir", default=None)
         if not out or str(out).strip() in ("null", "~", ""):
             out = f"outputs/vsibench_confidence/{cfg.model.name}/{cfg.task_filter}_frames{cfg.num_frames}"
-        cmd = ["python", str(sp), "--output_dir", str(out), *shared]
+        cmd = ["python", str(sp), "--output_dir", str(out), *run_shared]
         append_model_args(cfg, cmd, model_snapshot)
         ms = OmegaConf.select(cfg, "train.max_samples", default=None)
         if ms is not None and str(ms).strip() not in ("", "null", "None"):
@@ -195,7 +201,7 @@ def main(cfg: DictConfig) -> None:
         cmd = [
             "python",
             str(sp),
-            *shared,
+            *run_shared,
             *dataset_shared,
             "--num_samples",
             str(cfg.num_samples),

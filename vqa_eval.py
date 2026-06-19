@@ -12,7 +12,6 @@ from typing import Any
 from tqdm import tqdm
 
 from data_loaders import (
-    apply_dataset_cli_defaults,
     should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
@@ -28,7 +27,14 @@ from utils import (
     compute_accuracy_from_results as _compute_accuracy_from_results,
     compute_score_counts_for_csv as _compute_score_counts_for_csv,
 )
-from lmms_eval_bridge import generate_response, load_model_and_processor, release_cuda_memory
+from lmms_eval_bridge import generate_response, load_model_and_processor, release_cuda_memory, resolve_lmms_model_name
+from lmms_eval_official import (
+    aggregate_videomme,
+    build_videomme_prompt,
+    is_official_videomme_dataset,
+    resolve_videomme_max_new_tokens,
+    score_videomme,
+)
 
 MODE_MAX_NEW_TOKENS = {
     "thinking": 4086,
@@ -74,13 +80,10 @@ def log_to_csv(
     over_max_tokens_count: int,
     model_name: str,
     lora_path: str,
-    train_ratio: float,
-    use_train_split: bool,
 ):
     Path(log_file).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
     file_exists = os.path.exists(log_file)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    split_name = "train" if use_train_split else "test"
     row_data = [
         timestamp,
         dataset,
@@ -100,8 +103,6 @@ def log_to_csv(
         over_max_tokens_count,
         model_name,
         lora_path,
-        train_ratio,
-        split_name,
     ]
     with open(log_file, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -126,8 +127,6 @@ def log_to_csv(
                     "over_max_tokens_count",
                     "model_name",
                     "lora_path",
-                    "train_ratio",
-                    "eval_split",
                 ]
             )
         writer.writerow(row_data)
@@ -151,7 +150,10 @@ def evaluate_vqa(
     preprocessed_clip_dir: str | None = None,
     use_subtitles: bool = False,
     subtitles_dir: str | None = None,
+    dataset: str = "",
+    lmms_model_name: str = "",
 ) -> dict[str, Any]:
+    use_official_videomme = is_official_videomme_dataset(dataset)
     results = {
         "correct": 0,
         "total": 0,
@@ -161,6 +163,7 @@ def evaluate_vqa(
         "frame_sampling_times": [],
         "over_max_tokens_count": 0,
         "missing_think_end_count": 0,
+        "official_videomme_scores": [],
     }
 
     pbar = tqdm(samples, desc="评估进度")
@@ -218,14 +221,21 @@ def evaluate_vqa(
                 random_seed=random_seed,
                 subtitles_dir=subtitles_dir,
             )
-            if use_subtitles
+            if use_subtitles and not use_official_videomme
             else []
         )
-        prompt = (
-            build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt)
-            if use_subtitles
-            else build_user_text(sample.question, sample.options)
-        )
+        raw_doc = sample.metadata.get("raw_doc")
+        if use_official_videomme and isinstance(raw_doc, dict):
+            prompt = build_videomme_prompt(
+                raw_doc,
+                lmms_model_name,
+                use_subtitles=use_subtitles,
+                num_frames=num_frames,
+            )
+        elif use_subtitles:
+            prompt = build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt)
+        else:
+            prompt = build_user_text(sample.question, sample.options)
         sample_t0 = time.time()
         sample_t1 = sample_t0 + frame_sampling_time
         response, inference_time, generated_token_count, hit_max_tokens = generate_response(
@@ -254,6 +264,19 @@ def evaluate_vqa(
             has_options=bool(sample.options),
             model_mode=model_mode,
         )
+        if use_official_videomme and isinstance(raw_doc, dict):
+            score_dict = score_videomme(raw_doc, response)
+            results["official_videomme_scores"].append(score_dict)
+            pred_answer = score_dict.get("pred_answer", "")
+            ans_text = str(pred_answer)
+            is_correct = float(score_dict.get("score", 0.0)) == 1.0
+            answer_usable = True
+        else:
+            answer_usable = has_think_end or (not require_think_end_for_scoring)
+            if not answer_usable:
+                pred_answer = None
+            is_correct = False
+
         print(f"[vqa_eval] sample_id={sample.sample_id} RAW:\n{response}", flush=True)
         print(f"[vqa_eval] sample_id={sample.sample_id} COT:\n{cot_text}", flush=True)
         print(f"[vqa_eval] sample_id={sample.sample_id} ANS:\n{ans_text}", flush=True)
@@ -264,15 +287,13 @@ def evaluate_vqa(
             f"require_think_end_for_scoring={require_think_end_for_scoring}",
             flush=True,
         )
-        answer_usable = has_think_end or (not require_think_end_for_scoring)
-        if not answer_usable:
-            pred_answer = None
         results["inference_times"].append(inference_time)
 
         if sample.options is not None:
-            is_correct = answer_usable and (
-                str(sample.answer).strip().upper() == str(pred_answer).strip().upper()
-            )
+            if not use_official_videomme:
+                is_correct = answer_usable and (
+                    str(sample.answer).strip().upper() == str(pred_answer).strip().upper()
+                )
             results["total"] += 1
             if is_correct:
                 results["correct"] += 1
@@ -292,16 +313,15 @@ def evaluate_vqa(
         pbar.set_postfix(Acc=f"{partial_acc:.2f}%", AvgTime=f"{partial_time:.2f}s", n=i + 1)
         release_cuda_memory()
 
+    if use_official_videomme and results["official_videomme_scores"]:
+        results["official_videomme_overall"] = aggregate_videomme(results["official_videomme_scores"])
+
     return results
 
 
 def parse_args():
     p = argparse.ArgumentParser(description="通用 VQA 评估脚本")
     p.add_argument("--dataset", type=str, default="vsibench", choices=list_supported_datasets())
-    p.add_argument("--dataset_split", type=str, default="test")
-    p.add_argument("--dataset_name", type=str, default="nyu-visionx/VSI-Bench")
-    p.add_argument("--dataset_config", type=str, default="full")
-    p.add_argument("--no_dataset_config", action="store_true")
 
     p.add_argument("--model_path", type=str, default="Qwen/Qwen2.5-VL-3B-Instruct")
     p.add_argument("--model_name", type=str, default=None, help="模型名称（可选，优先用于日志）")
@@ -309,8 +329,7 @@ def parse_args():
     p.add_argument("--base_model", type=str, default=None)
     p.add_argument("--merge_lora", action="store_true")
 
-    p.add_argument("--video_dir", type=str, default="~/dataset/vsi_bench")
-    p.add_argument("--num_samples", type=str, default="10")
+    p.add_argument("--num_samples", type=str, default="10", help="评测样本数；all=全量 test")
     p.add_argument("--num_frames", type=int, default=8)
     p.add_argument(
         "--frame_sampling_method",
@@ -352,8 +371,6 @@ def parse_args():
         help="模型响应模式配置文件(JSON): 通过规则自动判断 thinking/instruct。",
     )
     p.add_argument("--log_file", type=str, default="vqa_evaluation_log.csv")
-    p.add_argument("--train_ratio", type=float, default=0.8)
-    p.add_argument("--use_train_split", action="store_true")
     p.add_argument(
         "--use_preprocessed_clip_frames",
         action="store_true",
@@ -379,8 +396,6 @@ def parse_args():
 def main():
     experiment_start_time = time.perf_counter()
     args = parse_args()
-    apply_dataset_cli_defaults(args)
-    video_dir = os.path.expanduser(args.video_dir)
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
@@ -409,19 +424,10 @@ def main():
     sample_count = None if args.num_samples.lower() == "all" else int(args.num_samples)
     loader = get_data_loader(
         args.dataset,
-        video_dir=video_dir,
         seed=args.seed,
-        train_ratio=args.train_ratio,
         task_filter=args.task_filter,
-        dataset_name=args.dataset_name,
-        dataset_config=args.dataset_config,
-        no_dataset_config=args.no_dataset_config,
     )
-    samples = loader.get_split_samples(
-        split=args.dataset_split,
-        use_train_split=args.use_train_split,
-        sample_count=sample_count,
-    )
+    samples = loader.get_eval_samples(sample_count=sample_count)
 
     resolved_model_path = os.path.expanduser(args.model_path)
     lora_path = ""
@@ -466,17 +472,24 @@ def main():
         flush=True,
     )
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
-    print(
-        f"[vqa_eval] max_new_tokens 已按模式固定: mode={model_mode}, "
-        f"effective_max_new_tokens={effective_max_new_tokens}",
-        flush=True,
-    )
+    lmms_model_name = resolve_lmms_model_name(resolved_model_path)
+    if is_official_videomme_dataset(args.dataset):
+        effective_max_new_tokens = resolve_videomme_max_new_tokens()
+        print(
+            "[vqa_eval] Video-MME 使用官方 lmms-eval 数据 / prompt / 打分；"
+            f"max_new_tokens={effective_max_new_tokens}, lmms_model={lmms_model_name}",
+            flush=True,
+        )
+    else:
+        print(
+            f"[vqa_eval] max_new_tokens 已按模式固定: mode={model_mode}, "
+            f"effective_max_new_tokens={effective_max_new_tokens}",
+            flush=True,
+        )
 
     apply_pixel_limits = should_apply_vl_pixel_limits(
         resolved_model_path,
         args.dataset,
-        args.dataset_split,
-        args.dataset_name,
     )
     if apply_pixel_limits:
         print(
@@ -509,6 +522,8 @@ def main():
         preprocessed_clip_dir=preprocessed_clip_dir,
         use_subtitles=bool(args.use_subtitles),
         subtitles_dir=(args.subtitles_dir.strip() if args.subtitles_dir.strip() else None),
+        dataset=args.dataset,
+        lmms_model_name=lmms_model_name,
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     evaluated_samples, correct_count = _compute_score_counts_for_csv(results, args.task_filter)
@@ -535,8 +550,6 @@ def main():
         over_max_tokens_count=results["over_max_tokens_count"],
         model_name=model_name,
         lora_path=lora_path,
-        train_ratio=args.train_ratio,
-        use_train_split=args.use_train_split,
     )
     print(
         f"评估完成：样本 {len(samples)}, Accuracy {avg_accuracy:.2f}%, "
@@ -544,6 +557,12 @@ def main():
         f"AvgEmbedBuild {avg_embedding_build_time:.6f}s, AvgTotal {avg_total_time_hours:.6f}h, "
         f"OverLimit {results['over_max_tokens_count']}, MissingThinkEnd {results['missing_think_end_count']}"
     )
+    if "official_videomme_overall" in results:
+        print(
+            f"官方 Video-MME Overall: {results['official_videomme_overall']:.1f}% "
+            f"(n={len(results['official_videomme_scores'])})",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
