@@ -19,7 +19,7 @@ from transformers import AutoModel, AutoProcessor
 
 from data_loaders import (
     apply_dataset_cli_defaults,
-    dataset_uses_vl_pixel_limits,
+    should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
 )
@@ -2066,14 +2066,15 @@ def main():
         f"quota_gamma={float(args.quota_gamma):g}"
     )
 
-    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+    apply_pixel_limits = should_apply_vl_pixel_limits(
+        resolved_model_path,
         args.dataset,
         args.dataset_split,
         args.dataset_name,
     )
     if apply_pixel_limits:
         print(
-            "[vqa_eval_ours] MLVU-Test：启用 processor max_pixels 限制（防超高分辨率 OOM）",
+            f"[vqa_eval_ours] 启用 processor 像素限制（num_frames={budget}，防 OOM / context 溢出）",
             flush=True,
         )
     model, proc = load_model_and_processor(
@@ -2082,6 +2083,7 @@ def main():
         base_model=args.base_model,
         merge_lora=args.merge_lora,
         apply_pixel_limits=apply_pixel_limits,
+        num_frames=budget,
     )
     results = evaluate_vqa(
         model,

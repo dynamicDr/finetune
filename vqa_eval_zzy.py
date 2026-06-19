@@ -16,7 +16,7 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
-from data_loaders import dataset_uses_vl_pixel_limits, get_data_loader, list_supported_datasets
+from data_loaders import should_apply_vl_pixel_limits, get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
 from utils import build_user_text, build_user_text_with_subtitles, from_pretrained_local_first
@@ -497,14 +497,15 @@ def main() -> None:
         raise RuntimeError("本脚本仅支持 instruct 模式。请改用 instruct 模型或扩展实现。")
     effective_max_new_tokens = MODE_MAX_NEW_TOKENS[model_mode]
 
-    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+    apply_pixel_limits = should_apply_vl_pixel_limits(
+        resolved_model_path,
         args.dataset,
         args.dataset_split,
         args.dataset_name,
     )
     if apply_pixel_limits:
         print(
-            "[vqa_eval_zzy] MLVU-Test：启用 processor max_pixels 限制（防超高分辨率 OOM）",
+            f"[vqa_eval_zzy] 启用 processor 像素限制（num_frames={args.num_frames}，防 OOM / context 溢出）",
             flush=True,
         )
     model, proc = load_model_and_processor(
@@ -513,6 +514,7 @@ def main() -> None:
         base_model=args.base_model,
         merge_lora=args.merge_lora,
         apply_pixel_limits=apply_pixel_limits,
+        num_frames=args.num_frames,
     )
     results = evaluate_vqa(
         model=model,

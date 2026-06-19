@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from data_loaders import (
     apply_dataset_cli_defaults,
-    dataset_uses_vl_pixel_limits,
+    should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
 )
@@ -247,7 +247,8 @@ def main():
         else "1fps"
     )
 
-    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+    apply_pixel_limits = should_apply_vl_pixel_limits(
+        args.model_path,
         args.dataset,
         args.dataset_split,
         args.dataset_name,

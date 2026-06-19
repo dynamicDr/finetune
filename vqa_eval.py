@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from data_loaders import (
     apply_dataset_cli_defaults,
-    dataset_uses_vl_pixel_limits,
+    should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
 )
@@ -472,14 +472,15 @@ def main():
         flush=True,
     )
 
-    apply_pixel_limits = dataset_uses_vl_pixel_limits(
+    apply_pixel_limits = should_apply_vl_pixel_limits(
+        resolved_model_path,
         args.dataset,
         args.dataset_split,
         args.dataset_name,
     )
     if apply_pixel_limits:
         print(
-            "[vqa_eval] MLVU-Test：启用 processor max_pixels 限制（防超高分辨率 OOM）",
+            f"[vqa_eval] 启用 processor 像素限制（num_frames={args.num_frames}，防 OOM / context 溢出）",
             flush=True,
         )
     model, processor = load_model_and_processor(
@@ -488,6 +489,7 @@ def main():
         base_model=args.base_model,
         merge_lora=args.merge_lora,
         apply_pixel_limits=apply_pixel_limits,
+        num_frames=args.num_frames,
     )
     results = evaluate_vqa(
         model=model,

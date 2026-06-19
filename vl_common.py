@@ -134,6 +134,16 @@ def is_llava_video_qwen_inference(processor, model=None) -> bool:
     return getattr(processor, "is_llava_video_qwen", False)
 
 
+def is_llava_onevision_video_inference(processor, model=None) -> bool:
+    """LLaVA-OneVision HF：视频走官方 video 路径，每帧池化到约 196 visual token（非 anyres 多图）。"""
+    if is_llava_video_qwen_inference(processor, model=model):
+        return False
+    if type(processor).__name__ == "LlavaOnevisionProcessor":
+        return True
+    model_type = getattr(getattr(model, "config", None), "model_type", None)
+    return model_type == "llava_onevision"
+
+
 def is_llava_next_video_inference(processor, model=None) -> bool:
     """LLaVA-NeXT-Video HF 权重需走单路 video 输入，不能与 Qwen / OneVision 共用多图路径。"""
     if is_llava_video_qwen_inference(processor, model=model):
@@ -142,6 +152,13 @@ def is_llava_next_video_inference(processor, model=None) -> bool:
         return True
     model_type = getattr(getattr(model, "config", None), "model_type", None)
     return model_type in ("llava_next_video", "llava_next_video2")
+
+
+def is_llava_hf_video_inference(processor, model=None) -> bool:
+    """HF LLaVA 视频推理：NeXT-Video 与 OneVision 均走 processor(videos=...) 单路输入。"""
+    return is_llava_next_video_inference(processor, model=model) or is_llava_onevision_video_inference(
+        processor, model=model
+    )
 
 
 def _is_vl_model_id(model_id: str) -> bool:
@@ -205,7 +222,7 @@ def build_vlm_user_messages(
     *,
     model=None,
 ) -> list[dict[str, Any]]:
-    if is_llava_next_video_inference(processor, model=model):
+    if is_llava_hf_video_inference(processor, model=model):
         content: list[dict[str, Any]] = []
         if frames:
             content.append({"type": "video", "video": frames})
@@ -226,7 +243,7 @@ def prepare_vlm_inputs(
     frames = _maybe_resize_vlm_frames(frames, processor)
     messages = build_vlm_user_messages(frames, prompt, processor, model=model)
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    if is_llava_next_video_inference(processor, model=model):
+    if is_llava_hf_video_inference(processor, model=model):
         proc_kwargs: dict[str, Any] = {
             "text": [text],
             "return_tensors": "pt",
@@ -247,7 +264,7 @@ def _log_vision_inputs(
     *,
     model=None,
 ) -> None:
-    llava_video = is_llava_next_video_inference(processor, model=model)
+    llava_video = is_llava_hf_video_inference(processor, model=model)
     print(
         f"[perf-debug][vision-input] frames_count={len(frames)}, "
         f"llava_next_video={llava_video}, input_keys={sorted(list(inputs.keys()))}",
@@ -314,13 +331,45 @@ def build_mcq_prompt(question: str, options: list[str]) -> str:
 # Qwen VL 官方推荐：单图/单帧视觉 token 预算 256–1280（经 spatial merge 后）
 _DEFAULT_MAX_VISUAL_TOKENS = 1280
 _DEFAULT_MIN_VISUAL_TOKENS = 256
-# LLaVA anyres 在 MLVU 超高分辨率帧上会切成大量 384 patch，32 帧极易 OOM。
+# LLaVA anyres 在 MLVU 超高分辨率帧上会切成大量 384 patch，32 帧极易 OOM / 超 context。
 _LLAVA_DEFAULT_MAX_IMAGE_EDGE = 768
+_LLAVA_DEFAULT_CONTEXT_LENGTH = 131072
+_LLAVA_TEXT_TOKEN_RESERVE = 2048
+# llava-onevision anyres 经验值：max_edge → 单帧约 visual token 数（9 patch ≈ 5967）
+_LLAVA_EDGE_TOKEN_ESTIMATES: tuple[tuple[int, int], ...] = (
+    (768, 5967),
+    (640, 4500),
+    (512, 3300),
+    (448, 2600),
+    (384, 1800),
+    (336, 1500),
+)
 
 
 def _is_llava_pixel_limit_model(model_id: str) -> bool:
+    """OneVision 走官方 video 路径（~196 token/帧），无需 anyres 多图降分辨率。"""
     model_id_lower = model_id.lower()
-    return "llava-onevision" in model_id_lower or "llava-next" in model_id_lower
+    if "llava-onevision" in model_id_lower:
+        return False
+    return "llava-next" in model_id_lower
+
+
+def model_uses_vl_pixel_limits(model_id: str) -> bool:
+    """LLaVA anyres / Qwen VL 等需在推理前限制单帧像素，避免 OOM 或 context 溢出。"""
+    return _is_llava_pixel_limit_model(model_id) or _vl_pixel_factor(model_id) is not None
+
+
+def _llava_max_edge_for_frames(
+    num_frames: int,
+    *,
+    context_length: int = _LLAVA_DEFAULT_CONTEXT_LENGTH,
+) -> int:
+    """按帧数反推 max_image_edge，使总视觉 token 尽量落在 context 内。"""
+    tokens_per_frame_budget = (context_length - _LLAVA_TEXT_TOKEN_RESERVE) // max(1, num_frames)
+    for edge, est_tokens in _LLAVA_EDGE_TOKEN_ESTIMATES:
+        if est_tokens <= tokens_per_frame_budget:
+            return edge
+    return _LLAVA_EDGE_TOKEN_ESTIMATES[-1][0]
 
 
 def _vl_pixel_factor(model_id: str) -> int | None:
@@ -338,12 +387,17 @@ def _apply_processor_pixel_limits(
     *,
     max_pixels: int | None = None,
     min_pixels: int | None = None,
+    num_frames: int | None = None,
 ) -> None:
-    """限制 VLM 单帧像素，避免 MLVU 超高分辨率 outlier 触发 OOM。"""
+    """限制 VLM 单帧像素，避免 MLVU 超高分辨率 outlier 触发 OOM / context 溢出。"""
     if _is_llava_pixel_limit_model(model_id):
-        processor._finetune_max_image_edge = (
-            max_pixels if max_pixels is not None else _LLAVA_DEFAULT_MAX_IMAGE_EDGE
-        )
+        if max_pixels is not None:
+            max_edge = int(max_pixels)
+        elif num_frames is not None and num_frames > 0:
+            max_edge = _llava_max_edge_for_frames(num_frames)
+        else:
+            max_edge = _LLAVA_DEFAULT_MAX_IMAGE_EDGE
+        processor._finetune_max_image_edge = max_edge
         return
 
     factor = _vl_pixel_factor(model_id)
@@ -376,6 +430,7 @@ def _maybe_resize_vlm_frames(
         return frames
 
     resized: list[Image.Image] = []
+    scaled_count = 0
     for frame in frames:
         width, height = frame.size
         longest = max(width, height)
@@ -385,6 +440,13 @@ def _maybe_resize_vlm_frames(
         scale = max_edge / float(longest)
         new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
         resized.append(frame.resize(new_size, Image.Resampling.BICUBIC))
+        scaled_count += 1
+    if scaled_count:
+        print(
+            "[perf-debug][pixel-limits] "
+            f"llava_max_image_edge={max_edge}, scaled_frames={scaled_count}/{len(frames)}",
+            flush=True,
+        )
     return resized
 
 
@@ -434,6 +496,7 @@ def load_model_and_processor(
     max_pixels: int | None = None,
     min_pixels: int | None = None,
     apply_pixel_limits: bool = False,
+    num_frames: int | None = None,
 ):
     model_path = os.path.expanduser(model_path)
     print(
@@ -489,6 +552,7 @@ def load_model_and_processor(
                 base_id,
                 max_pixels=max_pixels,
                 min_pixels=min_pixels,
+                num_frames=num_frames,
             )
         _log_processor_pixel_config(processor)
         return model, processor
@@ -514,6 +578,7 @@ def load_model_and_processor(
                 model_path,
                 max_pixels=max_pixels,
                 min_pixels=min_pixels,
+                num_frames=num_frames,
             )
         _log_processor_pixel_config(processor)
         return model, processor
@@ -557,6 +622,7 @@ def load_model_and_processor(
             pixel_limit_model_id,
             max_pixels=max_pixels,
             min_pixels=min_pixels,
+            num_frames=num_frames,
         )
     _log_processor_pixel_config(processor)
     return model, processor
@@ -845,7 +911,7 @@ def generate_response_with_split_embedding(
 ) -> tuple[str, float, float, int, bool]:
     import time
 
-    if is_llava_next_video_inference(processor, model=model) or is_llava_video_qwen_inference(processor, model=model):
+    if is_llava_hf_video_inference(processor, model=model) or is_llava_video_qwen_inference(processor, model=model):
         raise RuntimeError("LLaVA 视频模型不支持 split embedding 推理路径，请使用 generate_response。")
     model_inputs, _ = prepare_vlm_inputs(processor, frames, prompt, model=model)
     model_inputs = model_inputs.to(model.device)
@@ -884,7 +950,7 @@ def generate_response_with_split_embedding_detailed(
     import time
 
     model_call_start = time.perf_counter()
-    if is_llava_next_video_inference(processor, model=model) or is_llava_video_qwen_inference(processor, model=model):
+    if is_llava_hf_video_inference(processor, model=model) or is_llava_video_qwen_inference(processor, model=model):
         raise RuntimeError("LLaVA 视频模型不支持 split embedding 推理路径，请使用 generate_response。")
 
     processor_start = time.perf_counter()

@@ -44,6 +44,20 @@ def dataset_uses_vl_pixel_limits(
     return "mlvu_test" in name.replace("-", "_")
 
 
+def should_apply_vl_pixel_limits(
+    model_id: str,
+    dataset: str = "",
+    dataset_split: str = "",
+    dataset_name: str = "",
+) -> bool:
+    """数据集或模型任一需要像素限制时启用（如 MLVU outlier、LLaVA anyres 多帧超 context）。"""
+    from vl_common import model_uses_vl_pixel_limits
+
+    return dataset_uses_vl_pixel_limits(dataset, dataset_split, dataset_name) or model_uses_vl_pixel_limits(
+        model_id
+    )
+
+
 def apply_dataset_cli_defaults(args: Any) -> None:
     """当用户只改 --dataset 时，自动补齐常用 video_dir / dataset_name / split。"""
     key = str(getattr(args, "dataset", "")).strip().lower()
