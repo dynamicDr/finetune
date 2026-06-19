@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import os
 import random
 from typing import Any
@@ -222,6 +223,7 @@ def prepare_vlm_inputs(
     *,
     model=None,
 ) -> tuple[Any, str]:
+    frames = _maybe_resize_vlm_frames(frames, processor)
     messages = build_vlm_user_messages(frames, prompt, processor, model=model)
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     if is_llava_next_video_inference(processor, model=model):
@@ -312,6 +314,13 @@ def build_mcq_prompt(question: str, options: list[str]) -> str:
 # Qwen VL 官方推荐：单图/单帧视觉 token 预算 256–1280（经 spatial merge 后）
 _DEFAULT_MAX_VISUAL_TOKENS = 1280
 _DEFAULT_MIN_VISUAL_TOKENS = 256
+# LLaVA anyres 在 MLVU 超高分辨率帧上会切成大量 384 patch，32 帧极易 OOM。
+_LLAVA_DEFAULT_MAX_IMAGE_EDGE = 768
+
+
+def _is_llava_pixel_limit_model(model_id: str) -> bool:
+    model_id_lower = model_id.lower()
+    return "llava-onevision" in model_id_lower or "llava-next" in model_id_lower
 
 
 def _vl_pixel_factor(model_id: str) -> int | None:
@@ -330,7 +339,13 @@ def _apply_processor_pixel_limits(
     max_pixels: int | None = None,
     min_pixels: int | None = None,
 ) -> None:
-    """限制 Qwen VL processor 单帧/单图像素，避免超高分辨率视频帧 OOM。"""
+    """限制 VLM 单帧像素，避免 MLVU 超高分辨率 outlier 触发 OOM。"""
+    if _is_llava_pixel_limit_model(model_id):
+        processor._finetune_max_image_edge = (
+            max_pixels if max_pixels is not None else _LLAVA_DEFAULT_MAX_IMAGE_EDGE
+        )
+        return
+
     factor = _vl_pixel_factor(model_id)
     if factor is None:
         return
@@ -350,6 +365,33 @@ def _apply_processor_pixel_limits(
     image_processor = getattr(processor, "image_processor", None)
     if image_processor is not None:
         image_processor.size = size
+
+
+def _maybe_resize_vlm_frames(
+    frames: list[Image.Image],
+    processor,
+) -> list[Image.Image]:
+    max_edge = getattr(processor, "_finetune_max_image_edge", None)
+    if max_edge is None:
+        return frames
+
+    resized: list[Image.Image] = []
+    for frame in frames:
+        width, height = frame.size
+        longest = max(width, height)
+        if longest <= max_edge:
+            resized.append(frame)
+            continue
+        scale = max_edge / float(longest)
+        new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+        resized.append(frame.resize(new_size, Image.Resampling.BICUBIC))
+    return resized
+
+
+def release_cuda_memory() -> None:
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _log_processor_pixel_config(processor) -> None:
@@ -373,11 +415,13 @@ def _log_processor_pixel_config(processor) -> None:
         shortest_edge = None
     min_pixels = getattr(image_processor, "min_pixels", None)
     max_pixels = getattr(image_processor, "max_pixels", None)
+    llava_max_edge = getattr(processor, "_finetune_max_image_edge", None)
     print(
         "[perf-debug][processor] "
         f"processor={type(processor).__name__}, "
         f"size.longest_edge={longest_edge}, size.shortest_edge={shortest_edge}, "
-        f"min_pixels={min_pixels}, max_pixels={max_pixels}",
+        f"min_pixels={min_pixels}, max_pixels={max_pixels}, "
+        f"llava_max_image_edge={llava_max_edge}",
         flush=True,
     )
 
@@ -746,6 +790,8 @@ def generate_response(
         flush=True,
     )
     hit_max_tokens = generated_token_count >= max_new_tokens
+    del inputs, generated_ids
+    release_cuda_memory()
     return response, inference_time, generated_token_count, hit_max_tokens
 
 

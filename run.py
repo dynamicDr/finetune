@@ -118,12 +118,9 @@ def main(cfg: DictConfig) -> None:
             if subtitles_dir is not None and str(subtitles_dir).strip() not in ("", "null", "None"):
                 dataset_shared += ["--subtitles_dir", str(subtitles_dir)]
         if script_key == "vqa_eval_ours.py":
-            quota_prescreen_alpha = OmegaConf.select(cfg, "quota_prescreen_alpha", default=None)
-            if quota_prescreen_alpha is not None and str(quota_prescreen_alpha).strip() not in ("", "null", "None"):
-                dataset_shared += ["--quota_prescreen_alpha", str(int(quota_prescreen_alpha))]
-            quota_gamma = OmegaConf.select(cfg, "quota_gamma", default=None)
-            if quota_gamma is not None and str(quota_gamma).strip() not in ("", "null", "None"):
-                dataset_shared += ["--quota_gamma", str(float(quota_gamma))]
+            candidate_pool_fps = OmegaConf.select(cfg, "candidate_pool_fps", default=None)
+            if candidate_pool_fps is not None and str(candidate_pool_fps).strip() not in ("", "null", "None"):
+                dataset_shared += ["--candidate_pool_fps", str(float(candidate_pool_fps))]
             max_keywords = OmegaConf.select(cfg, "max_keywords", default=None)
             if max_keywords is not None and str(max_keywords).strip() not in ("", "null", "None"):
                 dataset_shared += ["--max_keywords", str(int(max_keywords))]
@@ -155,19 +152,6 @@ def main(cfg: DictConfig) -> None:
                 dataset_shared += ["--keyword_cache_number", str(int(keyword_cache_number))]
             elif bool(use_keyword_cache):
                 dataset_shared += ["--keyword_cache_number", "0"]
-            # 0=配额topk，1=覆盖贪心，2=稀疏自适应配额 sparsity_adaptive_quota
-            frame_selection_mode = OmegaConf.select(cfg, "frame_selection_mode", default=None)
-            if frame_selection_mode is not None and str(frame_selection_mode).strip() not in ("", "null", "None"):
-                dataset_shared += ["--frame_selection_mode", str(int(frame_selection_mode))]
-            ensure_keyword_min_coverage = OmegaConf.select(cfg, "ensure_keyword_min_coverage", default=False)
-            if bool(ensure_keyword_min_coverage):
-                dataset_shared.append("--ensure_keyword_min_coverage")
-            hybrid_anchor_in_mode1 = OmegaConf.select(cfg, "hybrid_anchor_in_mode1", default=False)
-            if bool(hybrid_anchor_in_mode1):
-                dataset_shared.append("--hybrid_anchor_in_mode1")
-            hybrid_anchor_ratio = OmegaConf.select(cfg, "hybrid_anchor_ratio", default=None)
-            if hybrid_anchor_ratio is not None and str(hybrid_anchor_ratio).strip() not in ("", "null", "None"):
-                dataset_shared += ["--hybrid_anchor_ratio", str(float(hybrid_anchor_ratio))]
             ours_clip_model_id = OmegaConf.select(cfg, "ours_clip_model_id", default=None)
             if ours_clip_model_id is not None and str(ours_clip_model_id).strip() not in ("", "null", "None"):
                 dataset_shared += ["--ours_clip_model_id", str(ours_clip_model_id)]

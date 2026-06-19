@@ -30,6 +30,7 @@ from utils import (
     build_user_text,
     build_user_text_with_subtitles,
     format_labeled_options,
+    KEYWORD_EXTRACTOR_PROVIDERS,
     calculate_mra,
     collect_subtitles_for_frame_ids as _collect_subtitles_for_sample,
     compute_accuracy_from_results as _compute_accuracy_from_results,
@@ -307,25 +308,6 @@ def _dedup_keyword_phrases(kws_raw: list[str]) -> list[str]:
     return out_kws
 
 
-_KEYWORD_EXTRACTOR_PROVIDERS: dict[str, dict[str, str]] = {
-    "poe": {
-        "base_url": "https://api.poe.com/v1",
-        "api_key_env": "POE_API_KEY",
-        "api_style": "responses",
-    },
-    "aio": {
-        "base_url": "https://api.aiohub.org/v1",
-        "api_key_env": "AIOHUB_API_KEY",
-        "api_style": "chat",
-    },
-    "or": {
-        "base_url": "https://openrouter.ai/api/v1",
-        "api_key_env": "OPENROUTER_API_KEY",
-        "api_style": "chat",
-    },
-}
-
-
 def _resolve_keyword_extractor(
     extractor_model: str,
     api_base_url: str,
@@ -349,7 +331,7 @@ def _resolve_keyword_extractor(
 
     provider: str | None = None
     remote_model = raw
-    for prefix in _KEYWORD_EXTRACTOR_PROVIDERS:
+    for prefix in KEYWORD_EXTRACTOR_PROVIDERS:
         for sep in ("-", "_", ":"):
             token = f"{prefix}{sep}"
             if lower.startswith(token):
@@ -362,7 +344,7 @@ def _resolve_keyword_extractor(
     if provider is not None:
         if not remote_model:
             raise ValueError(f"keyword_extractor_model={raw!r} 缺少模型名，例如 {provider}-gpt-5.2")
-        spec = _KEYWORD_EXTRACTOR_PROVIDERS[provider]
+        spec = KEYWORD_EXTRACTOR_PROVIDERS[provider]
         return {
             "mode": "remote",
             "raw": raw,
@@ -378,8 +360,8 @@ def _resolve_keyword_extractor(
         "raw": raw,
         "provider": "",
         "remote_model": raw,
-        "base_url": str(api_base_url or "").strip() or _KEYWORD_EXTRACTOR_PROVIDERS["aio"]["base_url"],
-        "api_key_env": str(api_key_env or "").strip() or _KEYWORD_EXTRACTOR_PROVIDERS["aio"]["api_key_env"],
+        "base_url": str(api_base_url or "").strip() or KEYWORD_EXTRACTOR_PROVIDERS["aio"]["base_url"],
+        "api_key_env": str(api_key_env or "").strip() or KEYWORD_EXTRACTOR_PROVIDERS["aio"]["api_key_env"],
         "api_style": "chat",
     }
 
@@ -445,7 +427,7 @@ def _ensure_keyword_api_no_proxy_env() -> None:
 
 
 def _openrouter_default_headers() -> dict[str, str]:
-    """OpenRouter 可选 attribution 头（见 https://openrouter.ai/docs/quickstart）。"""
+    """OpenRouter 可选 attribution 头。"""
     headers: dict[str, str] = {}
     referer = os.getenv("OPENROUTER_HTTP_REFERER", "").strip()
     title = os.getenv("OPENROUTER_APP_TITLE", "vqa_eval_ours").strip()
@@ -849,59 +831,6 @@ def _allocate_counts_by_weights(weights: torch.Tensor, total: int) -> torch.Tens
     return base
 
 
-def _allocate_adaptive_quotas(
-    weights: torch.Tensor,
-    local_evidence: torch.Tensor,
-    budget: int,
-    gamma: float,
-) -> torch.Tensor:
-    """按权重与 Hoyer LE 分配每关键词帧配额：尖峰词配额小，平缓词配额大。"""
-    budget = int(budget)
-    m = int(weights.numel())
-    if budget <= 0 or m == 0:
-        return torch.zeros((m,), dtype=torch.long, device=weights.device)
-
-    w = weights.float().clamp(min=0.0)
-    le = local_evidence.float().clamp(min=0.0, max=1.0)
-    if le.numel() != m:
-        le = torch.zeros_like(w)
-
-    raw = w * (1.0 + float(gamma) * (1.0 - le))
-    s = float(raw.sum().item())
-    if s <= 1e-12:
-        raw = torch.ones_like(w)
-        s = float(m)
-
-    if budget >= m:
-        quotas = torch.ones((m,), dtype=torch.long, device=weights.device)
-        extra = budget - m
-        if extra > 0:
-            quotas = quotas + _allocate_counts_by_weights(raw, extra)
-        return quotas
-
-    proportional = budget * raw / s
-    quotas = torch.round(proportional).to(torch.long).clamp(min=1)
-    diff = budget - int(quotas.sum().item())
-    if diff == 0:
-        return quotas
-
-    frac = proportional - quotas.float()
-    order = torch.argsort(frac, descending=(diff > 0))
-    guard = 0
-    while diff != 0 and guard < m * 4:
-        i = int(order[guard % m].item())
-        if diff > 0:
-            quotas[i] += 1
-            diff -= 1
-        elif int(quotas[i].item()) > 1:
-            quotas[i] -= 1
-            diff += 1
-        guard += 1
-    if diff != 0:
-        return _allocate_counts_by_weights(raw, budget)
-    return quotas
-
-
 def _local_evidence_score(x: torch.Tensor) -> float:
     """计算一维相似度曲线的局部证据度：减中位数基线后取 Hoyer 稀疏度。"""
     x = x.detach().float().flatten()
@@ -1013,357 +942,20 @@ def _run_vlm_once(model: Any, proc: Any, frames: list[Image.Image], prompt: str,
     return {"pred_answer": pred_u, "response": resp, "option_probs": probs, "entropy": 0.0, "inference_time": infer_t, "hit_max_tokens": int(len(out.scores) >= max_new_tokens)}
 
 
-def _build_quota_prescreen_candidates(
-    kw_sims: torch.Tensor,
-    kw_w: torch.Tensor,
-    budget: int,
-    alpha: int,
-    quotas: torch.Tensor | None = None,
-) -> list[int]:
-    """按关键词配额做软预筛：每词取 top-(alpha*q_i)，并集去重。"""
-    if kw_sims.ndim != 2 or kw_sims.shape[0] == 0 or budget <= 0:
-        return []
-    m = int(kw_sims.shape[0])
-    n = int(kw_sims.shape[1])
-    if kw_w.numel() != m:
-        kw_w = torch.ones((m,), device=kw_sims.device)
-    kw_w = kw_w.float().clamp(min=0.0)
-    if quotas is None:
-        quotas = _allocate_counts_by_weights(kw_w, budget)
-    else:
-        quotas = quotas.to(device=kw_sims.device, dtype=torch.long)
-        if quotas.numel() != m:
-            quotas = _allocate_counts_by_weights(kw_w, budget)
-    alpha = max(1, int(alpha))
-    picked: set[int] = set()
-    for j in range(m):
-        qj = int(quotas[j].item())
-        topn = alpha * qj
-        if topn <= 0:
-            continue
-        topn = min(n, topn)
-        idxs = torch.argsort(kw_sims[j], descending=True)[:topn].tolist()
-        picked.update(int(i) for i in idxs)
-    return sorted(picked)
-
-
-def _submodular_cover_greedy_select(
-    kw_sims: torch.Tensor,
-    kw_w: torch.Tensor,
-    budget: int,
-    candidate_idx: list[int],
-) -> list[int]:
-    """次模覆盖贪心：F(S)=sum_i w_i * max_{f in S} sim(f,k_i)。"""
-    if kw_sims.ndim != 2 or budget <= 0:
-        return []
-    m = int(kw_sims.shape[0])
-    n = int(kw_sims.shape[1])
-    if m == 0 or n == 0:
-        return []
-
-    if kw_w.numel() != m:
-        kw_w = torch.ones((m,), device=kw_sims.device)
-    kw_w = kw_w.float().clamp(min=0.0)
-    if float(kw_w.sum().item()) <= 1e-12:
-        kw_w = torch.ones_like(kw_w)
-
-    cand = sorted({int(i) for i in candidate_idx if 0 <= int(i) < n})
-    if len(cand) < min(budget, n):
-        cand = list(range(n))
-
-    selected: list[int] = []
-    selected_set: set[int] = set()
-    covered = torch.zeros((m,), dtype=kw_sims.dtype, device=kw_sims.device)
-
-    max_pick = min(int(budget), n)
-    for _ in range(max_pick):
-        avail = [i for i in cand if i not in selected_set]
-        if not avail:
-            break
-        avail_tensor = torch.tensor(avail, device=kw_sims.device, dtype=torch.long)
-        sim_avail = kw_sims[:, avail_tensor]  # (M, C)
-        delta = torch.maximum(covered.unsqueeze(1), sim_avail) - covered.unsqueeze(1)
-        gains = (delta * kw_w.unsqueeze(1)).sum(dim=0)  # (C,)
-        best_local = int(torch.argmax(gains).item())
-        if float(gains[best_local].item()) <= -1e8:
-            break
-        best_idx = int(avail[best_local])
-        selected.append(best_idx)
-        selected_set.add(best_idx)
-        covered = torch.maximum(covered, kw_sims[:, best_idx])
-    return selected
-
-
-def _submodular_cover_greedy_select_with_init(
-    kw_sims: torch.Tensor,
-    kw_w: torch.Tensor,
-    budget: int,
-    candidate_idx: list[int],
-    init_selected: list[int],
-) -> list[int]:
-    """带初始化集合的次模覆盖贪心：
-    在 init_selected 基础上继续选，直到总数达到 budget。
-    F(S)=sum_i w_i * max_{f in S} sim(f,k_i)
-    """
-    if kw_sims.ndim != 2 or budget <= 0:
-        return list(init_selected)
-    m = int(kw_sims.shape[0])
-    n = int(kw_sims.shape[1])
-    if m == 0 or n == 0:
-        return list(init_selected)
-
-    if kw_w.numel() != m:
-        kw_w = torch.ones((m,), device=kw_sims.device)
-    kw_w = kw_w.float().clamp(min=0.0)
-    if float(kw_w.sum().item()) <= 1e-12:
-        kw_w = torch.ones_like(kw_w)
-
-    cand = sorted({int(i) for i in candidate_idx if 0 <= int(i) < n})
-    if len(cand) < min(budget, n):
-        cand = list(range(n))
-
-    selected = [int(i) for i in init_selected if 0 <= int(i) < n]
-    selected_set = set(selected)
-
-    covered = torch.zeros((m,), dtype=kw_sims.dtype, device=kw_sims.device)
-    if selected:
-        init_tensor = torch.tensor(selected, device=kw_sims.device, dtype=torch.long)
-        covered = kw_sims[:, init_tensor].max(dim=1).values
-
-    max_pick = min(int(budget), n)
-    while len(selected) < max_pick:
-        avail = [i for i in cand if i not in selected_set]
-        if not avail:
-            break
-        avail_tensor = torch.tensor(avail, device=kw_sims.device, dtype=torch.long)
-        sim_avail = kw_sims[:, avail_tensor]  # (M, C)
-        delta = torch.maximum(covered.unsqueeze(1), sim_avail) - covered.unsqueeze(1)
-        gains = (delta * kw_w.unsqueeze(1)).sum(dim=0)
-
-        best_local = int(torch.argmax(gains).item())
-        best_gain = float(gains[best_local].item())
-        if best_gain <= -1e8:
-            break
-
-        best_idx = int(avail[best_local])
-        selected.append(best_idx)
-        selected_set.add(best_idx)
-        covered = torch.maximum(covered, kw_sims[:, best_idx])
-
-    return selected
-
-
-def _topq_mean_similarity(sims: list[float], q: int) -> float:
-    if not sims or q <= 0:
-        return 0.0
-    k = min(int(q), len(sims))
-    top = sorted(sims, reverse=True)[:k]
-    return float(sum(top)) / k
-
-
-def _sparsity_adaptive_quota_select(
-    kw_sims: torch.Tensor,
-    kw_w: torch.Tensor,
-    quotas: torch.Tensor,
-    budget: int,
-    candidate_idx: list[int],
-) -> list[int]:
-    """Lazy greedy: F(S) = sum_i w_i * mean(top_{q_i} sims_i(S))."""
-    if kw_sims.ndim != 2 or budget <= 0:
-        return []
-    m = int(kw_sims.shape[0])
-    n = int(kw_sims.shape[1])
-    if m == 0 or n == 0:
-        return []
-
-    if kw_w.numel() != m:
-        kw_w = torch.ones((m,), device=kw_sims.device)
-    kw_w = kw_w.float().clamp(min=0.0)
-    if float(kw_w.sum().item()) <= 1e-12:
-        kw_w = torch.ones_like(kw_w)
-
-    if quotas.numel() != m:
-        quotas = _allocate_counts_by_weights(kw_w, budget)
-    quotas = quotas.long()
-
-    cand = sorted({int(i) for i in candidate_idx if 0 <= int(i) < n})
-    if len(cand) < min(budget, n):
-        cand = list(range(n))
-
-    max_pick = min(int(budget), n)
-    selected: list[int] = []
-    selected_set: set[int] = set()
-    kw_selected_sims: list[list[float]] = [[] for _ in range(m)]
-
-    for _ in range(max_pick):
-        best_idx = -1
-        best_gain = -1.0
-        for f in cand:
-            if f in selected_set:
-                continue
-            gain = 0.0
-            sim_f = kw_sims[:, f]
-            for i in range(m):
-                qi = int(quotas[i].item())
-                old_m = _topq_mean_similarity(kw_selected_sims[i], qi)
-                new_m = _topq_mean_similarity(kw_selected_sims[i] + [float(sim_f[i].item())], qi)
-                gain += float(kw_w[i].item()) * (new_m - old_m)
-            if gain > best_gain:
-                best_gain = gain
-                best_idx = f
-        if best_idx < 0:
-            break
-        selected.append(best_idx)
-        selected_set.add(best_idx)
-        sim_best = kw_sims[:, best_idx]
-        for i in range(m):
-            kw_selected_sims[i].append(float(sim_best[i].item()))
-    return selected
-
-
-def _ensure_keyword_min_coverage(
-    selected_idx: list[int],
-    kw_sims: torch.Tensor,
-    budget: int,
-    candidate_idx: list[int] | None = None,
-) -> list[int]:
-    """保证每个关键词在已选帧集合中至少有一帧 sim>0；预算满时替换贡献最低的帧。"""
-    if kw_sims.ndim != 2 or budget <= 0:
-        return list(selected_idx)
-    m = int(kw_sims.shape[0])
-    n = int(kw_sims.shape[1])
-    if m == 0 or n == 0:
-        return list(selected_idx)
-
-    cand = sorted({int(i) for i in (candidate_idx or list(range(n))) if 0 <= int(i) < n})
-    if not cand:
-        return list(selected_idx)
-
-    max_pick = min(int(budget), n)
-    selected = [int(i) for i in selected_idx if 0 <= int(i) < n]
-    selected_set = set(selected)
-
-    def _is_covered(kw_i: int) -> bool:
-        if not selected:
-            return False
-        return float(kw_sims[kw_i, selected].max().item()) > 1e-8
-
-    def _best_uncovered_frame(kw_i: int) -> int | None:
-        for idx in torch.argsort(kw_sims[kw_i], descending=True).tolist():
-            j = int(idx)
-            if j in cand and j not in selected_set:
-                return j
-        return None
-
-    def _replace_weakest(new_idx: int) -> None:
-        nonlocal selected, selected_set
-        if not selected:
-            selected = [new_idx]
-            selected_set = {new_idx}
-            return
-        worst_pos = min(
-            range(len(selected)),
-            key=lambda pos: float(kw_sims[:, selected[pos]].max().item()),
-        )
-        selected_set.discard(selected[worst_pos])
-        selected[worst_pos] = new_idx
-        selected_set.add(new_idx)
-
-    for kw_i in range(m):
-        if _is_covered(kw_i):
-            continue
-        pick = _best_uncovered_frame(kw_i)
-        if pick is None:
-            continue
-        if len(selected) < max_pick:
-            selected.append(pick)
-            selected_set.add(pick)
-        else:
-            _replace_weakest(pick)
-
-    return selected[:max_pick]
-
-
 def _select_keyword_frames(
     kw_frame_sims: torch.Tensor,
     kw_weights: torch.Tensor,
-    kw_local_evidence: torch.Tensor,
     budget: int,
-    frame_selection_mode: int,
-    args: argparse.Namespace,
-) -> tuple[list[int], list[int], str]:
+) -> list[int]:
     if budget <= 0:
-        return [], [], "skipped"
-    if frame_selection_mode == 1:
-        candidate_idx = _build_quota_prescreen_candidates(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            alpha=int(args.quota_prescreen_alpha),
-        )
-
-        if bool(getattr(args, "hybrid_anchor_in_mode1", False)):
-            n_frames = int(kw_frame_sims.shape[1])
-            max_pick = min(int(budget), n_frames)
-
-            anchor_budget = int(round(max_pick * float(args.hybrid_anchor_ratio)))
-            anchor_budget = max(1, min(anchor_budget, max_pick))
-
-            anchor_idx = _quota_topk_select(
-                kw_sims=kw_frame_sims,
-                kw_w=kw_weights,
-                budget=anchor_budget,
-                candidate_idx=list(range(n_frames)),
-            )
-
-            selected_idx = _submodular_cover_greedy_select_with_init(
-                kw_sims=kw_frame_sims,
-                kw_w=kw_weights,
-                budget=max_pick,
-                candidate_idx=candidate_idx,
-                init_selected=anchor_idx,
-            )
-            return selected_idx, candidate_idx, f"coverage_greedy+anchor_topk(r={float(args.hybrid_anchor_ratio):.2f})"
-
-        selected_idx = _submodular_cover_greedy_select(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            candidate_idx=candidate_idx,
-        )
-        return selected_idx, candidate_idx, "coverage_greedy"
-    if frame_selection_mode == 0:
-        candidate_idx = list(range(int(kw_frame_sims.shape[1])))
-        selected_idx = _quota_topk_select(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            candidate_idx=candidate_idx,
-        )
-        return selected_idx, candidate_idx, "quota_topk"
-    if frame_selection_mode == 2:
-        adaptive_quotas = _allocate_adaptive_quotas(
-            kw_weights,
-            kw_local_evidence,
-            budget,
-            float(args.quota_gamma),
-        )
-        candidate_idx = _build_quota_prescreen_candidates(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            budget=budget,
-            alpha=int(args.quota_prescreen_alpha),
-            quotas=adaptive_quotas,
-        )
-        selected_idx = _sparsity_adaptive_quota_select(
-            kw_sims=kw_frame_sims,
-            kw_w=kw_weights,
-            quotas=adaptive_quotas,
-            budget=budget,
-            candidate_idx=candidate_idx,
-        )
-        return selected_idx, candidate_idx, "sparsity_adaptive_quota"
-    raise ValueError(f"frame_selection_mode 仅支持 0/1/2，当前: {frame_selection_mode}")
+        return []
+    n_frames = int(kw_frame_sims.shape[1])
+    return _quota_topk_select(
+        kw_sims=kw_frame_sims,
+        kw_w=kw_weights,
+        budget=budget,
+        candidate_idx=list(range(n_frames)),
+    )
 
 
 def _quota_topk_select(
@@ -1536,7 +1128,6 @@ def _eval_one_sample(
     kws_use: list[str] = info_pack["kws_use"]
     kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
     kw_weights: torch.Tensor = info_pack["kw_weights"]
-    kw_local_evidence: torch.Tensor = info_pack["local_evidence"]
     kw_frame_sims = (kw_emb_use @ img_emb.T) if kw_emb_use.shape[0] > 0 else torch.empty((0, img_emb.shape[0]), device=img_emb.device)
 
     if VERBOSE:
@@ -1564,38 +1155,18 @@ def _eval_one_sample(
     if kw_emb_use.shape[0] == 0:
         raise RuntimeError(f"样本无可用关键词: sample={sample.sample_id}")
 
-    frame_selection_mode = int(args.frame_selection_mode)
-    selected_idx, candidate_idx, selection_method = _select_keyword_frames(
+    selected_idx = _select_keyword_frames(
         kw_frame_sims=kw_frame_sims,
         kw_weights=kw_weights,
-        kw_local_evidence=kw_local_evidence,
         budget=budget,
-        frame_selection_mode=frame_selection_mode,
-        args=args,
     )
     if not selected_idx:
         raise RuntimeError(f"样本未能选出有效帧: sample={sample.sample_id}")
 
-    if bool(args.ensure_keyword_min_coverage):
-        selected_idx = _ensure_keyword_min_coverage(
-            selected_idx,
-            kw_sims=kw_frame_sims,
-            budget=budget,
-            candidate_idx=candidate_idx,
-        )
-        selection_method = f"{selection_method}+min_kw_cover"
-
     selected_idx = sorted(selected_idx, key=lambda x: frame_ids[x])
-    if frame_selection_mode == 1:
-        mode_log = f"alpha={int(args.quota_prescreen_alpha)}"
-    elif frame_selection_mode == 2:
-        mode_log = f"gamma={float(args.quota_gamma):g}, alpha={int(args.quota_prescreen_alpha)}"
-    else:
-        mode_log = "alpha=skipped"
     _log(
-        f"sample={sample.sample_id} 候选池={len(candidate_idx) if candidate_idx else len(imgs)}, "
-        f"选帧={len(selected_idx)}, mode={frame_selection_mode}/{selection_method}, "
-        f"{mode_log}"
+        f"sample={sample.sample_id} 候选池={len(imgs)}, "
+        f"选帧={len(selected_idx)}, method=quota_topk"
     )
 
     one_shot_frames = [imgs[i] for i in selected_idx]
@@ -1648,17 +1219,11 @@ def _eval_one_sample(
             "num_frames_budget": int(budget),
             "candidate_pool_size": int(len(imgs)),
             "candidate_pool_fps": float(args.candidate_pool_fps),
-            "quota_prescreen_alpha": int(args.quota_prescreen_alpha),
-            "quota_gamma": float(args.quota_gamma),
             "max_keywords": int(args.max_keywords),
             "keyword_prompt_version": int(args.keyword_prompt_version),
             "keyword_extractor_model": str(args.keyword_extractor_model),
             "keyword_weight_strength": float(args.keyword_weight_strength),
-            "frame_selection_mode": frame_selection_mode,
-            "frame_selection_method": selection_method,
-            "prescreen_candidate_count": int(len(candidate_idx) if candidate_idx else len(imgs)),
-            "prescreen_frame_ids": sorted(int(frame_ids[i]) for i in candidate_idx) if candidate_idx else sorted(int(x) for x in frame_ids),
-            "ensure_keyword_min_coverage": bool(args.ensure_keyword_min_coverage),
+            "frame_selection_method": "quota_topk",
             "keyword_extract_time_sec": float(keyword_extract_time),
         },
         task_type=str(sample.task_type),
@@ -1775,13 +1340,6 @@ def parse_args():
         default=1.0,
         help="候选池粗采样目标 fps（默认 1.0，即一秒一帧）；视频按源 fps 换算帧索引，预处理目录按 preprocessed_clip_fps 重采样",
     )
-    p.add_argument("--quota_prescreen_alpha", type=int, default=3, help="配额软预筛系数 alpha：每个关键词预筛 top-(alpha*q_i) 帧")
-    p.add_argument(
-        "--quota_gamma",
-        type=float,
-        default=1.0,
-        help="mode2 稀疏自适应配额系数 gamma：raw_q_i = w_i * (1 + gamma * (1 - LE_i))",
-    )
     p.add_argument(
         "--max_keywords",
         type=int,
@@ -1833,29 +1391,6 @@ def parse_args():
         default=0,
         help="关键词缓存组编号：同一 dataset+extractor+prompt 下可维护多组缓存，选最优一组评测",
     )
-    p.add_argument(
-        "--frame_selection_mode",
-        type=int,
-        choices=[0, 1, 2],
-        default=1,
-        help="最终选帧模式：1=覆盖贪心，0=配额topk，2=稀疏自适应配额 sparsity_adaptive_quota",
-    )
-    p.add_argument(
-        "--ensure_keyword_min_coverage",
-        action="store_true",
-        help="开启后保证每个关键词在已选帧中至少有一帧 sim>0；预算满时替换全局贡献最低的帧",
-    )
-    p.add_argument(
-        "--hybrid_anchor_ratio",
-        type=float,
-        default=0.5,
-        help="mode=1 混合策略时，先用 quota_topk 锁定的预算比例，例如 0.5 表示 16 帧里先锁 8 帧",
-    )
-    p.add_argument(
-        "--hybrid_anchor_in_mode1",
-        action="store_true",
-        help="开启后，mode=1 不再纯 coverage greedy，而是先锁定一部分 topk anchor，再用 coverage greedy 补剩余帧",
-    )
     return p.parse_args()
 
 
@@ -1878,21 +1413,15 @@ def _ours_csv_columns() -> list[str]:
         "model_name",
         "lora_path",
         "candidate_pool_fps",
-        "quota_prescreen_alpha",
-        "quota_gamma",
         "max_keywords",
         "keyword_prompt_version",
         "keyword_extractor_model",
         "use_keyword_cache",
         "keyword_cache_number",
         "keyword_weight_strength",
-        "frame_selection_mode",
-        "ensure_keyword_min_coverage",
         "use_preprocessed_clip_frames",
         "preprocessed_clip_fps",
         "use_subtitles",
-        "hybrid_anchor_in_mode1",
-        "hybrid_anchor_ratio",
     ]
 
 
@@ -1928,21 +1457,15 @@ def _ours_csv_row(
         model_name,
         lora_path,
         f"{float(args.candidate_pool_fps):g}",
-        int(args.quota_prescreen_alpha),
-        f"{float(args.quota_gamma):g}",
         int(args.max_keywords),
         int(args.keyword_prompt_version),
         str(args.keyword_extractor_model),
         bool(args.use_keyword_cache),
         int(args.keyword_cache_number),
         f"{float(args.keyword_weight_strength):g}",
-        int(args.frame_selection_mode),
-        bool(args.ensure_keyword_min_coverage),
         bool(args.use_preprocessed_clip_frames),
         f"{float(args.preprocessed_clip_fps):g}",
         bool(args.use_subtitles),
-        bool(getattr(args, "hybrid_anchor_in_mode1", False)),
-        f"{float(getattr(args, 'hybrid_anchor_ratio', 0.0)):g}",
     ]
 
 
@@ -1979,14 +1502,8 @@ def main():
             "num_samples": str(args.num_samples),
             "num_frames": int(args.num_frames),
             "candidate_pool_fps": float(args.candidate_pool_fps),
-            "frame_selection_mode": int(args.frame_selection_mode),
-            "quota_prescreen_alpha": int(args.quota_prescreen_alpha),
-            "quota_gamma": float(args.quota_gamma),
             "max_keywords": int(args.max_keywords),
             "keyword_weight_strength": float(args.keyword_weight_strength),
-            "ensure_keyword_min_coverage": bool(args.ensure_keyword_min_coverage),
-            "hybrid_anchor_in_mode1": bool(getattr(args, "hybrid_anchor_in_mode1", False)),
-            "hybrid_anchor_ratio": float(getattr(args, "hybrid_anchor_ratio", 0.5)),
             "keyword_extractor_model": str(args.keyword_extractor_model),
             "keyword_prompt_version": int(args.keyword_prompt_version),
             "index_file": "selected_frames_index.jsonl",
@@ -1994,8 +1511,7 @@ def main():
                 "sample_id": "样本 ID",
                 "selected_frame_ids": "按时间排序的选中帧 ID",
                 "selected_index_in_pool": "候选池中的帧下标",
-                "prescreen_frame_ids": "覆盖贪心预筛候选帧 ID（mode=1/2）",
-                "frame_selection_mode": "0=topk, 1=coverage, 2=sparsity_adaptive",
+                "frame_selection_method": "quota_topk",
                 "verbose_detail_path": "单样本详细 info.json 相对路径",
             },
         },
@@ -2061,9 +1577,7 @@ def main():
             )
     _log(
         f"配置: candidate_pool_fps={float(args.candidate_pool_fps):g}, "
-        f"budget={budget}, frame_selection_mode={int(args.frame_selection_mode)}, "
-        f"quota_prescreen_alpha={int(args.quota_prescreen_alpha)}, "
-        f"quota_gamma={float(args.quota_gamma):g}"
+        f"budget={budget}, frame_selection=quota_topk"
     )
 
     apply_pixel_limits = dataset_uses_vl_pixel_limits(

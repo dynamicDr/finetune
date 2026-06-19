@@ -43,6 +43,24 @@ def from_pretrained_local_first(
 
 _OPTION_LETTER_PREFIX_RE = re.compile(r"^([A-Za-z])[\.\)\:\-]\s*(.*)$", re.DOTALL)
 
+KEYWORD_EXTRACTOR_PROVIDERS: dict[str, dict[str, str]] = {
+    "poe": {
+        "base_url": "https://api.poe.com/v1",
+        "api_key_env": "POE_API_KEY",
+        "api_style": "responses",
+    },
+    "aio": {
+        "base_url": "https://api.aiohub.org/v1",
+        "api_key_env": "AIOHUB_API_KEY",
+        "api_style": "chat",
+    },
+    "or": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+        "api_style": "chat",
+    },
+}
+
 
 def format_labeled_options(options: list[str]) -> str:
     """为 MCQ 选项加上 A. B. C. … 前缀，便于模型按字母作答。"""

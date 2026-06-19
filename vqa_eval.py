@@ -28,7 +28,7 @@ from utils import (
     compute_accuracy_from_results as _compute_accuracy_from_results,
     compute_score_counts_for_csv as _compute_score_counts_for_csv,
 )
-from vl_common import generate_response, load_model_and_processor
+from vl_common import generate_response, load_model_and_processor, release_cuda_memory
 
 MODE_MAX_NEW_TOKENS = {
     "thinking": 4086,
@@ -290,6 +290,7 @@ def evaluate_vqa(
 
         partial_acc, partial_time = _compute_accuracy_from_results(results, task_filter)
         pbar.set_postfix(Acc=f"{partial_acc:.2f}%", AvgTime=f"{partial_time:.2f}s", n=i + 1)
+        release_cuda_memory()
 
     return results
 
