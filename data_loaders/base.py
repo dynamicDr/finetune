@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from vl_common import split_indices
+from lmms_eval_bridge import split_indices
 
 
 def load_dataset(*args, **kwargs):

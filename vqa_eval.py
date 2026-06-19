@@ -28,7 +28,7 @@ from utils import (
     compute_accuracy_from_results as _compute_accuracy_from_results,
     compute_score_counts_for_csv as _compute_score_counts_for_csv,
 )
-from vl_common import generate_response, load_model_and_processor, release_cuda_memory
+from lmms_eval_bridge import generate_response, load_model_and_processor, release_cuda_memory
 
 MODE_MAX_NEW_TOKENS = {
     "thinking": 4086,

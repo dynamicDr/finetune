@@ -41,7 +41,7 @@ from utils import (
     normalize_sample_id,
     write_verbose_frame_selection_manifest,
 )
-from vl_common import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs
+from lmms_eval_bridge import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
 PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"ours"}

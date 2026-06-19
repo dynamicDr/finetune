@@ -9,7 +9,7 @@ from typing import Any
 import random
 
 from .base import BaseDataLoader, VQASample
-from vl_common import split_indices
+from lmms_eval_bridge import split_indices
 
 
 # MLVU-Test 多选题任务（11 类中的 9 类 MCQ）

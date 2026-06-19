@@ -51,7 +51,7 @@ def should_apply_vl_pixel_limits(
     dataset_name: str = "",
 ) -> bool:
     """数据集或模型任一需要像素限制时启用（如 MLVU outlier、LLaVA anyres 多帧超 context）。"""
-    from vl_common import model_uses_vl_pixel_limits
+    from lmms_eval_bridge import model_uses_vl_pixel_limits
 
     return dataset_uses_vl_pixel_limits(dataset, dataset_split, dataset_name) or model_uses_vl_pixel_limits(
         model_id

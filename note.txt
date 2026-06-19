@@ -1888,4 +1888,30 @@ python run.py --multirun \
   slurm=default_4090
 
   ============================
-  111
+
+python run.py --multirun \
+  hydra/launcher=submitit_slurm \
+  hydra.launcher.timeout_min=720 \
+  script=vqa_eval_ours.py \
+  dataset=mlvu \
+  dataset_name=MLVU/MLVU_Test \
+  dataset_no_config=true \
+  dataset_split=test \
+  video_dir=/userhome/cs3/duanty/dataset/mlvu_test \
+  frame_sampling_method=ours \
+  num_frames=16,32 \
+  num_samples=all \
+  model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+  task_filter=mcq \
+  train_ratio=0 \
+  seed=42 \
+  use_preprocessed_clip_frames=true \
+  preprocessed_clip_fps=1 \
+  candidate_pool_fps=1 \
+  max_keywords=10 \
+  keyword_prompt_version=0 \
+  keyword_extractor_model=poe-gpt-5.2 \
+  use_keyword_cache=true \
+  keyword_cache_number=0 \
+  keyword_weight_strength=0,1,2,4 \
+  slurm=default_4090
