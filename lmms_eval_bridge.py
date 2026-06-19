@@ -19,7 +19,8 @@ from PIL import Image
 
 from lmms_eval.models import get_model
 
-_DEFAULT_MAX_VISUAL_TOKENS = 1280
+_LLAVA_HF_VIDEO_TOKEN = "<video>"
+_LLAVA_HF_IMAGE_TOKEN = "<image>"
 _DEFAULT_MIN_VISUAL_TOKENS = 256
 # lmms-eval qwen2_vl / qwen2_5_vl / qwen3_vl 默认 processor 像素预算
 _QWEN_VL_OFFICIAL_MIN_PIXELS = 256 * 28 * 28
@@ -203,8 +204,11 @@ def resolve_lmms_model_name(model_id: str) -> str:
     lowered = model_id.lower()
     if _is_llava_video_qwen_model_id(model_id):
         return "llava_vid"
-    if "llava-onevision" in lowered:
-        if "lmms-lab" in lowered or "onevision-qwen2" in lowered:
+    if "llava-onevision" in lowered or "llava_onevision" in lowered:
+        # HF 官方权重走 transformers llava_hf；仅 lmms-lab 旧版走 llava 包
+        if "llava-hf" in lowered:
+            return "llava_hf"
+        if "lmms-lab" in lowered:
             return "llava_onevision"
         return "llava_hf"
     if "llava-next" in lowered or "llava_next" in lowered:
@@ -466,10 +470,9 @@ def build_vlm_user_messages(
     model=None,
 ) -> list[dict[str, Any]]:
     if is_llava_hf_video_inference(processor, model=model):
-        content: list[dict[str, Any]] = []
-        if frames:
-            content.append({"type": "video", "video": frames})
-        content.append({"type": "text", "text": prompt})
+        content = prompt
+        if frames and _LLAVA_HF_VIDEO_TOKEN not in content and _LLAVA_HF_IMAGE_TOKEN not in content:
+            content = f"{_LLAVA_HF_VIDEO_TOKEN}\n{content}"
         return [{"role": "user", "content": content}]
     content = [{"type": "image", "image": frame} for frame in frames]
     content.append({"type": "text", "text": prompt})
