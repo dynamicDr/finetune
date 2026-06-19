@@ -1915,3 +1915,22 @@ python run.py --multirun \
   keyword_cache_number=0 \
   keyword_weight_strength=0,1,2,4 \
   slurm=default_4090
+
+[zzy跑]重构后MLUV+qwen+uniform
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    dataset=mlvu \
+    dataset_name=MLVU/MLVU_Test \
+    dataset_no_config=true \
+    dataset_split=test \
+    video_dir=~/dataset/Video-MME \
+    frame_sampling_method=uniform \
+    num_frames=16,32 \
+    model=llava_video_7b_qwen2,qwen3_8b_instruct \
+    task_filter=mcq \
+    use_preprocessed_clip_frames=true \
+    train_ratio=0.0 \
+    seed=42 \
+    slurm=default_4090
