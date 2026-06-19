@@ -121,8 +121,10 @@ def _load_blip(device: str):
     except ImportError as exc:
         raise ImportError("AKS-BLIP 依赖缺失：需要安装 transformers。") from exc
     model_id = "Salesforce/blip-itm-base-coco"
-    model = BlipForImageTextRetrieval.from_pretrained(model_id).to(device).eval()
-    processor = BlipProcessor.from_pretrained(model_id)
+    model = from_pretrained_local_first(
+        BlipForImageTextRetrieval.from_pretrained, model_id, log=_log
+    ).to(device).eval()
+    processor = from_pretrained_local_first(BlipProcessor.from_pretrained, model_id, log=_log)
     _AKS_MODEL_CACHE[key] = (model, processor)
     _log(f"loaded BLIP model({model_id}) on device={device}")
     return _AKS_MODEL_CACHE[key]
@@ -142,8 +144,10 @@ def _load_blip2(device: str):
     model_kwargs: dict[str, Any] = {}
     if device.startswith("cuda"):
         model_kwargs["torch_dtype"] = torch.float16
-    model = Blip2Model.from_pretrained(model_id, **model_kwargs).to(device).eval()
-    processor = Blip2Processor.from_pretrained(model_id)
+    model = from_pretrained_local_first(
+        Blip2Model.from_pretrained, model_id, log=_log, **model_kwargs
+    ).to(device).eval()
+    processor = from_pretrained_local_first(Blip2Processor.from_pretrained, model_id, log=_log)
     _AKS_MODEL_CACHE[key] = (model, processor)
     _log(f"loaded BLIP2 model({model_id}) on device={device}")
     return _AKS_MODEL_CACHE[key]

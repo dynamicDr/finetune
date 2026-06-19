@@ -287,6 +287,21 @@ def is_llava_hf_video_inference(processor, model=None) -> bool:
     )
 
 
+def is_llava_hf_inference(processor, model=None) -> bool:
+    if is_llava_video_qwen_inference(processor, model=model) or isinstance(processor, LlavaLegacyProcessor):
+        return False
+    processor_name = type(processor).__name__
+    if processor_name in {
+        "LlavaProcessor",
+        "LlavaNextProcessor",
+        "LlavaOnevisionProcessor",
+        "LlavaNextVideoProcessor",
+    }:
+        return True
+    model_type = getattr(getattr(model, "config", None), "model_type", None)
+    return model_type in {"llava", "llava_next", "llava_onevision", "llava_next_video", "llava_next_video2"}
+
+
 def is_qwen_vl_inference(processor, model=None) -> bool:
     if is_llava_video_qwen_inference(processor, model=model):
         return False
@@ -343,6 +358,9 @@ def _normalize_model_processor(lmms_wrapper, lmms_model_name: str):
     model = lmms_wrapper.model
     if hasattr(lmms_wrapper, "processor"):
         processor = lmms_wrapper.processor
+    elif lmms_model_name == "llava_hf" and hasattr(lmms_wrapper, "_image_processor"):
+        # lmms-eval llava_hf 将 AutoProcessor 存在 _image_processor
+        processor = lmms_wrapper._image_processor
     elif hasattr(lmms_wrapper, "_image_processor"):
         conv = getattr(lmms_wrapper, "conv_template", "chatml_direct")
         processor = LlavaLegacyProcessor(lmms_wrapper.tokenizer, lmms_wrapper._image_processor, conv_template=conv)
@@ -469,11 +487,13 @@ def build_vlm_user_messages(
     *,
     model=None,
 ) -> list[dict[str, Any]]:
-    if is_llava_hf_video_inference(processor, model=model):
-        content = prompt
-        if frames and _LLAVA_HF_VIDEO_TOKEN not in content and _LLAVA_HF_IMAGE_TOKEN not in content:
-            content = f"{_LLAVA_HF_VIDEO_TOKEN}\n{content}"
-        return [{"role": "user", "content": content}]
+    if is_llava_hf_inference(processor, model=model):
+        context = prompt
+        if frames and _LLAVA_HF_VIDEO_TOKEN not in context and _LLAVA_HF_IMAGE_TOKEN not in context:
+            token = _LLAVA_HF_VIDEO_TOKEN if is_llava_hf_video_inference(processor, model=model) else _LLAVA_HF_IMAGE_TOKEN
+            prefix = " ".join([token] * len(frames)) if not is_llava_hf_video_inference(processor, model=model) else token
+            context = f"{prefix}\n{context}"
+        return [{"role": "user", "content": context}]
     content = [{"type": "image", "image": frame} for frame in frames]
     content.append({"type": "text", "text": prompt})
     user_message = {"role": "user", "content": content}
@@ -494,19 +514,72 @@ def prepare_vlm_inputs(
 ) -> tuple[Any, str]:
     frames = _maybe_resize_vlm_frames(frames, processor)
     messages = build_vlm_user_messages(frames, prompt, processor, model=model)
+    if is_llava_hf_inference(processor, model=model):
+        tokenizer = processor.tokenizer
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        if is_llava_hf_video_inference(processor, model=model) and frames:
+            inputs = processor(videos=[frames], text=text, return_tensors="pt")
+        elif frames:
+            inputs = processor(images=frames, text=text, return_tensors="pt")
+        else:
+            inputs = processor(text=text, return_tensors="pt")
+        return inputs, text
+
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    if is_llava_hf_video_inference(processor, model=model):
-        proc_kwargs: dict[str, Any] = {
-            "text": [text],
-            "return_tensors": "pt",
-            "padding": True,
-        }
-        if frames:
-            proc_kwargs["videos"] = [frames]
-        inputs = processor(**proc_kwargs)
-    else:
-        inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt")
+    inputs = processor(text=[text], images=frames, padding=True, return_tensors="pt")
     return inputs, text
+
+
+def _generate_response_llava_hf(
+    model,
+    processor,
+    frames: list[Image.Image],
+    prompt: str,
+    max_new_tokens: int,
+) -> tuple[str, float, int, bool]:
+    """与 lmms_eval.models.simple.llava_hf.generate_until 对齐。"""
+    import time
+
+    tokenizer = processor.tokenizer
+    messages = build_vlm_user_messages(frames, prompt, processor, model=model)
+    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+    t_proc_start = time.time()
+    if is_llava_hf_video_inference(processor, model=model) and frames:
+        inputs = processor(videos=[frames], text=text, return_tensors="pt")
+    elif frames:
+        inputs = processor(images=frames, text=text, return_tensors="pt")
+    else:
+        inputs = processor(text=text, return_tensors="pt")
+    inputs = inputs.to(model.device, model.dtype)
+    processor_time = time.time() - t_proc_start
+    prompt_len = int(inputs["input_ids"].shape[-1])
+
+    start_time = time.time()
+    with torch.no_grad():
+        generated_ids = model.generate(
+            **inputs,
+            do_sample=False,
+            num_beams=1,
+            max_new_tokens=max_new_tokens,
+            use_cache=True,
+            pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        )
+        generated_ids = generated_ids[:, prompt_len:]
+    inference_time = time.time() - start_time
+
+    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    generated_token_count = int(generated_ids.shape[1]) if generated_ids.numel() else 0
+    hit_max_tokens = generated_token_count >= max_new_tokens
+    print(
+        "[perf-debug][timing-split] "
+        f"processor={processor_time:.2f}s, generate={inference_time:.2f}s",
+        flush=True,
+    )
+    del inputs, generated_ids
+    release_cuda_memory()
+    return response, inference_time, generated_token_count, hit_max_tokens
 
 
 def _generate_response_llava_video_qwen(
@@ -593,6 +666,14 @@ def generate_response(
 
     if is_llava_video_qwen_inference(processor, model=model):
         return _generate_response_llava_video_qwen(
+            model,
+            processor,
+            frames,
+            prompt,
+            max_new_tokens,
+        )
+    if is_llava_hf_inference(processor, model=model):
+        return _generate_response_llava_hf(
             model,
             processor,
             frames,

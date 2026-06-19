@@ -10,6 +10,8 @@ from PIL import Image
 import torch
 from transformers import BlipForImageTextRetrieval, BlipProcessor
 
+from utils import from_pretrained_local_first
+
 
 DEFAULT_SEVILA_MODEL = "Salesforce/blip-itm-large-coco"
 _SEVILA_CACHE: dict[tuple[str, str], tuple[BlipProcessor, BlipForImageTextRetrieval]] = {}
@@ -65,8 +67,8 @@ def _compose_query(
 def _get_blip(model_name: str, device: str) -> tuple[BlipProcessor, BlipForImageTextRetrieval]:
     key = (model_name, device)
     if key not in _SEVILA_CACHE:
-        processor = BlipProcessor.from_pretrained(model_name)
-        model = BlipForImageTextRetrieval.from_pretrained(model_name)
+        processor = from_pretrained_local_first(BlipProcessor.from_pretrained, model_name)
+        model = from_pretrained_local_first(BlipForImageTextRetrieval.from_pretrained, model_name)
         model = model.to(device)
         model.eval()
         _SEVILA_CACHE[key] = (processor, model)

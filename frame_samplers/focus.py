@@ -9,6 +9,8 @@ from PIL import Image
 import torch
 from transformers import BlipForImageTextRetrieval, BlipProcessor
 
+from utils import from_pretrained_local_first
+
 try:
     import cv2  # type: ignore
     _CV2_IMPORT_ERROR: Exception | None = None
@@ -56,8 +58,8 @@ def _read_frame_rgb(cap: Any, frame_idx: int) -> np.ndarray | None:
 def _get_blip(model_name: str, device: str) -> tuple[BlipProcessor, BlipForImageTextRetrieval]:
     key = (model_name, device)
     if key not in _BLIP_CACHE:
-        processor = BlipProcessor.from_pretrained(model_name)
-        model = BlipForImageTextRetrieval.from_pretrained(model_name)
+        processor = from_pretrained_local_first(BlipProcessor.from_pretrained, model_name)
+        model = from_pretrained_local_first(BlipForImageTextRetrieval.from_pretrained, model_name)
         model = model.to(device)
         model.eval()
         _BLIP_CACHE[key] = (processor, model)

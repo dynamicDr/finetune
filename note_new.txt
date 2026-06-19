@@ -3,26 +3,27 @@ sinfo
 
 查看任务：
 squeue -u $USER
+squeue -u u3008441
 
 取消任务：
 scancel -u $USER
 
-
-# Video-MME | Qwen3-VL-8B | short/medium/long | uniform | 16帧
+【zzy跑】
+# Qwen+Video-MME全baseline
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval.py \
     dataset=videomme \
     num_samples=all \
     num_frames=16,32 \
-    model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+    model=qwen3_8b_instruct \
     use_preprocessed_clip_frames=true \
     task_filter=short,medium,long \
     frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
     seed=42 \
     slurm=hgpu_batch
 
-#
+# OV+Video-MME全baseline
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval.py \
@@ -31,13 +32,27 @@ python run.py --multirun \
     num_frames=16,32 \
     model=llava_onevision_qwen2_7b_ov_hf \
     use_preprocessed_clip_frames=true \
-    task_filter=short \
-    frame_sampling_method=uniform \
+    task_filter=short,medium,long \
+    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
     seed=42 \
     slurm=hgpu_batch
 
 
-# Video-MME | Qwen3-VL-8B | ours 选帧 | short/medium/long | 32帧
+【dty跑以下两个】
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16,32 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    use_preprocessed_clip_frames=true \
+    task_filter=short,medium,long \
+    frame_sampling_method=uniform,bolt-clip \
+    seed=42 \
+    slurm=hgpu_batch
+
+#qwen+Videomme Ours
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval_ours.py \
