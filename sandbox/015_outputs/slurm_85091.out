@@ -1,0 +1,19 @@
+OpenCLIP not installed
+[015] 输出目录: /userhome/cs3/duanty/finetune/sandbox/015_outputs
+[015] 加载 CLIP...
+[vqa_eval_ours] 从本地缓存加载: openai/clip-vit-base-patch32
+[vqa_eval_ours] 从本地缓存加载: openai/clip-vit-base-patch32
+[015] 完成 nf16_ws0: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf16_ws0.png
+[015] 完成 nf16_ws0p5: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf16_ws0p5.png
+[015] 完成 nf16_ws1: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf16_ws1.png
+[015] 完成 nf16_ws2: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf16_ws2.png
+[015] 完成 nf16_ws4: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf16_ws4.png
+[015] 完成 nf16_ws8: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf16_ws8.png
+[015] 完成 nf32_ws0: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf32_ws0.png
+[015] 完成 nf32_ws0p5: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf32_ws0p5.png
+[015] 完成 nf32_ws1: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf32_ws1.png
+[015] 完成 nf32_ws2: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf32_ws2.png
+[015] 完成 nf32_ws4: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf32_ws4.png
+[015] 完成 nf32_ws8: /userhome/cs3/duanty/finetune/sandbox/015_outputs/alloc_nf32_ws8.png
+[015] 明细: /userhome/cs3/duanty/finetune/sandbox/015_outputs/allocation_detail.jsonl
+[015] 汇总: /userhome/cs3/duanty/finetune/sandbox/015_outputs/allocation_summary.json

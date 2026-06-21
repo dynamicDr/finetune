@@ -15,11 +15,7 @@ from .clip import (
     _load_vlm,
     _to_feature_tensor,
 )
-from .siglip2 import (
-    _build_query as _build_siglip2_query,
-    _encode_images_batched as _encode_siglip2_images_batched,
-    _load_siglip2,
-)
+from .siglip2 import _load_vlm as _load_siglip2
 
 # BOLT 超参数（写死，不暴露到入口）
 CLIP_MODEL_ID = "openai/clip-vit-base-patch32"
@@ -201,11 +197,11 @@ def sample_bolt_frames(
             model_id=SIGLIP2_MODEL_ID,
             device=None,
         )
-        query = _build_siglip2_query(question=question, options=options, answer=answer)
+        query = _build_clip_query(question=question, options=options, answer=answer)
         preview_query = query if len(query) <= 160 else query[:157] + "..."
         _log(f"text query={preview_query}")
 
-        image_feats = _encode_siglip2_images_batched(
+        image_feats = _encode_clip_images_batched(
             images=images,
             processor=processor,
             model=model,
@@ -217,12 +213,10 @@ def sample_bolt_frames(
 
         text_inputs = processor(
             text=[query],
-            padding="max_length",
+            padding=True,
             truncation=True,
-            max_length=64,
             return_tensors="pt",
-        )
-        text_inputs = {k: v.to(resolved_device) for k, v in text_inputs.items()}
+        ).to(resolved_device)
         with torch.no_grad():
             text_feats = _to_feature_tensor(model.get_text_features(**text_inputs), torch)
         text_feats = text_feats / text_feats.norm(dim=-1, keepdim=True)

@@ -16,13 +16,13 @@ _VLM_CACHE: dict[str, Any] = {}
 
 
 def _log(msg: str) -> None:
-    print(f"[siglip2_sampler] {msg}", flush=True)
+    print(f"[blip_sampler] {msg}", flush=True)
 
 
 def _load_vlm(model_id: str, device: str | None):
     try:
         import torch
-        from transformers import AutoModel, AutoProcessor
+        from transformers import BlipForImageTextRetrieval, BlipProcessor
     except ImportError as exc:
         raise ImportError("选帧依赖缺失，请安装 torch 和 transformers。") from exc
 
@@ -33,30 +33,13 @@ def _load_vlm(model_id: str, device: str | None):
         return _VLM_CACHE[cache_key]
 
     _log(f"loading model: model_id={model_id}, device={resolved_device}")
-    processor = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
-    model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(resolved_device).eval()
+    processor = from_pretrained_local_first(BlipProcessor.from_pretrained, model_id, log=_log)
+    model = from_pretrained_local_first(
+        BlipForImageTextRetrieval.from_pretrained, model_id, log=_log
+    ).to(resolved_device).eval()
     _VLM_CACHE[cache_key] = (processor, model, resolved_device, torch)
     _log("model loaded and cached")
     return _VLM_CACHE[cache_key]
-
-
-_load_siglip2 = _load_vlm
-
-
-def _to_feature_tensor(features, torch):
-    if isinstance(features, torch.Tensor):
-        return features
-    for attr in ("image_embeds", "text_embeds", "pooler_output", "last_hidden_state"):
-        val = getattr(features, attr, None)
-        if isinstance(val, torch.Tensor):
-            if attr == "last_hidden_state" and val.ndim >= 2:
-                return val[:, 0, :]
-            return val
-    if isinstance(features, (tuple, list)) and features:
-        first = features[0]
-        if isinstance(first, torch.Tensor):
-            return first
-    raise TypeError(f"无法将特征输出转换为 Tensor，实际类型: {type(features)!r}")
 
 
 def _collect_candidate_frames(
@@ -145,11 +128,11 @@ def _format_question_and_options(question: str | None, options: list[str] | None
 
     q = (question or "").strip()
     if not q:
-        raise ValueError("SigLIP2 选帧需要提供 question。")
+        raise ValueError("BLIP 选帧需要提供 question。")
     if not options:
-        raise ValueError("SigLIP2 选帧需要提供 options，且每个选项必须包含具体内容。")
+        raise ValueError("BLIP 选帧需要提供 options，且每个选项必须包含具体内容。")
     if any(not str(opt).strip() for opt in options):
-        raise ValueError("SigLIP2 选帧选项不能为空。")
+        raise ValueError("BLIP 选帧选项不能为空。")
     return f"{q}\nOptions:\n{format_labeled_options(options)}"
 
 
@@ -160,20 +143,38 @@ def _build_query(question: str | None, options: list[str] | None, answer: str | 
     return f"a video frame relevant to the following question and options:\n{qa_text}"
 
 
-def _encode_images_batched(images, processor, model, torch, device, batch_size=16):
-    feats = []
+def _extract_itm_scores(outputs, torch):
+    logits = getattr(outputs, "itm_score", None)
+    if logits is None:
+        logits = getattr(outputs, "logits", None)
+    if logits is None:
+        raise RuntimeError("BLIP 输出中缺少 itm_score/logits，无法计算打分。")
+    probs = torch.nn.functional.softmax(logits, dim=-1)
+    if probs.shape[-1] >= 2:
+        return probs[:, 1]
+    return probs.squeeze(-1)
+
+
+def _score_images_batched(images, processor, model, torch, device, query, batch_size=16):
+    scores = []
     for start in range(0, len(images), batch_size):
         batch = images[start:start + batch_size]
-        _log(f"encoding image batch: start={start}, end={start + len(batch) - 1}, batch_size={len(batch)}")
-        inputs = processor(images=batch, return_tensors="pt").to(device)
+        _log(f"scoring image batch: start={start}, end={start + len(batch) - 1}, batch_size={len(batch)}")
+        inputs = processor(
+            images=batch,
+            text=[query] * len(batch),
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        ).to(device)
         with torch.no_grad():
-            batch_feats = _to_feature_tensor(model.get_image_features(**inputs), torch)
-        batch_feats = batch_feats / batch_feats.norm(dim=-1, keepdim=True)
-        feats.append(batch_feats)
-    return torch.cat(feats, dim=0)
+            outputs = model(**inputs, use_itm_head=True)
+        batch_scores = _extract_itm_scores(outputs, torch)
+        scores.append(batch_scores)
+    return torch.cat(scores, dim=0)
 
 
-def sample_siglip2_frames(
+def sample_blip_frames(
     video_path: str,
     num_frames: int,
     random_seed: int | None = None,
@@ -181,7 +182,7 @@ def sample_siglip2_frames(
     question: str | None = None,
     options: list[str] | None = None,
     answer: str | None = None,
-    model_id: str = "google/siglip2-base-patch16-224",
+    model_id: str = "Salesforce/blip-itm-base-coco",
     sample_every: int = 15,
     device: str | None = None,
     batch_size: int = 16,
@@ -236,33 +237,21 @@ def sample_siglip2_frames(
     _log(f"using device={resolved_device}")
     query = _build_query(question=question, options=options, answer=answer)
     if answer is not None and str(answer).strip():
-        _log("answer label is ignored for siglip2 sampling")
+        _log("answer label is ignored for blip sampling")
     preview_query = query if len(query) <= 160 else query[:157] + "..."
     _log(f"text query={preview_query}")
 
-    image_feats = _encode_images_batched(
+    scores = _score_images_batched(
         images=images,
         processor=processor,
         model=model,
         torch=torch,
         device=resolved_device,
+        query=query,
         batch_size=batch_size,
     )
-    _log(f"image feature shape={tuple(image_feats.shape)}")
+    _log(f"score shape={tuple(scores.shape)}")
 
-    text_inputs = processor(
-        text=[query],
-        padding=True,
-        truncation=True,
-        return_tensors="pt",
-    ).to(resolved_device)
-
-    with torch.no_grad():
-        text_feats = _to_feature_tensor(model.get_text_features(**text_inputs), torch)
-    text_feats = text_feats / text_feats.norm(dim=-1, keepdim=True)
-    _log(f"text feature shape={tuple(text_feats.shape)}")
-
-    scores = (image_feats @ text_feats.T).squeeze(1)
     scores_cpu = scores.detach().cpu()
     _log(
         f"score stats: min={scores_cpu.min().item():.6f}, max={scores_cpu.max().item():.6f}, "

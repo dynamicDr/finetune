@@ -35,6 +35,46 @@ def build_batch_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def _cfg_nonempty_str(cfg: DictConfig, key: str) -> str | None:
+    val = OmegaConf.select(cfg, key, default=None)
+    if val is None or str(val).strip() in ("", "null", "None"):
+        return None
+    return str(val).strip()
+
+
+def _hydra_task_override_prefixes() -> set[str]:
+    try:
+        return {str(o).split("=", 1)[0] for o in HydraConfig.get().overrides.task}
+    except (ValueError, AttributeError):
+        return set()
+
+
+def resolve_visual_encoder_model(cfg: DictConfig) -> str | None:
+    """解析 vqa_eval_ours 视觉编码器：ours_clip_model_id 与 visual_encoder_model 为别名。
+
+    sweep 仅改其中一个时，以 CLI/Hydra 显式 override 的键为准；否则二者应一致（config 里 visual 引用 ours）。
+    """
+    ours = _cfg_nonempty_str(cfg, "ours_clip_model_id")
+    visual = _cfg_nonempty_str(cfg, "visual_encoder_model")
+    if not ours and not visual:
+        return None
+    if ours == visual or (ours and not visual):
+        return ours
+    if visual and not ours:
+        return visual
+
+    override_keys = _hydra_task_override_prefixes()
+    ours_set = "ours_clip_model_id" in override_keys
+    visual_set = "visual_encoder_model" in override_keys
+    if ours_set and not visual_set:
+        return ours
+    if visual_set and not ours_set:
+        return visual
+    if ours_set and visual_set:
+        return ours
+    return ours or visual
+
+
 def append_model_args(cfg: DictConfig, cmd: list[str], model_snapshot: str) -> None:
     if OmegaConf.select(cfg, "lora.enabled", default=False):
         ap = str(OmegaConf.select(cfg, "lora.adapter_path", default="") or "").strip()
@@ -156,9 +196,9 @@ def main(cfg: DictConfig) -> None:
                 dataset_shared += ["--keyword_cache_number", str(int(keyword_cache_number))]
             elif bool(use_keyword_cache):
                 dataset_shared += ["--keyword_cache_number", "0"]
-            ours_clip_model_id = OmegaConf.select(cfg, "ours_clip_model_id", default=None)
-            if ours_clip_model_id is not None and str(ours_clip_model_id).strip() not in ("", "null", "None"):
-                dataset_shared += ["--ours_clip_model_id", str(ours_clip_model_id)]
+            visual_encoder_model = resolve_visual_encoder_model(cfg)
+            if visual_encoder_model is not None:
+                dataset_shared += ["--ours_clip_model_id", visual_encoder_model]
             ours_clip_device = OmegaConf.select(cfg, "ours_clip_device", default=None)
             if ours_clip_device is not None and str(ours_clip_device).strip() not in ("", "null", "None"):
                 dataset_shared += ["--ours_clip_device", str(ours_clip_device)]

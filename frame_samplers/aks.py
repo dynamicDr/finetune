@@ -111,8 +111,8 @@ def _load_clip(device: str):
     return _AKS_MODEL_CACHE[key]
 
 
-def _load_blip(device: str):
-    key = ("blip", device)
+def _load_blip(device: str, model_id: str = "Salesforce/blip-itm-base-coco"):
+    key = ("blip", model_id, device)
     if key in _AKS_MODEL_CACHE:
         _log(f"reuse cached BLIP model on device={device}")
         return _AKS_MODEL_CACHE[key]
@@ -120,7 +120,6 @@ def _load_blip(device: str):
         from transformers import BlipForImageTextRetrieval, BlipProcessor
     except ImportError as exc:
         raise ImportError("AKS-BLIP 依赖缺失：需要安装 transformers。") from exc
-    model_id = "Salesforce/blip-itm-base-coco"
     model = from_pretrained_local_first(
         BlipForImageTextRetrieval.from_pretrained, model_id, log=_log
     ).to(device).eval()
@@ -287,10 +286,16 @@ def _compose_query(
     extract_feature_model: str,
 ) -> str:
     _ = answer
-    qa_text = _format_question_and_options(question=question, options=options)
+    q = (question or "").strip()
+    if not q:
+        raise ValueError("AKS 选帧需要提供 question。")
+
     if extract_feature_model == "sevila":
+        qa_text = _format_question_and_options(question=question, options=options)
         return f"Question: {qa_text}. Is this a good frame can answer the question?"
-    return qa_text
+
+    # 对齐原版 AKS：blip / clip / blip2 特征提取仅使用 question
+    return q
 
 
 def _extract_blip_itm_score(outputs, torch) -> float:
@@ -313,6 +318,7 @@ def _extract_scores(
     answer: str | None,
     extract_feature_model: str,
     device: str,
+    blip_model_id: str = "Salesforce/blip-itm-base-coco",
     use_preprocessed_clip_frames: bool = False,
     preprocessed_clip_dir: str | None = None,
 ) -> tuple[list[float], list[int]]:
@@ -364,7 +370,7 @@ def _extract_scores(
         )
 
     if extract_feature_model == "blip":
-        model, processor = _load_blip(device=device)
+        model, processor = _load_blip(device=device, model_id=blip_model_id)
         if candidate_images is not None and candidate_frame_ids is not None:
             iterator = zip(candidate_frame_ids, candidate_images)
         else:
@@ -534,6 +540,7 @@ def sample_aks_frames(
     options: list[str] | None = None,
     answer: str | None = None,
     extract_feature_model: str = "blip",
+    blip_model_id: str = "Salesforce/blip-itm-base-coco",
     device: str | None = None,
     ratio: int = 1,
     t1: float = 0.8,
@@ -565,6 +572,7 @@ def sample_aks_frames(
         answer=answer,
         extract_feature_model=extract_feature_model,
         device=resolved_device,
+        blip_model_id=blip_model_id,
         use_preprocessed_clip_frames=use_preprocessed_clip_frames,
         preprocessed_clip_dir=preprocessed_clip_dir,
     )

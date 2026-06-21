@@ -19,7 +19,7 @@ python run.py --multirun \
     model=qwen3_8b_instruct \
     use_preprocessed_clip_frames=true \
     task_filter=short,medium,long \
-    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
+    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,blip-new,siglip2-new \
     seed=42 \
     slurm=hgpu_batch
 
@@ -32,8 +32,8 @@ python run.py --multirun \
     num_frames=16,32 \
     model=llava_onevision_qwen2_7b_ov_hf \
     use_preprocessed_clip_frames=true \
-    task_filter=short,medium,long \
-    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,siglip2-new \
+    task_filter=long,medium,short \
+    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,blip-new,siglip2-new \
     seed=42 \
     slurm=hgpu_batch
 
@@ -62,8 +62,134 @@ python run.py --multirun \
     model=qwen3_8b_instruct \
     task_filter=short,medium,long \
     frame_sampling_method=ours \
+    max_keywords=10 \
     use_preprocessed_clip_frames=true \
     use_keyword_cache=true \
     keyword_cache_number=0 \
     seed=42 \
     slurm=hgpu_batch
+
+# qwen + Video-MME Ours 消融：ours_clip_model_id（CLIP vs BLIP），4×2=8 jobs
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=openai/clip-vit-base-patch32,openai/clip-vit-large-patch14,Salesforce/blip-itm-base-coco,Salesforce/blip-itm-large-coco \
+    seed=42 \
+    slurm=default_4090
+
+
+# keyword_weight_strength Ours 消融
+# 共 24 jobs = 6 strength × 2 num_frames(16,32) × 2 task(short,medium)
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=long \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=0,1,2,4,8,16 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=default_4090
+
+32帧
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=32 \
+    model=qwen3_8b_instruct \
+    task_filter=medium,short \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1,2 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+Ours OV+Videomme
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16,32 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    task_filter=short,medium,long \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    seed=42 \
+    slurm=default_4090
+
+
+============
+补跑aks和blip_new:
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct \
+    use_preprocessed_clip_frames=true \
+    task_filter=long,medium,short \
+    frame_sampling_method=blip-new,aks-blip,aks-clip \
+    seed=42 \
+    slurm=hgpu_batch
+
+重跑ours with itm blip:
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=short,medium,long \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=Salesforce/blip-itm-base-coco,Salesforce/blip-itm-large-coco \
+    seed=42 \
+    slurm=hgpu_batch
+

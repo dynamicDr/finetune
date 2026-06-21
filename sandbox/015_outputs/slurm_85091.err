@@ -1,0 +1,14 @@
+/userhome/cs3/duanty/miniconda3/lib/python3.13/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.1) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+/userhome/cs3/duanty/miniconda3/envs/finetune/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+Loading weights:   0%|          | 0/398 [00:00<?, ?it/s]Loading weights: 100%|██████████| 398/398 [00:00<00:00, 49000.03it/s]
+[1mCLIPModel LOAD REPORT[0m from: openai/clip-vit-base-patch32
+Key                                  | Status     |  | 
+-------------------------------------+------------+--+-
+text_model.embeddings.position_ids   | UNEXPECTED |  | 
+vision_model.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+015 预计算:   0%|          | 0/10 [00:00<?, ?it/s]015 预计算:  10%|█         | 1/10 [00:01<00:10,  1.17s/it]015 预计算:  20%|██        | 2/10 [00:01<00:07,  1.14it/s]015 预计算:  30%|███       | 3/10 [00:02<00:05,  1.31it/s]015 预计算:  40%|████      | 4/10 [00:03<00:04,  1.32it/s]015 预计算:  50%|█████     | 5/10 [00:03<00:03,  1.32it/s]015 预计算:  60%|██████    | 6/10 [00:04<00:02,  1.34it/s]015 预计算:  70%|███████   | 7/10 [00:05<00:02,  1.27it/s]015 预计算:  80%|████████  | 8/10 [00:06<00:01,  1.22it/s]015 预计算:  90%|█████████ | 9/10 [00:07<00:00,  1.19it/s]015 预计算: 100%|██████████| 10/10 [00:07<00:00,  1.29it/s]015 预计算: 100%|██████████| 10/10 [00:07<00:00,  1.25it/s]

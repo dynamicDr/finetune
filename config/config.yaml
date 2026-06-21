@@ -33,7 +33,9 @@ use_keyword_cache: false
 keyword_cache_dir: ""
 keyword_cache_number: 0
 candidate_pool_fps: 1.0
+# CLIP/BLIP 视觉编码器（vqa_eval_ours.py；visual_encoder_model 默认跟随 ours_clip_model_id）
 ours_clip_model_id: openai/clip-vit-base-patch32
+visual_encoder_model: ${ours_clip_model_id}
 ours_clip_device: null
 ours_clip_batch_size: 16
 focus_blip_model_name: Salesforce/blip-itm-base-coco

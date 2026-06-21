@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import csv
 import json
 import math
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -752,4 +754,321 @@ def _to_serializable_option_probs(probs: dict[str, float]) -> dict[str, float]:
 
 def normalize_sample_id(sample_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", sample_id.strip()).strip("_")
+
+
+# ==================== 候选帧读取与采样 ====================
+def load_preprocessed_candidate_frames(
+    preprocessed_clip_dir: str,
+    sample_id: str,
+) -> tuple[list[int], list[Image.Image]]:
+    sample_dir = Path(preprocessed_clip_dir).expanduser().resolve() / normalize_sample_id(sample_id)
+    if not sample_dir.is_dir():
+        raise FileNotFoundError(f"预处理帧目录不存在: {sample_dir}")
+    meta_path = sample_dir / "metadata.json"
+    frame_ids: list[int] = []
+    image_paths: list[Path] = []
+    if meta_path.is_file():
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        ids = meta.get("frame_ids", [])
+        files = meta.get("files", [])
+        if isinstance(ids, list) and isinstance(files, list) and len(ids) == len(files):
+            for fid, rel_name in zip(ids, files):
+                p = sample_dir / str(rel_name)
+                if p.is_file():
+                    frame_ids.append(int(fid))
+                    image_paths.append(p)
+    if not image_paths:
+        for p in sorted(sample_dir.glob("frame_*.jpg")):
+            m = re.match(r"frame_(\d+)\.jpg$", p.name)
+            if m:
+                frame_ids.append(int(m.group(1)))
+                image_paths.append(p)
+    if not image_paths:
+        raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
+    images: list[Image.Image] = []
+    for p in image_paths:
+        with Image.open(p) as img:
+            images.append(img.convert("RGB"))
+    return frame_ids, images
+
+
+def frame_indices_by_target_fps(total_frames: int, src_fps: float, target_fps: float) -> list[int]:
+    if total_frames <= 0:
+        return []
+    if target_fps <= 0:
+        raise ValueError(f"target_fps 必须 > 0，当前: {target_fps}")
+    if not src_fps or src_fps <= 0:
+        return list(range(total_frames))
+    step = src_fps / target_fps
+    indices: list[int] = []
+    cursor = 0.0
+    last = -1
+    while True:
+        idx = int(round(cursor))
+        if idx >= total_frames:
+            break
+        if idx != last:
+            indices.append(idx)
+            last = idx
+        cursor += step
+    if indices and indices[0] != 0:
+        indices.insert(0, 0)
+    return indices
+
+
+def pool_positions_at_fps(n_items: int, src_fps: float, target_fps: float) -> list[int]:
+    """在已有 n_items 个按 src_fps 采样的条目上，重采样到 target_fps。"""
+    if n_items <= 0:
+        return []
+    if target_fps <= 0:
+        raise ValueError(f"target_fps 必须 > 0，当前: {target_fps}")
+    if not src_fps or src_fps <= 0:
+        src_fps = float(target_fps)
+    return frame_indices_by_target_fps(n_items, src_fps, target_fps)
+
+
+def collect_video_frames_at_fps(
+    video_path: str,
+    target_fps: float,
+) -> tuple[list[int], list[Image.Image]]:
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"无法打开视频: {video_path}")
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    src_fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    if frame_count <= 0:
+        cap.release()
+        raise RuntimeError(f"视频帧数无效: {video_path}")
+    idxs = frame_indices_by_target_fps(frame_count, src_fps, target_fps)
+    frame_ids, images = [], []
+    try:
+        for fid in idxs:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(fid))
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_ids.append(int(fid))
+            images.append(Image.fromarray(rgb))
+    finally:
+        cap.release()
+    if not images:
+        raise RuntimeError(f"视频无可用候选帧: {video_path}")
+    return frame_ids, images
+
+
+# ==================== 关键词磁盘缓存 ====================
+KEYWORD_CACHE_DURATION_SUFFIXES = frozenset({"short", "medium", "long"})
+DEFAULT_KEYWORD_CACHE_DIR = Path.home() / "vqa_keyword_cache"
+
+
+def keyword_cache_dataset_key(dataset: str, task_type: str | None = None) -> str:
+    """Video-MME 等按 duration 分桶时，缓存目录为 videomme-short / videomme-medium / videomme-long。"""
+    ds = str(dataset or "dataset").strip()
+    tt = str(task_type or "").strip().lower()
+    if tt in KEYWORD_CACHE_DURATION_SUFFIXES:
+        return f"{ds}-{tt}"
+    return ds
+
+
+def sanitize_cache_component(text: str, *, max_len: int = 120) -> str:
+    s = re.sub(r"[^A-Za-z0-9_.\-]+", "_", str(text or "").strip()).strip("_")
+    if not s:
+        s = "default"
+    return s[:max_len]
+
+
+def resolve_keyword_cache_root(cache_dir: str | None) -> Path:
+    raw = str(cache_dir or "").strip()
+    if raw:
+        return Path(os.path.expanduser(raw)).resolve()
+    return DEFAULT_KEYWORD_CACHE_DIR.resolve()
+
+
+def keyword_cache_run_dir(
+    cache_root: Path,
+    *,
+    dataset: str,
+    task_type: str | None = None,
+    extractor_model: str,
+    prompt_version: int,
+    target_keywords: int,
+    cache_number: int = 0,
+) -> Path:
+    """同一数据集(+duration) + 关键词抽取配置 + cache_number 共用一个缓存子目录。"""
+    ext = sanitize_cache_component(extractor_model or "local")
+    ds = sanitize_cache_component(keyword_cache_dataset_key(dataset, task_type))
+    return (
+        cache_root
+        / ds
+        / ext
+        / f"pv{int(prompt_version)}_tk{int(target_keywords)}"
+        / f"cn{int(cache_number)}"
+    )
+
+
+def keyword_cache_file(run_dir: Path, sample_id: str) -> Path:
+    sid = normalize_sample_id(sample_id)
+    return run_dir / f"{sanitize_cache_component(sid, max_len=200)}.json"
+
+
+def load_keyword_cache_entry(
+    path: Path,
+    *,
+    sample_id: str,
+    log_fn: Callable[[str], None] | None = None,
+) -> tuple[list[str], list[str]] | None:
+    if not path.is_file():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        if log_fn:
+            log_fn(f"关键词缓存读取失败，将重新抽取: {path} ({e})")
+        return None
+    if not isinstance(data, dict):
+        return None
+    cached_sid = str(data.get("sample_id", "")).strip()
+    if cached_sid and normalize_sample_id(cached_sid) != normalize_sample_id(sample_id):
+        if log_fn:
+            log_fn(f"关键词缓存 sample_id 不匹配，忽略: {path}")
+        return None
+    kws_raw = data.get("kws_raw")
+    kws = data.get("kws")
+    if not isinstance(kws_raw, list) or not isinstance(kws, list):
+        return None
+    kws_raw_out = [str(x).strip() for x in kws_raw if str(x).strip()]
+    kws_out = [str(x).strip() for x in kws if str(x).strip()]
+    if not kws_out:
+        return None
+    return kws_raw_out, kws_out
+
+
+def save_keyword_cache_entry(
+    path: Path,
+    *,
+    sample_id: str,
+    dataset: str,
+    extractor_model: str,
+    prompt_version: int,
+    target_keywords: int,
+    kws_raw: list[str],
+    kws: list[str],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "sample_id": normalize_sample_id(sample_id),
+        "dataset": str(dataset),
+        "extractor_model": str(extractor_model),
+        "prompt_version": int(prompt_version),
+        "target_keywords": int(target_keywords),
+        "kws_raw": list(kws_raw),
+        "kws": list(kws),
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    tmp.replace(path)
+
+
+# ==================== ours 评估 CSV 日志 ====================
+def ours_eval_csv_columns() -> list[str]:
+    return [
+        "timestamp",
+        "dataset",
+        "seed",
+        "task_filter",
+        "num_samples",
+        "correct_count",
+        "accuracy_percent",
+        "num_frames",
+        "avg_inference_time",
+        "frame_sampling_method",
+        "avg_frame_sampling_time",
+        "avg_embedding_build_time",
+        "avg_selected_frame_count",
+        "avg_total_time_hours",
+        "model_name",
+        "lora_path",
+        "candidate_pool_fps",
+        "max_keywords",
+        "keyword_prompt_version",
+        "keyword_extractor_model",
+        "use_keyword_cache",
+        "keyword_cache_number",
+        "keyword_weight_strength",
+        "use_preprocessed_clip_frames",
+        "preprocessed_clip_fps",
+        "use_subtitles",
+    ]
+
+
+def ours_eval_csv_row(
+    args: Any,
+    *,
+    num_samples: int,
+    correct_count: float,
+    accuracy_percent: float,
+    avg_inference_time: float,
+    avg_frame_sampling_time: float,
+    avg_embedding_build_time: float,
+    avg_selected_frame_count: float,
+    avg_total_time_hours: float,
+    model_name: str,
+    lora_path: str,
+) -> list[Any]:
+    return [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        args.dataset,
+        args.seed,
+        args.task_filter,
+        num_samples,
+        f"{correct_count:.6f}",
+        f"{accuracy_percent:.2f}",
+        args.num_frames,
+        f"{avg_inference_time:.3f}",
+        args.frame_sampling_method,
+        f"{avg_frame_sampling_time:.6f}",
+        f"{avg_embedding_build_time:.6f}",
+        f"{avg_selected_frame_count:.6f}",
+        f"{avg_total_time_hours:.6f}",
+        model_name,
+        lora_path,
+        f"{float(args.candidate_pool_fps):g}",
+        int(args.max_keywords),
+        int(args.keyword_prompt_version),
+        str(args.keyword_extractor_model),
+        bool(args.use_keyword_cache),
+        int(args.keyword_cache_number),
+        f"{float(args.keyword_weight_strength):g}",
+        bool(args.use_preprocessed_clip_frames),
+        f"{float(args.preprocessed_clip_fps):g}",
+        bool(args.use_subtitles),
+    ]
+
+
+def log_ours_eval_to_csv(
+    log_file: str,
+    columns: list[str],
+    row: list[Any],
+    *,
+    log_fn: Callable[[str], None] | None = None,
+) -> None:
+    path = Path(log_file).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not path.is_file() or path.stat().st_size == 0
+    if not write_header:
+        with path.open("r", newline="", encoding="utf-8") as rf:
+            existing_header = next(csv.reader(rf), None)
+        if existing_header != columns:
+            if log_fn:
+                log_fn(f"CSV 表头与当前版本不一致，跳过写入: {path}")
+            return
+    with path.open("a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if write_header:
+            w.writerow(columns)
+        w.writerow(row)
 

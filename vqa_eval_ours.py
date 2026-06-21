@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import math
 import os
 import re
 import time
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import cv2
 import torch
 from PIL import Image
 from tqdm import tqdm
@@ -28,7 +26,9 @@ from utils import (
     avg as _avg,
     build_user_text,
     build_user_text_with_subtitles,
+    collect_video_frames_at_fps,
     format_labeled_options,
+    KEYWORD_CACHE_DURATION_SUFFIXES,
     KEYWORD_EXTRACTOR_PROVIDERS,
     calculate_mra,
     collect_subtitles_for_frame_ids as _collect_subtitles_for_sample,
@@ -37,7 +37,18 @@ from utils import (
     dump_verbose_round,
     from_pretrained_local_first,
     init_verbose_run_dir,
-    normalize_sample_id,
+    keyword_cache_dataset_key,
+    keyword_cache_file,
+    keyword_cache_run_dir,
+    load_keyword_cache_entry,
+    load_preprocessed_candidate_frames,
+    log_ours_eval_to_csv,
+    ours_eval_csv_columns,
+    ours_eval_csv_row,
+    pool_positions_at_fps,
+    resolve_keyword_cache_root,
+    sanitize_cache_component,
+    save_keyword_cache_entry,
     write_verbose_frame_selection_manifest,
 )
 from lmms_eval_bridge import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs, resolve_lmms_model_name
@@ -51,117 +62,17 @@ from lmms_eval_official import (
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
 PREPROCESSED_CLIP_COMPATIBLE_METHODS = {"ours"}
-_CLIP_CACHE: dict[str, tuple[Any, Any, str]] = {}
+_VISUAL_ENCODER_CACHE: dict[str, "VisualEncoder"] = {}
 _OPENAI_CLIENT_CACHE: dict[tuple[str, str], Any] = {}
 _KEYWORD_LOCAL_MODEL_CACHE: dict[str, tuple[Any, Any]] = {}
 VERBOSE = True
 VERBOSE_OUTPUT_DIR = Path(__file__).resolve().parent / "verbose_eval_ours"
-_DEFAULT_KEYWORD_CACHE_DIR = Path.home() / "vqa_keyword_cache"
 _VERBOSE_RUN_DIR: Path | None = None
 
 
 # ==================== 基础工具 ====================
 def _log(msg: str) -> None:
     print(f"[vqa_eval_ours] {msg}", flush=True)
-
-
-# ==================== 候选帧读取与采样 ====================
-def _load_preprocessed_candidate_frames(preprocessed_clip_dir: str, sample_id: str) -> tuple[list[int], list[Image.Image]]:
-    sample_dir = Path(preprocessed_clip_dir).expanduser().resolve() / normalize_sample_id(sample_id)
-    if not sample_dir.is_dir():
-        raise FileNotFoundError(f"预处理帧目录不存在: {sample_dir}")
-    meta_path = sample_dir / "metadata.json"
-    frame_ids: list[int] = []
-    image_paths: list[Path] = []
-    if meta_path.is_file():
-        with meta_path.open("r", encoding="utf-8") as f:
-            meta = json.load(f)
-        ids = meta.get("frame_ids", [])
-        files = meta.get("files", [])
-        if isinstance(ids, list) and isinstance(files, list) and len(ids) == len(files):
-            for fid, rel_name in zip(ids, files):
-                p = sample_dir / str(rel_name)
-                if p.is_file():
-                    frame_ids.append(int(fid))
-                    image_paths.append(p)
-    if not image_paths:
-        for p in sorted(sample_dir.glob("frame_*.jpg")):
-            m = re.match(r"frame_(\d+)\.jpg$", p.name)
-            if m:
-                frame_ids.append(int(m.group(1)))
-                image_paths.append(p)
-    if not image_paths:
-        raise RuntimeError(f"预处理帧目录中没有可用图片: {sample_dir}")
-    images: list[Image.Image] = []
-    for p in image_paths:
-        with Image.open(p) as img:
-            images.append(img.convert("RGB"))
-    return frame_ids, images
-
-
-def _frame_indices_by_target_fps(total_frames: int, src_fps: float, target_fps: float) -> list[int]:
-    if total_frames <= 0:
-        return []
-    if target_fps <= 0:
-        raise ValueError(f"target_fps 必须 > 0，当前: {target_fps}")
-    if not src_fps or src_fps <= 0:
-        return list(range(total_frames))
-    step = src_fps / target_fps
-    indices: list[int] = []
-    cursor = 0.0
-    last = -1
-    while True:
-        idx = int(round(cursor))
-        if idx >= total_frames:
-            break
-        if idx != last:
-            indices.append(idx)
-            last = idx
-        cursor += step
-    if indices and indices[0] != 0:
-        indices.insert(0, 0)
-    return indices
-
-
-def _pool_positions_at_fps(n_items: int, src_fps: float, target_fps: float) -> list[int]:
-    """在已有 n_items 个按 src_fps 采样的条目上，重采样到 target_fps。"""
-    if n_items <= 0:
-        return []
-    if target_fps <= 0:
-        raise ValueError(f"target_fps 必须 > 0，当前: {target_fps}")
-    if not src_fps or src_fps <= 0:
-        src_fps = float(target_fps)
-    return _frame_indices_by_target_fps(n_items, src_fps, target_fps)
-
-
-def _collect_video_frames_at_fps(
-    video_path: str,
-    target_fps: float,
-) -> tuple[list[int], list[Image.Image]]:
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"无法打开视频: {video_path}")
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    src_fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
-    if frame_count <= 0:
-        cap.release()
-        raise RuntimeError(f"视频帧数无效: {video_path}")
-    idxs = _frame_indices_by_target_fps(frame_count, src_fps, target_fps)
-    frame_ids, images = [], []
-    try:
-        for fid in idxs:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, int(fid))
-            ok, frame = cap.read()
-            if not ok:
-                continue
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_ids.append(int(fid))
-            images.append(Image.fromarray(rgb))
-    finally:
-        cap.release()
-    if not images:
-        raise RuntimeError(f"视频无可用候选帧: {video_path}")
-    return frame_ids, images
 
 
 def _to_feature_tensor(features: Any) -> torch.Tensor:
@@ -180,18 +91,53 @@ def _norm(x: torch.Tensor) -> torch.Tensor:
     return x / x.norm(dim=-1, keepdim=True).clamp(min=1e-12)
 
 
-# ==================== CLIP 编码 ====================
-def _load_clip(model_id: str, device: str | None) -> tuple[Any, Any, str]:
+@dataclass(frozen=True)
+class VisualEncoder:
+    backend: str  # "clip" | "blip_itm"
+    model_id: str
+    processor: Any
+    model: Any
+    device: str
+
+
+def _is_blip_itm_model(model_id: str) -> bool:
+    return "blip-itm" in model_id.strip().lower()
+
+
+# ==================== 视觉编码器（CLIP embedding / BLIP ITM） ====================
+def _load_visual_encoder(model_id: str, device: str | None) -> VisualEncoder:
     d = device or ("cuda" if torch.cuda.is_available() else "cpu")
     key = f"{model_id}::{d}"
-    if key not in _CLIP_CACHE:
-        proc = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
+    if key in _VISUAL_ENCODER_CACHE:
+        return _VISUAL_ENCODER_CACHE[key]
+
+    if _is_blip_itm_model(model_id):
+        try:
+            from transformers import BlipForImageTextRetrieval, BlipProcessor
+        except ImportError as exc:
+            raise ImportError("BLIP ITM 依赖缺失，请安装 transformers。") from exc
+        processor = from_pretrained_local_first(BlipProcessor.from_pretrained, model_id, log=_log)
+        model = from_pretrained_local_first(
+            BlipForImageTextRetrieval.from_pretrained, model_id, log=_log
+        ).to(d).eval()
+        ve = VisualEncoder(backend="blip_itm", model_id=model_id, processor=processor, model=model, device=d)
+        _log(f"loaded BLIP ITM visual encoder: model_id={model_id}, device={d}")
+    else:
+        processor = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
         model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(d).eval()
-        _CLIP_CACHE[key] = (proc, model, d)
-    return _CLIP_CACHE[key]
+        ve = VisualEncoder(backend="clip", model_id=model_id, processor=processor, model=model, device=d)
+        _log(f"loaded CLIP visual encoder: model_id={model_id}, device={d}")
+
+    _VISUAL_ENCODER_CACHE[key] = ve
+    return ve
 
 
-def _encode_images(images: list[Image.Image], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+def _load_clip(model_id: str, device: str | None) -> tuple[Any, Any, str]:
+    ve = _load_visual_encoder(model_id, device)
+    return ve.processor, ve.model, ve.device
+
+
+def _encode_clip_images(images: list[Image.Image], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
     outs = []
     for i in range(0, len(images), bs):
         inputs = proc(images=images[i:i + bs], return_tensors="pt").to(device)
@@ -201,7 +147,7 @@ def _encode_images(images: list[Image.Image], proc: Any, model: Any, device: str
     return torch.cat(outs, dim=0)
 
 
-def _encode_texts(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+def _encode_clip_texts(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
     outs = []
     for i in range(0, len(texts), bs):
         inputs = proc(text=texts[i:i + bs], padding=True, truncation=True, return_tensors="pt").to(device)
@@ -209,6 +155,93 @@ def _encode_texts(texts: list[str], proc: Any, model: Any, device: str, bs: int)
             feats = _to_feature_tensor(model.get_text_features(**inputs))
         outs.append(_norm(feats))
     return torch.cat(outs, dim=0)
+
+
+def _encode_blip_texts_for_dedup(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    outs = []
+    for i in range(0, len(texts), bs):
+        batch = texts[i:i + bs]
+        inputs = proc(text=batch, return_tensors="pt", padding=True, truncation=True).to(device)
+        with torch.no_grad():
+            text_output = model.text_encoder(
+                input_ids=inputs.input_ids,
+                attention_mask=inputs.attention_mask,
+                return_dict=True,
+            )
+            text_embeds = model.text_proj(text_output.last_hidden_state[:, 0, :])
+        outs.append(_norm(text_embeds))
+    return torch.cat(outs, dim=0)
+
+
+def _extract_blip_itm_probs(outputs) -> torch.Tensor:
+    logits = getattr(outputs, "itm_score", None)
+    if logits is None:
+        logits = getattr(outputs, "logits", None)
+    if logits is None:
+        raise RuntimeError("BLIP 输出中缺少 itm_score/logits，无法计算打分。")
+    probs = torch.nn.functional.softmax(logits, dim=-1)
+    if probs.shape[-1] >= 2:
+        return probs[:, 1]
+    return probs.squeeze(-1)
+
+
+def _compute_blip_itm_sims(
+    images: list[Image.Image],
+    texts: list[str],
+    proc: Any,
+    model: Any,
+    device: str,
+    bs: int,
+) -> torch.Tensor:
+    m = len(texts)
+    n = len(images)
+    if m == 0 or n == 0:
+        return torch.empty((m, n), device=device)
+    sims = torch.zeros(m, n, device=device)
+    for i, text in enumerate(texts):
+        for start in range(0, n, bs):
+            batch = images[start:start + bs]
+            inputs = proc(
+                images=batch,
+                text=[text] * len(batch),
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+            ).to(device)
+            with torch.no_grad():
+                outputs = model(**inputs, use_itm_head=True)
+            probs = _extract_blip_itm_probs(outputs)
+            sims[i, start:start + len(batch)] = probs
+    return sims
+
+
+def _encode_texts_for_dedup(ve: VisualEncoder, texts: list[str], bs: int) -> torch.Tensor:
+    if ve.backend == "blip_itm":
+        return _encode_blip_texts_for_dedup(texts, ve.processor, ve.model, ve.device, bs)
+    return _encode_clip_texts(texts, ve.processor, ve.model, ve.device, bs)
+
+
+def _compute_kw_frame_sims(
+    ve: VisualEncoder,
+    images: list[Image.Image],
+    texts: list[str],
+    bs: int,
+) -> torch.Tensor:
+    if not texts or not images:
+        return torch.empty((len(texts), len(images)), device=ve.device)
+    if ve.backend == "blip_itm":
+        return _compute_blip_itm_sims(images, texts, ve.processor, ve.model, ve.device, bs)
+    kw_emb = _encode_clip_texts(texts, ve.processor, ve.model, ve.device, bs)
+    img_emb = _encode_clip_images(images, ve.processor, ve.model, ve.device, bs)
+    return kw_emb @ img_emb.T
+
+
+def _encode_images(images: list[Image.Image], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    return _encode_clip_images(images, proc, model, device, bs)
+
+
+def _encode_texts(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    return _encode_clip_texts(texts, proc, model, device, bs)
 
 
 # ==================== 关键词抽取（仅 LLM） ====================
@@ -573,113 +606,6 @@ def _extract_keywords_with_llm_text(
     return _ask_once(retry_prompt)
 
 
-# ==================== 关键词磁盘缓存 ====================
-_KEYWORD_CACHE_DURATION_SUFFIXES = frozenset({"short", "medium", "long"})
-
-
-def _keyword_cache_dataset_key(dataset: str, task_type: str | None = None) -> str:
-    """Video-MME 等按 duration 分桶时，缓存目录为 videomme-short / videomme-medium / videomme-long。"""
-    ds = str(dataset or "dataset").strip()
-    tt = str(task_type or "").strip().lower()
-    if tt in _KEYWORD_CACHE_DURATION_SUFFIXES:
-        return f"{ds}-{tt}"
-    return ds
-
-
-def _sanitize_cache_component(text: str, *, max_len: int = 120) -> str:
-    s = re.sub(r"[^A-Za-z0-9_.\-]+", "_", str(text or "").strip()).strip("_")
-    if not s:
-        s = "default"
-    return s[:max_len]
-
-
-def _resolve_keyword_cache_root(cache_dir: str | None) -> Path:
-    raw = str(cache_dir or "").strip()
-    if raw:
-        return Path(os.path.expanduser(raw)).resolve()
-    return _DEFAULT_KEYWORD_CACHE_DIR.resolve()
-
-
-def _keyword_cache_run_dir(
-    cache_root: Path,
-    *,
-    dataset: str,
-    task_type: str | None = None,
-    extractor_model: str,
-    prompt_version: int,
-    target_keywords: int,
-    cache_number: int = 0,
-) -> Path:
-    """同一数据集(+duration) + 关键词抽取配置 + cache_number 共用一个缓存子目录。"""
-    ext = _sanitize_cache_component(extractor_model or "local")
-    ds = _sanitize_cache_component(_keyword_cache_dataset_key(dataset, task_type))
-    return (
-        cache_root
-        / ds
-        / ext
-        / f"pv{int(prompt_version)}_tk{int(target_keywords)}"
-        / f"cn{int(cache_number)}"
-    )
-
-
-def _keyword_cache_file(run_dir: Path, sample_id: str) -> Path:
-    sid = normalize_sample_id(sample_id)
-    return run_dir / f"{_sanitize_cache_component(sid, max_len=200)}.json"
-
-
-def _load_keyword_cache_entry(path: Path, *, sample_id: str) -> tuple[list[str], list[str]] | None:
-    if not path.is_file():
-        return None
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        _log(f"关键词缓存读取失败，将重新抽取: {path} ({e})")
-        return None
-    if not isinstance(data, dict):
-        return None
-    cached_sid = str(data.get("sample_id", "")).strip()
-    if cached_sid and normalize_sample_id(cached_sid) != normalize_sample_id(sample_id):
-        _log(f"关键词缓存 sample_id 不匹配，忽略: {path}")
-        return None
-    kws_raw = data.get("kws_raw")
-    kws = data.get("kws")
-    if not isinstance(kws_raw, list) or not isinstance(kws, list):
-        return None
-    kws_raw_out = [str(x).strip() for x in kws_raw if str(x).strip()]
-    kws_out = [str(x).strip() for x in kws if str(x).strip()]
-    if not kws_out:
-        return None
-    return kws_raw_out, kws_out
-
-
-def _save_keyword_cache_entry(
-    path: Path,
-    *,
-    sample_id: str,
-    dataset: str,
-    extractor_model: str,
-    prompt_version: int,
-    target_keywords: int,
-    kws_raw: list[str],
-    kws: list[str],
-) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "sample_id": normalize_sample_id(sample_id),
-        "dataset": str(dataset),
-        "extractor_model": str(extractor_model),
-        "prompt_version": int(prompt_version),
-        "target_keywords": int(target_keywords),
-        "kws_raw": list(kws_raw),
-        "kws": list(kws),
-    }
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-    tmp.replace(path)
-
-
 def _extract_keywords_with_optional_cache(
     model: Any,
     proc: Any,
@@ -699,9 +625,9 @@ def _extract_keywords_with_optional_cache(
     cache_dir: str | None,
     cache_number: int = 0,
 ) -> tuple[list[str], list[str]]:
-    cache_dataset_key = _keyword_cache_dataset_key(dataset, task_type)
-    cache_root = _resolve_keyword_cache_root(cache_dir)
-    run_dir = _keyword_cache_run_dir(
+    cache_dataset_key = keyword_cache_dataset_key(dataset, task_type)
+    cache_root = resolve_keyword_cache_root(cache_dir)
+    run_dir = keyword_cache_run_dir(
         cache_root,
         dataset=dataset,
         task_type=task_type,
@@ -710,10 +636,10 @@ def _extract_keywords_with_optional_cache(
         target_keywords=target_keywords,
         cache_number=cache_number,
     )
-    cache_path = _keyword_cache_file(run_dir, sample_id)
+    cache_path = keyword_cache_file(run_dir, sample_id)
 
     if use_cache:
-        cached = _load_keyword_cache_entry(cache_path, sample_id=sample_id)
+        cached = load_keyword_cache_entry(cache_path, sample_id=sample_id, log_fn=_log)
         if cached is not None:
             kws_raw, kws = cached
             _log(f"sample={sample_id} 关键词缓存命中 ({cache_path})")
@@ -732,7 +658,7 @@ def _extract_keywords_with_optional_cache(
         api_key_env=api_key_env,
     )
     if use_cache and kws:
-        _save_keyword_cache_entry(
+        save_keyword_cache_entry(
             cache_path,
             sample_id=sample_id,
             dataset=cache_dataset_key,
@@ -860,30 +786,27 @@ def _local_evidence_score(x: torch.Tensor) -> float:
 
 def _compute_keyword_information(
     kws_rep: list[str],
-    kw_emb_rep: torch.Tensor,
-    img_emb: torch.Tensor,
+    kw_frame_sims: torch.Tensor,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
     """合并后的关键词全部保留；用局部证据度作为关键词信息量。"""
-    m = int(kw_emb_rep.shape[0])
-    n = int(img_emb.shape[0])
+    m = len(kws_rep)
+    n = int(kw_frame_sims.shape[1]) if kw_frame_sims.ndim == 2 else 0
     if m == 0 or n == 0:
         return {
             "kws_use": [],
-            "kw_emb_use": kw_emb_rep[:0],
-            "kw_weights": torch.empty((0,), device=img_emb.device),
+            "kw_weights": torch.empty((0,), device=kw_frame_sims.device),
             "rows": [],
         }
 
-    sims = kw_emb_rep @ img_emb.T  # (M, N)
+    sims = kw_frame_sims
     local_evidence = torch.tensor(
         [_local_evidence_score(sims[i]) for i in range(m)],
-        dtype=kw_emb_rep.dtype,
-        device=kw_emb_rep.device,
+        dtype=kw_frame_sims.dtype,
+        device=kw_frame_sims.device,
     ).clamp(min=0.0, max=1.0)
 
     kws_use = list(kws_rep)
-    kw_emb_use = kw_emb_rep
     kw_info = local_evidence
     s = float(kw_info.sum().item())
     info_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
@@ -907,7 +830,6 @@ def _compute_keyword_information(
 
     return {
         "kws_use": kws_use,
-        "kw_emb_use": kw_emb_use,
         "kw_weights": kw_weights,
         "local_evidence": local_evidence,
         "rows": rows,
@@ -1044,19 +966,18 @@ def _build_image_keyword_scores(
     selected_idx: list[int],
     frame_ids: list[int],
     kws_rep: list[str],
-    kw_emb_rep: torch.Tensor,
-    img_emb: torch.Tensor,
+    kw_frame_sims: torch.Tensor,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if not selected_idx:
         return out
-    if not kws_rep or kw_emb_rep.shape[0] == 0:
+    if not kws_rep or kw_frame_sims.shape[0] == 0:
         for idx in selected_idx:
             out.append({"index_in_pool": int(idx), "frame_id": int(frame_ids[idx]), "keyword_scores": {}})
         return out
 
-    sel_tensor = torch.tensor(selected_idx, device=img_emb.device, dtype=torch.long)
-    sims = kw_emb_rep @ img_emb[sel_tensor].T
+    sel_tensor = torch.tensor(selected_idx, device=kw_frame_sims.device, dtype=torch.long)
+    sims = kw_frame_sims[:, sel_tensor]
     sims_cpu = sims.detach().cpu().tolist()
     for j, idx in enumerate(selected_idx):
         kw_scores = {kw: float(sims_cpu[i][j]) for i, kw in enumerate(kws_rep)}
@@ -1074,9 +995,7 @@ def _build_question_options_visual_text(question: str, options: list[str] | None
 def _eval_one_sample(
     model: Any,
     proc: Any,
-    clip_proc: Any,
-    clip_model: Any,
-    clip_device: str,
+    visual_encoder: VisualEncoder,
     sample: VQASample,
     prompt: str,
     args: argparse.Namespace,
@@ -1113,28 +1032,31 @@ def _eval_one_sample(
     if not kws:
         raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
     kws_after_text_dedup = list(kws)
-    kw_emb = _encode_texts(kws_after_text_dedup, clip_proc, clip_model, clip_device, 32)
+    kw_emb = _encode_texts_for_dedup(visual_encoder, kws_after_text_dedup, 32)
     kws_rep, kw_emb_rep, _ = _merge_keywords(kws_after_text_dedup, kw_emb, args.max_keywords)
     keyword_extract_time = time.perf_counter() - t_kw
 
     t0 = time.perf_counter()
     if args.use_preprocessed_clip_frames:
-        frame_ids, imgs = _load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
+        frame_ids, imgs = load_preprocessed_candidate_frames(preprocessed_clip_dir or "", sample.sample_id)
         src_fps = float(args.preprocessed_clip_fps)
-        keep = _pool_positions_at_fps(len(imgs), src_fps, pool_fps)
+        keep = pool_positions_at_fps(len(imgs), src_fps, pool_fps)
         if keep:
             frame_ids, imgs = [frame_ids[i] for i in keep], [imgs[i] for i in keep]
     else:
-        frame_ids, imgs = _collect_video_frames_at_fps(sample.video_path, pool_fps)
+        frame_ids, imgs = collect_video_frames_at_fps(sample.video_path, pool_fps)
     frame_sampling_time = time.perf_counter() - t0
 
     t1 = time.perf_counter()
-    img_emb = _encode_images(imgs, clip_proc, clip_model, clip_device, args.ours_clip_batch_size)
-    info_pack = _compute_keyword_information(kws_rep, kw_emb_rep, img_emb, args)
+    kw_frame_sims = _compute_kw_frame_sims(
+        visual_encoder,
+        imgs,
+        kws_rep,
+        args.ours_clip_batch_size,
+    )
+    info_pack = _compute_keyword_information(kws_rep, kw_frame_sims, args)
     kws_use: list[str] = info_pack["kws_use"]
-    kw_emb_use: torch.Tensor = info_pack["kw_emb_use"]
     kw_weights: torch.Tensor = info_pack["kw_weights"]
-    kw_frame_sims = (kw_emb_use @ img_emb.T) if kw_emb_use.shape[0] > 0 else torch.empty((0, img_emb.shape[0]), device=img_emb.device)
 
     if VERBOSE:
         keep_weight_map: dict[str, float] = {}
@@ -1158,7 +1080,7 @@ def _eval_one_sample(
         f"budget={budget}"
     )
 
-    if kw_emb_use.shape[0] == 0:
+    if kw_frame_sims.shape[0] == 0:
         raise RuntimeError(f"样本无可用关键词: sample={sample.sample_id}")
 
     selected_idx = _select_keyword_frames(
@@ -1185,14 +1107,19 @@ def _eval_one_sample(
     prompt_use = build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt) if use_subtitles else prompt
     one_shot_out = _run_vlm_once(model, proc, one_shot_frames, prompt_use, max_new_tokens, model_mode)
     verbose_keywords = list(kws_use)
-    verbose_kw_emb = kw_emb_use
     verbose_keyword_rows = list(info_pack["rows"])
+    verbose_kw_frame_sims = kw_frame_sims
     if VERBOSE:
         question_options_label = "question + options"
         question_options_text = _build_question_options_visual_text(sample.question, sample.options)
-        question_options_emb = _encode_texts([question_options_text], clip_proc, clip_model, clip_device, 1)
+        qo_sims = _compute_kw_frame_sims(
+            visual_encoder,
+            imgs,
+            [question_options_text],
+            args.ours_clip_batch_size,
+        )
         verbose_keywords.append(question_options_label)
-        verbose_kw_emb = torch.cat([verbose_kw_emb, question_options_emb], dim=0)
+        verbose_kw_frame_sims = torch.cat([kw_frame_sims, qo_sims], dim=0)
         verbose_keyword_rows.append(
             {
                 "keyword": question_options_label,
@@ -1202,7 +1129,12 @@ def _eval_one_sample(
                 "used_for_selection": False,
             }
         )
-    all_frame_kw_scores = _build_image_keyword_scores(list(range(len(frame_ids))), frame_ids, verbose_keywords, verbose_kw_emb, img_emb)
+    all_frame_kw_scores = _build_image_keyword_scores(
+        list(range(len(frame_ids))),
+        frame_ids,
+        verbose_keywords,
+        verbose_kw_frame_sims,
+    )
     dump_verbose_round(
         verbose=VERBOSE,
         verbose_run_dir=_VERBOSE_RUN_DIR,
@@ -1280,7 +1212,9 @@ def evaluate_vqa(
     lmms_model_name: str = "",
 ) -> dict[str, Any]:
     use_official_videomme = is_official_videomme_dataset(args.dataset)
-    clip_proc, clip_model, clip_device = _load_clip(args.ours_clip_model_id, args.ours_clip_device)
+    visual_encoder = _load_visual_encoder(args.ours_clip_model_id, args.ours_clip_device)
+    if visual_encoder.backend == "blip_itm":
+        _log(f"ours 使用 BLIP ITM 打分: model_id={visual_encoder.model_id}")
 
     res = {
         "correct": 0,
@@ -1308,9 +1242,7 @@ def evaluate_vqa(
         out = _eval_one_sample(
             model,
             proc,
-            clip_proc,
-            clip_model,
-            clip_device,
+            visual_encoder,
             s,
             prompt,
             args,
@@ -1444,98 +1376,6 @@ def parse_args():
     return p.parse_args()
 
 
-def _ours_csv_columns() -> list[str]:
-    return [
-        "timestamp",
-        "dataset",
-        "seed",
-        "task_filter",
-        "num_samples",
-        "correct_count",
-        "accuracy_percent",
-        "num_frames",
-        "avg_inference_time",
-        "frame_sampling_method",
-        "avg_frame_sampling_time",
-        "avg_embedding_build_time",
-        "avg_selected_frame_count",
-        "avg_total_time_hours",
-        "model_name",
-        "lora_path",
-        "candidate_pool_fps",
-        "max_keywords",
-        "keyword_prompt_version",
-        "keyword_extractor_model",
-        "use_keyword_cache",
-        "keyword_cache_number",
-        "keyword_weight_strength",
-        "use_preprocessed_clip_frames",
-        "preprocessed_clip_fps",
-        "use_subtitles",
-    ]
-
-
-def _ours_csv_row(
-    args: argparse.Namespace,
-    *,
-    num_samples: int,
-    correct_count: float,
-    accuracy_percent: float,
-    avg_inference_time: float,
-    avg_frame_sampling_time: float,
-    avg_embedding_build_time: float,
-    avg_selected_frame_count: float,
-    avg_total_time_hours: float,
-    model_name: str,
-    lora_path: str,
-) -> list[Any]:
-    return [
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        args.dataset,
-        args.seed,
-        args.task_filter,
-        num_samples,
-        f"{correct_count:.6f}",
-        f"{accuracy_percent:.2f}",
-        args.num_frames,
-        f"{avg_inference_time:.3f}",
-        args.frame_sampling_method,
-        f"{avg_frame_sampling_time:.6f}",
-        f"{avg_embedding_build_time:.6f}",
-        f"{avg_selected_frame_count:.6f}",
-        f"{avg_total_time_hours:.6f}",
-        model_name,
-        lora_path,
-        f"{float(args.candidate_pool_fps):g}",
-        int(args.max_keywords),
-        int(args.keyword_prompt_version),
-        str(args.keyword_extractor_model),
-        bool(args.use_keyword_cache),
-        int(args.keyword_cache_number),
-        f"{float(args.keyword_weight_strength):g}",
-        bool(args.use_preprocessed_clip_frames),
-        f"{float(args.preprocessed_clip_fps):g}",
-        bool(args.use_subtitles),
-    ]
-
-
-def _log_ours_eval_to_csv(log_file: str, columns: list[str], row: list[Any]) -> None:
-    path = Path(log_file).expanduser().resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not path.is_file() or path.stat().st_size == 0
-    if not write_header:
-        with path.open("r", newline="", encoding="utf-8") as rf:
-            existing_header = next(csv.reader(rf), None)
-        if existing_header != columns:
-            _log(f"CSV 表头与当前版本不一致，跳过写入: {path}")
-            return
-    with path.open("a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        if write_header:
-            w.writerow(columns)
-        w.writerow(row)
-
-
 def main():
     # ==================== 主入口与实验记录 ====================
     exp_t0 = time.perf_counter()
@@ -1611,9 +1451,9 @@ def main():
 
     budget = max(1, int(args.num_frames))
     if args.use_keyword_cache:
-        cache_root = _resolve_keyword_cache_root(args.keyword_cache_dir or None)
-        cache_task = str(args.task_filter) if str(args.task_filter) in _KEYWORD_CACHE_DURATION_SUFFIXES else None
-        cache_run = _keyword_cache_run_dir(
+        cache_root = resolve_keyword_cache_root(args.keyword_cache_dir or None)
+        cache_task = str(args.task_filter) if str(args.task_filter) in KEYWORD_CACHE_DURATION_SUFFIXES else None
+        cache_run = keyword_cache_run_dir(
             cache_root,
             dataset=str(args.dataset),
             task_type=cache_task,
@@ -1625,7 +1465,7 @@ def main():
         if cache_task:
             _log(f"关键词缓存已启用: {cache_run}")
         else:
-            ds_key = _sanitize_cache_component(str(args.dataset))
+            ds_key = sanitize_cache_component(str(args.dataset))
             _log(
                 f"关键词缓存已启用: {cache_root}/{ds_key}-{{short|medium|long}}/... "
                 f"(按样本 task_type 分目录)"
@@ -1673,11 +1513,11 @@ def main():
     avg_sel = _avg(results["selected_frame_counts"])
     avg_total_h = (time.perf_counter() - exp_t0) / 3600.0
 
-    csv_columns = _ours_csv_columns()
-    _log_ours_eval_to_csv(
+    csv_columns = ours_eval_csv_columns()
+    log_ours_eval_to_csv(
         log_file,
         csv_columns,
-        _ours_csv_row(
+        ours_eval_csv_row(
             args,
             num_samples=len(samples),
             correct_count=correct,
@@ -1690,6 +1530,7 @@ def main():
             model_name=model_name,
             lora_path=lora_path,
         ),
+        log_fn=_log,
     )
     _log(f"评估完成: samples={len(samples)}, acc={avg_acc:.2f}%, avg_infer={avg_time:.3f}s")
     if "official_videomme_overall" in results:

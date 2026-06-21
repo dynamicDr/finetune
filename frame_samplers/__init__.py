@@ -14,6 +14,8 @@ SUPPORTED_FRAME_SAMPLERS = (
     "videoagent",
     "clip",
     "clip-new",
+    "blip",
+    "blip-new",
     "siglip2",
     "siglip2-new",
     "qframe",
@@ -129,6 +131,42 @@ def sample_video_frames(
             preprocessed_clip_dir=preprocessed_clip_dir,
             use_segment_selection=False,
         )
+    if method == "blip":
+        from .blip import sample_blip_frames
+
+        return sample_blip_frames(
+            video_path,
+            num_frames,
+            sample_id=sample_id,
+            question=question,
+            options=options,
+            answer=answer,
+            random_seed=random_seed,
+            model_id=focus_blip_model_name,
+            device=focus_blip_device,
+            batch_size=focus_blip_batch_size,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            use_segment_selection=True,
+        )
+    if method == "blip-new":
+        from .blip import sample_blip_frames
+
+        return sample_blip_frames(
+            video_path,
+            num_frames,
+            sample_id=sample_id,
+            question=question,
+            options=options,
+            answer=answer,
+            random_seed=random_seed,
+            model_id=focus_blip_model_name,
+            device=focus_blip_device,
+            batch_size=focus_blip_batch_size,
+            use_preprocessed_clip_frames=use_preprocessed_clip_frames,
+            preprocessed_clip_dir=preprocessed_clip_dir,
+            use_segment_selection=False,
+        )
     if method == "siglip2":
         from .siglip2 import sample_siglip2_frames
 
@@ -202,6 +240,7 @@ def sample_video_frames(
             answer=answer,
             random_seed=random_seed,
             extract_feature_model=aks_feature_model,
+            blip_model_id=focus_blip_model_name,
             use_preprocessed_clip_frames=use_preprocessed_clip_frames,
             preprocessed_clip_dir=preprocessed_clip_dir,
         )
