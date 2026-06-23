@@ -1007,6 +1007,8 @@ def ours_eval_csv_columns() -> list[str]:
         "avg_selected_frame_count",
         "avg_total_time_hours",
         "model_name",
+        "visual_encoder_backend",
+        "visual_encoder_model",
         "lora_path",
         "candidate_pool_fps",
         "max_keywords",
@@ -1034,7 +1036,13 @@ def ours_eval_csv_row(
     avg_total_time_hours: float,
     model_name: str,
     lora_path: str,
+    visual_encoder_model: str = "",
+    visual_encoder_backend: str = "",
 ) -> list[Any]:
+    enc_model = visual_encoder_model or str(getattr(args, "ours_clip_model_id", ""))
+    enc_backend = visual_encoder_backend or (
+        "blip_itc" if "blip-itm" in enc_model.strip().lower() else "clip"
+    )
     return [
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         args.dataset,
@@ -1051,6 +1059,8 @@ def ours_eval_csv_row(
         f"{avg_selected_frame_count:.6f}",
         f"{avg_total_time_hours:.6f}",
         model_name,
+        enc_backend,
+        enc_model,
         lora_path,
         f"{float(args.candidate_pool_fps):g}",
         int(args.max_keywords),

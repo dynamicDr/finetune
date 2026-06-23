@@ -1270,6 +1270,8 @@ def evaluate_vqa(
         pbar.set_postfix(Acc=f"{acc:.2f}%", AvgTime=f"{t:.2f}s")
     if use_official_videomme and res["official_videomme_scores"]:
         res["official_videomme_overall"] = aggregate_videomme(res["official_videomme_scores"])
+    res["visual_encoder_model"] = visual_encoder.model_id
+    res["visual_encoder_backend"] = visual_encoder.backend
     return res
 
 
@@ -1517,6 +1519,8 @@ def main():
             avg_total_time_hours=avg_total_h,
             model_name=model_name,
             lora_path=lora_path,
+            visual_encoder_model=str(results.get("visual_encoder_model", "")),
+            visual_encoder_backend=str(results.get("visual_encoder_backend", "")),
         ),
         log_fn=_log,
     )
