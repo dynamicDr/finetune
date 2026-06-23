@@ -93,35 +93,35 @@ def _norm(x: torch.Tensor) -> torch.Tensor:
 
 @dataclass(frozen=True)
 class VisualEncoder:
-    backend: str  # "clip" | "blip_itm"
+    backend: str  # "clip" | "blip_itc"
     model_id: str
     processor: Any
     model: Any
     device: str
 
 
-def _is_blip_itm_model(model_id: str) -> bool:
+def _is_blip_model(model_id: str) -> bool:
     return "blip-itm" in model_id.strip().lower()
 
 
-# ==================== 视觉编码器（CLIP embedding / BLIP ITM） ====================
+# ==================== 视觉编码器（CLIP / BLIP ITC 双塔 embedding） ====================
 def _load_visual_encoder(model_id: str, device: str | None) -> VisualEncoder:
     d = device or ("cuda" if torch.cuda.is_available() else "cpu")
     key = f"{model_id}::{d}"
     if key in _VISUAL_ENCODER_CACHE:
         return _VISUAL_ENCODER_CACHE[key]
 
-    if _is_blip_itm_model(model_id):
+    if _is_blip_model(model_id):
         try:
             from transformers import BlipForImageTextRetrieval, BlipProcessor
         except ImportError as exc:
-            raise ImportError("BLIP ITM 依赖缺失，请安装 transformers。") from exc
+            raise ImportError("BLIP ITC 依赖缺失，请安装 transformers。") from exc
         processor = from_pretrained_local_first(BlipProcessor.from_pretrained, model_id, log=_log)
         model = from_pretrained_local_first(
             BlipForImageTextRetrieval.from_pretrained, model_id, log=_log
         ).to(d).eval()
-        ve = VisualEncoder(backend="blip_itm", model_id=model_id, processor=processor, model=model, device=d)
-        _log(f"loaded BLIP ITM visual encoder: model_id={model_id}, device={d}")
+        ve = VisualEncoder(backend="blip_itc", model_id=model_id, processor=processor, model=model, device=d)
+        _log(f"loaded BLIP ITC visual encoder: model_id={model_id}, device={d}")
     else:
         processor = from_pretrained_local_first(AutoProcessor.from_pretrained, model_id, log=_log)
         model = from_pretrained_local_first(AutoModel.from_pretrained, model_id, log=_log).to(d).eval()
@@ -157,7 +157,22 @@ def _encode_clip_texts(texts: list[str], proc: Any, model: Any, device: str, bs:
     return torch.cat(outs, dim=0)
 
 
-def _encode_blip_texts_for_dedup(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+def _encode_blip_images(images: list[Image.Image], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    """BLIP ITC：vision_model + vision_proj，与文本无关，可跨关键词复用。"""
+    outs = []
+    for i in range(0, len(images), bs):
+        batch = images[i:i + bs]
+        inputs = proc(images=batch, return_tensors="pt").to(device)
+        with torch.no_grad():
+            vision_outputs = model.vision_model(pixel_values=inputs.pixel_values)
+            image_embeds = vision_outputs.last_hidden_state
+            image_feat = model.vision_proj(image_embeds[:, 0, :])
+        outs.append(_norm(image_feat))
+    return torch.cat(outs, dim=0)
+
+
+def _encode_blip_texts(texts: list[str], proc: Any, model: Any, device: str, bs: int) -> torch.Tensor:
+    """BLIP ITC：text_encoder + text_proj，与图像无关。"""
     outs = []
     for i in range(0, len(texts), bs):
         batch = texts[i:i + bs]
@@ -173,52 +188,20 @@ def _encode_blip_texts_for_dedup(texts: list[str], proc: Any, model: Any, device
     return torch.cat(outs, dim=0)
 
 
-def _extract_blip_itm_probs(outputs) -> torch.Tensor:
-    logits = getattr(outputs, "itm_score", None)
-    if logits is None:
-        logits = getattr(outputs, "logits", None)
-    if logits is None:
-        raise RuntimeError("BLIP 输出中缺少 itm_score/logits，无法计算打分。")
-    probs = torch.nn.functional.softmax(logits, dim=-1)
-    if probs.shape[-1] >= 2:
-        return probs[:, 1]
-    return probs.squeeze(-1)
+def _encode_images_for_encoder(ve: VisualEncoder, images: list[Image.Image], bs: int) -> torch.Tensor:
+    if ve.backend == "blip_itc":
+        return _encode_blip_images(images, ve.processor, ve.model, ve.device, bs)
+    return _encode_clip_images(images, ve.processor, ve.model, ve.device, bs)
 
 
-def _compute_blip_itm_sims(
-    images: list[Image.Image],
-    texts: list[str],
-    proc: Any,
-    model: Any,
-    device: str,
-    bs: int,
-) -> torch.Tensor:
-    m = len(texts)
-    n = len(images)
-    if m == 0 or n == 0:
-        return torch.empty((m, n), device=device)
-    sims = torch.zeros(m, n, device=device)
-    for i, text in enumerate(texts):
-        for start in range(0, n, bs):
-            batch = images[start:start + bs]
-            inputs = proc(
-                images=batch,
-                text=[text] * len(batch),
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-            ).to(device)
-            with torch.no_grad():
-                outputs = model(**inputs, use_itm_head=True)
-            probs = _extract_blip_itm_probs(outputs)
-            sims[i, start:start + len(batch)] = probs
-    return sims
+def _encode_texts_for_encoder(ve: VisualEncoder, texts: list[str], bs: int) -> torch.Tensor:
+    if ve.backend == "blip_itc":
+        return _encode_blip_texts(texts, ve.processor, ve.model, ve.device, bs)
+    return _encode_clip_texts(texts, ve.processor, ve.model, ve.device, bs)
 
 
 def _encode_texts_for_dedup(ve: VisualEncoder, texts: list[str], bs: int) -> torch.Tensor:
-    if ve.backend == "blip_itm":
-        return _encode_blip_texts_for_dedup(texts, ve.processor, ve.model, ve.device, bs)
-    return _encode_clip_texts(texts, ve.processor, ve.model, ve.device, bs)
+    return _encode_texts_for_encoder(ve, texts, bs)
 
 
 def _compute_kw_frame_sims(
@@ -226,13 +209,13 @@ def _compute_kw_frame_sims(
     images: list[Image.Image],
     texts: list[str],
     bs: int,
+    img_emb: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if not texts or not images:
         return torch.empty((len(texts), len(images)), device=ve.device)
-    if ve.backend == "blip_itm":
-        return _compute_blip_itm_sims(images, texts, ve.processor, ve.model, ve.device, bs)
-    kw_emb = _encode_clip_texts(texts, ve.processor, ve.model, ve.device, bs)
-    img_emb = _encode_clip_images(images, ve.processor, ve.model, ve.device, bs)
+    if img_emb is None:
+        img_emb = _encode_images_for_encoder(ve, images, bs)
+    kw_emb = _encode_texts_for_encoder(ve, texts, bs)
     return kw_emb @ img_emb.T
 
 
@@ -1048,11 +1031,13 @@ def _eval_one_sample(
     frame_sampling_time = time.perf_counter() - t0
 
     t1 = time.perf_counter()
+    img_emb = _encode_images_for_encoder(visual_encoder, imgs, args.ours_clip_batch_size)
     kw_frame_sims = _compute_kw_frame_sims(
         visual_encoder,
         imgs,
         kws_rep,
         args.ours_clip_batch_size,
+        img_emb=img_emb,
     )
     info_pack = _compute_keyword_information(kws_rep, kw_frame_sims, args)
     kws_use: list[str] = info_pack["kws_use"]
@@ -1117,6 +1102,7 @@ def _eval_one_sample(
             imgs,
             [question_options_text],
             args.ours_clip_batch_size,
+            img_emb=img_emb,
         )
         verbose_keywords.append(question_options_label)
         verbose_kw_frame_sims = torch.cat([kw_frame_sims, qo_sims], dim=0)
@@ -1213,8 +1199,8 @@ def evaluate_vqa(
 ) -> dict[str, Any]:
     use_official_videomme = is_official_videomme_dataset(args.dataset)
     visual_encoder = _load_visual_encoder(args.ours_clip_model_id, args.ours_clip_device)
-    if visual_encoder.backend == "blip_itm":
-        _log(f"ours 使用 BLIP ITM 打分: model_id={visual_encoder.model_id}")
+    if visual_encoder.backend == "blip_itc":
+        _log(f"ours 使用 BLIP ITC 打分: model_id={visual_encoder.model_id}")
 
     res = {
         "correct": 0,
