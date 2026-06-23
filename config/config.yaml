@@ -19,6 +19,9 @@ num_frames: 4
 frame_sampling_method: uniform
 use_preprocessed_clip_frames: false
 preprocessed_clip_fps: 1.0
+# 共享预处理帧根目录；实际读取 {preprocessed_clip_base}/{dataset}/clip_{preprocessed_clip_fps}
+preprocessed_clip_base: /userhome/cs3/duanty/dataset_preposcess
+# 非空时覆盖完整 clip 目录；为空时由 run.py / 评测脚本按 dataset+fps 自动拼接
 preprocessed_clip_dir: ""
 use_subtitles: false
 subtitles_dir: ""

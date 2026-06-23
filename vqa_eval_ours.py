@@ -47,6 +47,7 @@ from utils import (
     ours_eval_csv_row,
     pool_positions_at_fps,
     resolve_keyword_cache_root,
+    resolve_preprocessed_clip_dir,
     sanitize_cache_component,
     save_keyword_cache_entry,
     write_verbose_frame_selection_manifest,
@@ -1393,8 +1394,9 @@ def main():
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
-    default_pre = Path("/userhome/cs3/duanty/dataset_preposcess") / args.dataset / f"clip_{args.preprocessed_clip_fps:g}"
-    preprocessed_clip_dir = os.path.expanduser(args.preprocessed_clip_dir) if args.preprocessed_clip_dir.strip() else str(default_pre)
+    preprocessed_clip_dir = resolve_preprocessed_clip_dir(
+        args.dataset, args.preprocessed_clip_fps, args.preprocessed_clip_dir
+    )
     if args.use_preprocessed_clip_frames and args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
         raise ValueError("use_preprocessed_clip_frames 仅支持 ours。")
 

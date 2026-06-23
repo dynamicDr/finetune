@@ -20,6 +20,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from data_loaders import get_data_loader
+from utils import PREPROCESSED_CLIP_BASE_DIR
 from vqa_eval_ours import (
     _allocate_counts_by_weights,
     _encode_images,
@@ -49,7 +50,7 @@ CANDIDATE_POOL_FPS = 1.0
 PREPROCESSED_CLIP_FPS = 1.0
 VISUAL_ENCODER_MODEL = "openai/clip-vit-base-patch32"
 OURS_CLIP_BATCH_SIZE = 16
-PREPROCESSED_CLIP_DIR = Path("/userhome/cs3/duanty/dataset_preposcess") / DATASET / "clip_1"
+PREPROCESSED_CLIP_DIR = Path(PREPROCESSED_CLIP_BASE_DIR) / DATASET / "clip_1"
 OUT_DIR = Path(__file__).resolve().parent / "015_outputs"
 
 

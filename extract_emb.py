@@ -19,7 +19,7 @@ from data_loaders import (
     list_supported_datasets,
 )
 from data_loaders.base import VQASample
-from utils import normalize_sample_id
+from utils import PREPROCESSED_CLIP_BASE_DIR, normalize_sample_id, resolve_preprocessed_clip_dir
 from vl_common import load_model_and_processor
 
 
@@ -186,15 +186,10 @@ def main():
     args = parse_args()
     apply_dataset_cli_defaults(args)
     video_dir = os.path.expanduser(args.video_dir)
-    default_preprocessed_dir = (
-        Path("/userhome/cs3/duanty/dataset_preposcess")
-        / args.dataset
-        / f"clip_{args.preprocessed_clip_fps:g}"
-    )
-    preprocessed_clip_dir = (
-        Path(args.preprocessed_clip_dir).expanduser()
-        if args.preprocessed_clip_dir.strip()
-        else default_preprocessed_dir
+    preprocessed_clip_dir = Path(
+        resolve_preprocessed_clip_dir(
+            args.dataset, args.preprocessed_clip_fps, args.preprocessed_clip_dir
+        )
     )
     if args.use_preprocessed_clip_frames:
         print(
@@ -207,7 +202,7 @@ def main():
         output_dir = Path(args.output_dir).expanduser().resolve()
     elif args.use_preprocessed_clip_frames:
         output_dir = (
-            Path("/userhome/cs3/duanty/dataset_preposcess")
+            Path(PREPROCESSED_CLIP_BASE_DIR)
             / args.dataset
             / f"embeddings_{args.preprocessed_clip_fps:g}fps"
         ).resolve()

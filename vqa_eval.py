@@ -26,6 +26,7 @@ from utils import (
     collect_unique_subtitles_for_sample as _collect_subtitles_for_sample,
     compute_accuracy_from_results as _compute_accuracy_from_results,
     compute_score_counts_for_csv as _compute_score_counts_for_csv,
+    resolve_preprocessed_clip_dir,
 )
 from lmms_eval_bridge import generate_response, load_model_and_processor, release_cuda_memory, resolve_lmms_model_name
 from lmms_eval_official import (
@@ -403,16 +404,10 @@ def main():
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
-    default_preprocessed_dir = (
-        Path("/userhome/cs3/duanty/dataset_preposcess")
-        / args.dataset
-        / f"clip_{args.preprocessed_clip_fps:g}"
+    default_preprocessed_dir = resolve_preprocessed_clip_dir(
+        args.dataset, args.preprocessed_clip_fps, args.preprocessed_clip_dir
     )
-    preprocessed_clip_dir = (
-        os.path.expanduser(args.preprocessed_clip_dir)
-        if args.preprocessed_clip_dir.strip()
-        else str(default_preprocessed_dir)
-    )
+    preprocessed_clip_dir = default_preprocessed_dir
     if args.use_preprocessed_clip_frames:
         if args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
             raise ValueError(

@@ -8,6 +8,8 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.utils import get_original_cwd
 from omegaconf import DictConfig, OmegaConf
 
+from utils import PREPROCESSED_CLIP_BASE_DIR, resolve_preprocessed_clip_dir
+
 
 log = logging.getLogger(__name__)
 
@@ -147,14 +149,42 @@ def main(cfg: DictConfig) -> None:
                 dataset_shared.append("--no_dataset_config")
         if script_key in ("vqa_eval.py", "vqa_eval_ours.py", "vqa_eval_zzy.py"):
             use_preprocessed_clip_frames = OmegaConf.select(cfg, "use_preprocessed_clip_frames", default=False)
+            preprocessed_clip_fps = OmegaConf.select(cfg, "preprocessed_clip_fps", default=1.0)
+            clip_fps = (
+                float(preprocessed_clip_fps)
+                if preprocessed_clip_fps is not None
+                and str(preprocessed_clip_fps).strip() not in ("", "null", "None")
+                else 1.0
+            )
             if bool(use_preprocessed_clip_frames):
                 dataset_shared.append("--use_preprocessed_clip_frames")
-            preprocessed_clip_fps = OmegaConf.select(cfg, "preprocessed_clip_fps", default=None)
-            if preprocessed_clip_fps is not None and str(preprocessed_clip_fps).strip() not in ("", "null", "None"):
-                dataset_shared += ["--preprocessed_clip_fps", str(float(preprocessed_clip_fps))]
+                dataset_shared += ["--preprocessed_clip_fps", str(clip_fps)]
+                clip_base = OmegaConf.select(
+                    cfg, "preprocessed_clip_base", default=PREPROCESSED_CLIP_BASE_DIR
+                )
+                clip_dir_override = OmegaConf.select(cfg, "preprocessed_clip_dir", default="")
+                preprocessed_clip_dir = resolve_preprocessed_clip_dir(
+                    str(cfg.dataset),
+                    clip_fps,
+                    str(clip_dir_override or ""),
+                    base_dir=str(clip_base or PREPROCESSED_CLIP_BASE_DIR),
+                )
+                dataset_shared += ["--preprocessed_clip_dir", preprocessed_clip_dir]
+            elif (
+                preprocessed_clip_fps is not None
+                and str(preprocessed_clip_fps).strip() not in ("", "null", "None")
+            ):
+                dataset_shared += ["--preprocessed_clip_fps", str(clip_fps)]
             preprocessed_clip_dir = OmegaConf.select(cfg, "preprocessed_clip_dir", default=None)
-            if preprocessed_clip_dir is not None and str(preprocessed_clip_dir).strip() not in ("", "null", "None"):
-                dataset_shared += ["--preprocessed_clip_dir", str(preprocessed_clip_dir)]
+            if (
+                not bool(use_preprocessed_clip_frames)
+                and preprocessed_clip_dir is not None
+                and str(preprocessed_clip_dir).strip() not in ("", "null", "None")
+            ):
+                dataset_shared += [
+                    "--preprocessed_clip_dir",
+                    str(Path(preprocessed_clip_dir).expanduser().resolve()),
+                ]
             use_subtitles = OmegaConf.select(cfg, "use_subtitles", default=False)
             if bool(use_subtitles):
                 dataset_shared.append("--use_subtitles")

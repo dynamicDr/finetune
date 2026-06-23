@@ -19,7 +19,7 @@ from transformers import AutoModel, AutoProcessor
 from data_loaders import should_apply_vl_pixel_limits, get_data_loader, list_supported_datasets
 from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
-from utils import build_user_text, build_user_text_with_subtitles, from_pretrained_local_first
+from utils import build_user_text, build_user_text_with_subtitles, from_pretrained_local_first, resolve_preprocessed_clip_dir
 from vl_common import load_model_and_processor, prepare_vlm_inputs
 
 MODE_MAX_NEW_TOKENS = {"thinking": 4086, "instruct": 128}
@@ -463,8 +463,9 @@ def main() -> None:
     eval_csv_dir = Path(__file__).resolve().parent / "eval_csv"
     eval_csv_dir.mkdir(parents=True, exist_ok=True)
     log_file = str(eval_csv_dir / Path(args.log_file).name)
-    default_pre = Path("/userhome/cs3/duanty/dataset_preposcess") / args.dataset / f"clip_{args.preprocessed_clip_fps:g}"
-    preprocessed_clip_dir = os.path.expanduser(args.preprocessed_clip_dir) if args.preprocessed_clip_dir.strip() else str(default_pre)
+    preprocessed_clip_dir = resolve_preprocessed_clip_dir(
+        args.dataset, args.preprocessed_clip_fps, args.preprocessed_clip_dir
+    )
     if args.use_preprocessed_clip_frames and args.frame_sampling_method not in PREPROCESSED_CLIP_COMPATIBLE_METHODS:
         raise ValueError("use_preprocessed_clip_frames 仅支持 zzy。")
 

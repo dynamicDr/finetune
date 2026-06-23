@@ -756,6 +756,22 @@ def normalize_sample_id(sample_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", sample_id.strip()).strip("_")
 
 
+PREPROCESSED_CLIP_BASE_DIR = "/userhome/cs3/duanty/dataset_preposcess"
+
+
+def resolve_preprocessed_clip_dir(
+    dataset: str,
+    fps: float,
+    override: str = "",
+    *,
+    base_dir: str = PREPROCESSED_CLIP_BASE_DIR,
+) -> str:
+    """返回预处理 clip 帧目录的绝对路径（供多用户共享读取）。"""
+    if override.strip():
+        return str(Path(override).expanduser().resolve())
+    return str(Path(base_dir).resolve() / dataset.strip() / f"clip_{fps:g}")
+
+
 # ==================== 候选帧读取与采样 ====================
 def load_preprocessed_candidate_frames(
     preprocessed_clip_dir: str,
