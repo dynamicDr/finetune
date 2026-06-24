@@ -384,6 +384,19 @@ python run.py --multirun \
     model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
     use_preprocessed_clip_frames=true \
     task_filter=mcq \
-    frame_sampling_method=uniform \
+    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip \
+    seed=42 \
+    slurm=hgpu_batch
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+    use_preprocessed_clip_frames=true \
+    task_filter=mcq \
+    frame_sampling_method=bolt-siglip2,clip-new,blip-new,siglip2-new \
     seed=42 \
     slurm=hgpu_batch
