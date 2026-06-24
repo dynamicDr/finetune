@@ -235,7 +235,7 @@ python run.py --multirun \
     slurm=hgpu_batch
 
 
-【zzy】补跑aks和blip_new: 18 个 job
+【zzy再跑】补跑aks和blip_new: 18 个 job
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval.py \
@@ -249,7 +249,7 @@ python run.py --multirun \
     seed=42 \
     slurm=hgpu_batch
 
-【dty待跑】our在OV上
+【dty在跑】our在OV上 12任务
 python run.py --multirun \
     hydra/launcher=submitit_slurm \
     script=vqa_eval_ours.py \
@@ -273,4 +273,130 @@ python run.py --multirun \
 
 
 ===========其他数据集==========
+=====测试
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=mlvu \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=default_4090
 
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=egoschema \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=default_4090
+
+
+=======提取mlvu,egoschema最佳关键词缓存
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=1,2,3,4 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+
+=======（需要确定最优关键词种子后，）正式 16实验
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=openai/clip-vit-base-patch32,Salesforce/blip-itm-base-coco \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+
+=========baseline==============
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+    use_preprocessed_clip_frames=true \
+    task_filter=mcq \
+    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip,bolt-siglip2,clip-new,blip-new,siglip2-new \
+    seed=42 \
+    slurm=hgpu_batch
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+    use_preprocessed_clip_frames=true \
+    task_filter=mcq \
+    frame_sampling_method=uniform,aks-blip,aks-clip,bolt-clip \
+    seed=42 \
+    slurm=hgpu_batch
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct,llava_onevision_qwen2_7b_ov_hf \
+    use_preprocessed_clip_frames=true \
+    task_filter=mcq \
+    frame_sampling_method=bolt-siglip2,clip-new,blip-new,siglip2-new \
+    seed=42 \
+    slurm=hgpu_batch
