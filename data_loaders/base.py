@@ -2,12 +2,67 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import hashlib
+import os
 import random
 import sys
 from pathlib import Path
 from typing import Any
 
 from lmms_eval_bridge import split_indices
+
+from .shared_paths import SHARED_HF_DATASETS_CACHE
+
+_HF_SHARED_CACHE_CONFIGURED = False
+
+
+def _path_is_writable(path: Path) -> bool:
+    if not path.is_dir():
+        return True
+    probe = path / f".write_probe_{os.getuid()}"
+    try:
+        probe.touch()
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _redirect_hf_dataset_locks(shared_cache_root: str, lock_root: Path) -> None:
+    """将 HuggingFace datasets 的 FileLock 重定向到当前用户可写目录。"""
+    lock_root.mkdir(parents=True, exist_ok=True)
+    shared_prefix = os.path.abspath(shared_cache_root)
+
+    from datasets.utils import _filelock
+
+    original_file_lock = _filelock.FileLock
+
+    class _SharedCacheFileLock(original_file_lock):
+        def __init__(self, lock_file, *args, **kwargs):
+            lock_path = os.path.abspath(str(lock_file))
+            if lock_path.startswith(shared_prefix + os.sep) or lock_path == shared_prefix:
+                digest = hashlib.sha1(lock_path.encode()).hexdigest()
+                lock_path = str(lock_root / f"{digest}.lock")
+            super().__init__(lock_path, *args, **kwargs)
+
+    _filelock.FileLock = _SharedCacheFileLock
+
+
+def configure_shared_hf_datasets_cache() -> None:
+    """优先读取 duanty 共享 HF datasets 缓存；锁文件落在当前用户 home。"""
+    global _HF_SHARED_CACHE_CONFIGURED
+    if _HF_SHARED_CACHE_CONFIGURED:
+        return
+    _HF_SHARED_CACHE_CONFIGURED = True
+
+    shared_cache = SHARED_HF_DATASETS_CACHE.expanduser().resolve()
+    if not shared_cache.is_dir():
+        return
+
+    os.environ.setdefault("HF_DATASETS_CACHE", str(shared_cache))
+    if not _path_is_writable(shared_cache):
+        lock_root = Path.home() / ".cache" / "huggingface" / "dataset_locks"
+        _redirect_hf_dataset_locks(str(shared_cache), lock_root)
 
 
 def load_dataset(*args, **kwargs):
@@ -17,6 +72,8 @@ def load_dataset(*args, **kwargs):
     Avoid importing any local `datasets/` folder in this repo by temporarily
     removing repo root from `sys.path` before importing HuggingFace `datasets`.
     """
+    configure_shared_hf_datasets_cache()
+
     repo_root = str(Path(__file__).resolve().parents[1])
     removed = False
     if repo_root in sys.path:

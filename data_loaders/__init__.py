@@ -7,6 +7,7 @@ from .base import BaseDataLoader, VQASample
 from .egoschema import EgoSchemaLoader
 from .mlvu import MLVULoader
 from .nextqa import NextQALoader
+from .shared_paths import SHARED_DATASET_ROOT
 from .videomme import VideoMMELoader
 from .vsibench import VSIBenchLoader
 
@@ -19,13 +20,13 @@ LOADER_REGISTRY: dict[str, type[BaseDataLoader]] = {
     "vsibench": VSIBenchLoader,
 }
 
-# 各数据集默认本地根目录；评测脚本只需传 dataset=xxx
+# 各数据集默认根目录（共享 duanty 数据，可用 FINETUNE_SHARED_DATASET_ROOT 覆盖）
 DEFAULT_DATASET_ROOTS: dict[str, str] = {
-    "egoschema": "~/dataset/egoschema",
-    "mlvu": "~/dataset/mlvu_test",
-    "nextqa": "~/dataset/nextqa",
-    "videomme": "~/dataset/Video-MME",
-    "vsibench": "~/dataset/vsi_bench",
+    "egoschema": str(SHARED_DATASET_ROOT / "egoschema"),
+    "mlvu": str(SHARED_DATASET_ROOT / "mlvu_test"),
+    "nextqa": str(SHARED_DATASET_ROOT / "nextqa"),
+    "videomme": str(SHARED_DATASET_ROOT / "Video-MME"),
+    "vsibench": str(SHARED_DATASET_ROOT / "vsi_bench"),
 }
 
 
