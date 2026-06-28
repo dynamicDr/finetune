@@ -841,7 +841,7 @@ def _compute_keyword_information(
     kw_frame_sims: torch.Tensor,
     args: argparse.Namespace,
 ) -> dict[str, Any]:
-    """合并后的关键词全部保留；用局部证据度作为关键词信息量。"""
+    """合并后的关键词全部保留；用局部证据度 φ 经幂律 w_i=φ_i^λ/Σφ_j^λ 得到关键词权重。"""
     m = len(kws_rep)
     n = int(kw_frame_sims.shape[1]) if kw_frame_sims.ndim == 2 else 0
     if m == 0 or n == 0:
@@ -860,13 +860,15 @@ def _compute_keyword_information(
 
     kws_use = list(kws_rep)
     kw_info = local_evidence
-    s = float(kw_info.sum().item())
-    info_weights = (kw_info / s) if s > 1e-12 else torch.ones_like(kw_info) / float(max(1, kw_info.numel()))
-    uniform_weights = torch.ones_like(info_weights) / float(max(1, info_weights.numel()))
-    weight_strength = max(0.0, float(args.keyword_weight_strength))
-    kw_weights = ((1.0 - weight_strength) * uniform_weights + weight_strength * info_weights).clamp(min=0.0)
-    ws = float(kw_weights.sum().item())
-    kw_weights = (kw_weights / ws) if ws > 1e-12 else uniform_weights
+    lam = max(0.0, float(args.keyword_weight_strength))
+    phi = kw_info.clamp(min=0.0)
+    powered = phi.pow(lam)
+    ps = float(powered.sum().item())
+    kw_weights = (
+        powered / ps
+        if ps > 1e-12
+        else torch.ones_like(phi) / float(max(1, phi.numel()))
+    )
 
     rows = []
     for i, kw in enumerate(kws_rep):
@@ -1448,7 +1450,7 @@ def parse_args():
         "--keyword_weight_strength",
         type=float,
         default=1.0,
-        help="关键词权重强度：0=均分，1=纯 info 权重；>1 时进一步压低弱词（clamp 后归一化）",
+        help="关键词权重幂律指数 λ：w_i=φ_i^λ/Σφ_j^λ，φ 为局部证据度；λ=0 均分，λ=1 按 info 比例，λ>1 强化高信息量词",
     )
     p.add_argument(
         "--use_keyword_cache",

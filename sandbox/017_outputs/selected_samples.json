@@ -1,0 +1,62 @@
+[
+  {
+    "sample_id": "219-1",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/fSDq8CPXHQM.mp4",
+    "question": "Where do the events in this video take place?"
+  },
+  {
+    "sample_id": "039-1",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/XOJKiOw8Xqo.mp4",
+    "question": "Which time is displayed on the clock in the video?"
+  },
+  {
+    "sample_id": "009-2",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/sUDY-SMREtA.mp4",
+    "question": "Based on the video, which day does the festival fall on the lunar calendar?"
+  },
+  {
+    "sample_id": "254-1",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/lk2ics_YImU.mp4",
+    "question": "What kind of transportation does the boy in the video take to and from school?"
+  },
+  {
+    "sample_id": "094-3",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/M69Sn3OERZo.mp4",
+    "question": "What action does the monkey do after being rescued?"
+  },
+  {
+    "sample_id": "084-2",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/aqTIB_q40bo.mp4",
+    "question": "Which summarizes the main content of this video?"
+  },
+  {
+    "sample_id": "077-1",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/540LkURTR7g.mp4",
+    "question": "What is the color of the tall drinking glass initially held by the woman?"
+  },
+  {
+    "sample_id": "048-2",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/M7WOXFvwbSY.mp4",
+    "question": "What significant event is the number at the bottom of the video referring to?"
+  },
+  {
+    "sample_id": "252-2",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/RP1AL2DU6vQ.mp4",
+    "question": "How many people in total can be seen in the video sitting at the table eating breakfast?"
+  },
+  {
+    "sample_id": "035-3",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/Gh_GtYtQoVI.mp4",
+    "question": "From which aspect does the video describe the role of finance?"
+  }
+]

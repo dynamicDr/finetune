@@ -480,3 +480,26 @@ python run.py --multirun \
     ours_clip_model_id=openai/clip-vit-base-patch32,Salesforce/blip-itm-base-coco \
     seed=42 \
     slurm=hgpu_batch
+
+
+
+    =======================消融实验
+    python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct \
+    task_filter=long,medium,short \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=0,0.5,1,2,4,8 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=hgpu_batch
