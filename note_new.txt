@@ -327,14 +327,14 @@ python run.py --multirun \
     frame_sampling_method=ours \
     use_preprocessed_clip_frames=true \
     use_keyword_cache=true \
-    keyword_cache_number=1,2,3,4 \
+    keyword_cache_number=1,2 \
     max_keywords=10 \
     keyword_prompt_version=0 \
     keyword_extractor_model=poe-gpt-5.2 \
     keyword_weight_strength=1.0 \
     ours_clip_model_id=openai/clip-vit-base-patch32 \
     seed=42 \
-    slurm=hgpu_batch
+    slurm=default_4090
 
 
 
@@ -398,5 +398,85 @@ python run.py --multirun \
     use_preprocessed_clip_frames=true \
     task_filter=mcq \
     frame_sampling_method=bolt-siglip2,clip-new,blip-new,siglip2-new \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+===============补跑缺失=========
+
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval.py \
+    dataset=videomme \
+    num_samples=all \
+    num_frames=16 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    use_preprocessed_clip_frames=true \
+    task_filter=short \
+    frame_sampling_method=siglip2-new \
+    seed=42 \
+    slurm=default_4090
+
+==========尝试不同的关键词提取器
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=mlvu,egoschema \
+    num_samples=all \
+    num_frames=16 \
+    model=qwen3_8b_instruct \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=5,6 \
+    max_keywords=10 \
+    keyword_prompt_version=2,3 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1.0 \
+    ours_clip_model_id=openai/clip-vit-base-patch32 \
+    seed=42 \
+    slurm=hgpu_batch
+
+=====尝试blip,clip
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=qwen3_8b_instruct \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0,2,3 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1 \
+    ours_clip_model_id=openai/clip-vit-base-patch32,Salesforce/blip-itm-base-coco \
+    seed=42 \
+    slurm=hgpu_batch
+
+
+====oursbasliene
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+    script=vqa_eval_ours.py \
+    dataset=egoschema \
+    num_samples=all \
+    num_frames=16,32 \
+    model=llava_onevision_qwen2_7b_ov_hf \
+    task_filter=mcq \
+    frame_sampling_method=ours \
+    use_preprocessed_clip_frames=true \
+    use_keyword_cache=true \
+    keyword_cache_number=0 \
+    max_keywords=10 \
+    keyword_prompt_version=0 \
+    keyword_extractor_model=poe-gpt-5.2 \
+    keyword_weight_strength=1 \
+    ours_clip_model_id=openai/clip-vit-base-patch32,Salesforce/blip-itm-base-coco \
     seed=42 \
     slurm=hgpu_batch

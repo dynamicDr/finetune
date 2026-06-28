@@ -1,0 +1,15 @@
+/userhome/cs3/duanty/miniconda3/lib/python3.13/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.1) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+/userhome/cs3/duanty/miniconda3/envs/finetune/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+samples:   0%|          | 0/10 [00:00<?, ?it/s]
+874-1@16f:   0%|          | 0/8 [00:00<?, ?it/s][A
+                                                [Asamples:   0%|          | 0/10 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 489, in <module>
+    main()
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 443, in main
+    frame_ids = select_frame_ids_for_method(
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 326, in select_frame_ids_for_method
+    return _uniform_frame_ids(**kwargs)
+TypeError: _uniform_frame_ids() got an unexpected keyword argument 'question'

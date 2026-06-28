@@ -19,6 +19,7 @@ from data_loaders import (
     should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
+    resolve_dataset_root,
 )
 from data_loaders.base import VQASample, sample_matches_task_filter
 from model_response_mode import load_model_response_mode_config, parse_response_by_mode, resolve_model_mode
@@ -52,12 +53,17 @@ from utils import (
     save_keyword_cache_entry,
     write_verbose_frame_selection_manifest,
 )
-from lmms_eval_bridge import load_keyword_model_and_processor, load_model_and_processor, prepare_vlm_inputs, resolve_lmms_model_name
+from lmms_eval_bridge import generate_response, load_keyword_model_and_processor, load_model_and_processor, resolve_lmms_model_name
 from lmms_eval_official import (
+    aggregate_lvb,
     aggregate_videomme,
+    build_lvb_prompt,
     build_videomme_prompt,
+    is_official_lvb_dataset,
     is_official_videomme_dataset,
+    resolve_lvb_max_new_tokens,
     resolve_videomme_max_new_tokens,
+    score_lvb,
     score_videomme,
 )
 
@@ -315,7 +321,69 @@ def _build_keyword_extraction_prompt(
             f"Options:\n{options_text}\n"
             "Output:"
         )
-    raise ValueError(f"keyword_prompt_version 仅支持 0 或 1，当前: {prompt_version}")
+    if int(prompt_version) == 2:
+        return (
+            "You extract visual phrases for CLIP-based frame retrieval in video multiple-choice QA.\n"
+            f"Output ONE JSON array with  no more than {target_keywords} elements combining two parts:\n"
+            "  (A) phrases from the QUESTION only\n"
+            "  (B) exactly ONE phrase per OPTION (when the option has visual content)\n"
+            "## Part A — Question phrases\n"
+            "From the QUESTION only (ignore options for this step), extract some short visual phrases:\n"
+            "- Subject, scene, and core action/object/event named in the question\n"
+            "- Concrete, single-frame visual cues\n\n"
+            "Do NOT copy option text into Part A.\n"
+            "## Part B — One phrase per option\n"
+            "For EACH option, output exactly ONE phrase that captures its distinguishing visual content:\n"
+            "- One option → one phrase. Never split one option into multiple phrases or sub-stages.\n"
+            "- Prefer the core visible object or action in that option; tie to the same subject/scene from the question when helpful.\n"
+            "- If an option has no stable visual content (for example bare numbers, yes/no), skip that option in Part B:\n\n"
+            "## Phrase style\n"
+            "- Single-frame, visual cue.\n"
+            "- Use phrases of more than two words whenever possible\n"
+            "- You can add extra synonyms for question(part A),  but NOT for the same option(part B).\n"
+            "## Final output\n"
+            "- Merge Part A then Part B into a single JSON array of strings\n"
+            "- No markdown, no labels, no explanation\n"
+            f"- Output no more than {target_keywords} key words.\n"
+            "## Example 1 — what/which (object in question)\n"
+            "Q: What did the woman take out of the refrigerator?\n"
+            "Options:\n"
+            "A. dragon fruit\n"
+            "B. eggplant\n"
+            "C. water\n"
+            "D. beer\n"
+            "Part A: [\"a woman in front of a refrigerator\", \"an open refrigerator door\", \"a woman holding food\"]\n"
+            "Part B: [\"dragon fruit\", \"eggplant\", \"water bottle\", \"beer bottle\"]\n"
+            "Output:\n"
+            "[\"a woman in front of a refrigerator\", \"an open refrigerator door\", \"a woman holding food\", \"dragon fruit\", \"eggplant\", \"water bottle\", \"beer bottle\"]\n"
+            "## Example 2 — counting (numeric options skipped in Part B)\n"
+            "Q: Throughout this video, what is the total count of occurrences for the scene featuring the 'pole vault' action?\n"
+            "Options:\n"
+            "A. 1\n"
+            "B. 2\n"
+            "C. 3\n\n"
+            "Part A: [\"pole vault athlete over bar\", \"pole vault runway\", \"person clearing a crossbar\"]\n"
+            "Part B: (all options are numbers — skip)\n"
+            "Output:\n"
+            "[\"pole vault athlete over bar\", \"pole vault runway\", \"person clearing a crossbar\"]\n"
+            "---\n"
+            "Now give the JSON for this one:\n"
+            f"Q: {question}\n"
+            f"Options:\n{options_text}\n"
+            "Output:"
+        )
+    if int(prompt_version) == 3:
+        return (
+            "Extract visually observable elements from the question and options for CLIP frame retrieval.\n\n"
+            "Rules:\n"
+            "- Only things visible in a single video frame: objects, people, actions, scenes, on-screen text.\n"
+            "- Short noun phrases; skip abstract or non-visual content (reasons, numbers-only options, yes/no).\n"
+            f"- Output at most {target_keywords} items.\n\n"
+            "Output STRICTLY a JSON array of strings. No markdown, no explanation.\n\n"
+            f"Q: {question}\n"
+            f"Options:\n{options_text}"
+        )
+    raise ValueError(f"keyword_prompt_version 仅支持 0、1、2 或 3，当前: {prompt_version}")
 
 
 def _dedup_keyword_phrases(kws_raw: list[str]) -> list[str]:
@@ -821,37 +889,38 @@ def _compute_keyword_information(
 
 
 # ==================== VLM 单轮推理与打分 ====================
-def _option_probs(proc: Any, logits: torch.Tensor) -> dict[str, float]:
-    p = torch.softmax(logits, dim=-1)
-    out = {}
-    for o in ("A", "B", "C", "D"):
-        # 选项首 token 可能有前导空格或大小写差异，统一做聚合。
-        ids = set()
-        for t in {o, o.lower(), f" {o}", f" {o.lower()}"}:
-            toks = proc.tokenizer(t, add_special_tokens=False)["input_ids"]
-            if toks:
-                ids.add(int(toks[0]))
-        out[o] = float(sum(float(p[i].item()) for i in ids)) if ids else 0.0
-    return out
-
-
-def _run_vlm_once(model: Any, proc: Any, frames: list[Image.Image], prompt: str, max_new_tokens: int, model_mode: str) -> dict[str, Any]:
-    inputs, _ = prepare_vlm_inputs(proc, frames, prompt, model=model)
-    inputs = inputs.to(model.device)
-    t0 = time.perf_counter()
-    with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, num_beams=1, return_dict_in_generate=True, output_scores=True)
-    infer_t = time.perf_counter() - t0
-    seq = out.sequences
-    trimmed = [o[len(i):] for i, o in zip(inputs.input_ids, seq)]
-    resp = proc.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0].strip()
-    _, _, pred = parse_response_by_mode(response=resp, has_options=True, model_mode=model_mode)
-    logits = out.scores[-1][0] if out.scores else torch.zeros((model.config.vocab_size,), device=model.device)
-    probs = _option_probs(proc, logits)
-    pred_u = str(pred).strip().upper()
-    if pred_u not in {"A", "B", "C", "D"}:
-        pred_u = max(probs.items(), key=lambda x: x[1])[0]
-    return {"pred_answer": pred_u, "response": resp, "option_probs": probs, "entropy": 0.0, "inference_time": infer_t, "hit_max_tokens": int(len(out.scores) >= max_new_tokens)}
+def _run_vlm_once(
+    model: Any,
+    proc: Any,
+    frames: list[Image.Image],
+    prompt: str,
+    max_new_tokens: int,
+    model_mode: str,
+    *,
+    has_options: bool,
+) -> dict[str, Any]:
+    """与 vqa_eval.py 对齐：generate_response + parse_response_by_mode，不做 A-D logit fallback。"""
+    response, inference_time, _generated_token_count, hit_max_tokens = generate_response(
+        model,
+        proc,
+        frames,
+        prompt,
+        max_new_tokens=max_new_tokens,
+    )
+    _, _, pred_answer = parse_response_by_mode(
+        response=response,
+        has_options=has_options,
+        model_mode=model_mode,
+    )
+    pred_u = str(pred_answer).strip().upper() if pred_answer is not None else ""
+    return {
+        "pred_answer": pred_u,
+        "response": response,
+        "option_probs": {},
+        "entropy": 0.0,
+        "inference_time": float(inference_time),
+        "hit_max_tokens": int(hit_max_tokens),
+    }
 
 
 def _select_keyword_frames(
@@ -1091,7 +1160,15 @@ def _eval_one_sample(
         else ([], ["" for _ in sampled_frame_ids])
     )
     prompt_use = build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt) if use_subtitles else prompt
-    one_shot_out = _run_vlm_once(model, proc, one_shot_frames, prompt_use, max_new_tokens, model_mode)
+    one_shot_out = _run_vlm_once(
+        model,
+        proc,
+        one_shot_frames,
+        prompt_use,
+        max_new_tokens,
+        model_mode,
+        has_options=sample.options is not None,
+    )
     verbose_keywords = list(kws_use)
     verbose_keyword_rows = list(info_pack["rows"])
     verbose_kw_frame_sims = kw_frame_sims
@@ -1173,6 +1250,7 @@ def _build_eval_prompt(
     *,
     use_subtitles: bool,
     num_frames: int,
+    subtitles_dir: str | None = None,
 ) -> str:
     raw_doc = sample.metadata.get("raw_doc")
     if is_official_videomme_dataset(args.dataset) and isinstance(raw_doc, dict):
@@ -1181,6 +1259,16 @@ def _build_eval_prompt(
             lmms_model_name,
             use_subtitles=use_subtitles,
             num_frames=num_frames,
+        )
+    if is_official_lvb_dataset(args.dataset) and isinstance(raw_doc, dict):
+        return build_lvb_prompt(
+            raw_doc,
+            lmms_model_name,
+            use_subtitles=use_subtitles,
+            num_frames=num_frames,
+            video_dir=resolve_dataset_root(args.dataset),
+            subtitles_dir=subtitles_dir,
+            subtitle_path=str(sample.metadata.get("subtitle_path", "") or "") or None,
         )
     return build_user_text(sample.question, sample.options)
 
@@ -1199,6 +1287,7 @@ def evaluate_vqa(
     lmms_model_name: str = "",
 ) -> dict[str, Any]:
     use_official_videomme = is_official_videomme_dataset(args.dataset)
+    use_official_lvb = is_official_lvb_dataset(args.dataset)
     visual_encoder = _load_visual_encoder(args.ours_clip_model_id, args.ours_clip_device)
     if visual_encoder.backend == "blip_itc":
         _log(f"ours 使用 BLIP ITC 打分: model_id={visual_encoder.model_id}")
@@ -1214,6 +1303,7 @@ def evaluate_vqa(
         "selected_frame_counts": [],
         "over_max_tokens_count": 0,
         "official_videomme_scores": [],
+        "official_lvb_scores": [],
     }
     pbar = tqdm(samples, desc="评估进度(ours semantic refinement)")
     for s in pbar:
@@ -1225,6 +1315,7 @@ def evaluate_vqa(
             lmms_model_name,
             use_subtitles=use_subtitles,
             num_frames=budget,
+            subtitles_dir=subtitles_dir,
         )
         out = _eval_one_sample(
             model,
@@ -1237,7 +1328,7 @@ def evaluate_vqa(
             model_mode,
             budget,
             preprocessed_clip_dir,
-            use_subtitles=use_subtitles and not use_official_videomme,
+            use_subtitles=use_subtitles and not use_official_videomme and not use_official_lvb,
             subtitles_dir=subtitles_dir,
         )
         pred = out["pred_answer"]
@@ -1249,6 +1340,13 @@ def evaluate_vqa(
                 res["official_videomme_scores"].append(score_dict)
                 pred = score_dict.get("pred_answer", "")
                 is_correct = float(score_dict.get("score", 0.0)) == 1.0
+        elif use_official_lvb:
+            raw_doc = s.metadata.get("raw_doc")
+            if isinstance(raw_doc, dict):
+                score_dict = score_lvb(raw_doc, str(out["response"]))
+                res["official_lvb_scores"].append(score_dict)
+                pred = score_dict.get("parsed_pred", "")
+                is_correct = str(score_dict.get("answer", "")).strip().upper() == str(pred).strip().upper()
         res["inference_times"].append(float(out["inference_time"]))
         res["frame_sampling_times"].append(float(out["frame_sampling_time"]))
         res["embedding_build_times"].append(float(out["embedding_build_time"]))
@@ -1256,7 +1354,7 @@ def evaluate_vqa(
         res["over_max_tokens_count"] += int(out["over_limit_count"])
         if s.options is not None:
             res["total"] += 1
-            if not use_official_videomme:
+            if not use_official_videomme and not use_official_lvb:
                 is_correct = str(s.answer).strip().upper() == str(pred).strip().upper()
             if is_correct:
                 res["correct"] += 1
@@ -1270,6 +1368,8 @@ def evaluate_vqa(
         pbar.set_postfix(Acc=f"{acc:.2f}%", AvgTime=f"{t:.2f}s")
     if use_official_videomme and res["official_videomme_scores"]:
         res["official_videomme_overall"] = aggregate_videomme(res["official_videomme_scores"])
+    if use_official_lvb and res["official_lvb_scores"]:
+        res["official_lvb_overall"] = aggregate_lvb(res["official_lvb_scores"])
     res["visual_encoder_model"] = visual_encoder.model_id
     res["visual_encoder_backend"] = visual_encoder.backend
     return res
@@ -1292,7 +1392,7 @@ def parse_args():
         "--task_filter",
         type=str,
         default="all",
-        help="all/mcq/numeric/generation，或数据集特定桶（如 videomme: short/medium/long；mlvu: plotQA/anomaly_reco/...）",
+        help="all/mcq/numeric/generation，或数据集特定桶（如 videomme: short/medium/long；lvb: 15/60/600/3600 或 TOS/T2A/...；mlvu: plotQA/anomaly_reco/...）",
     )
     p.add_argument("--max_new_tokens", type=int, default=2048)
     p.add_argument("--ours_clip_model_id", type=str, default="openai/clip-vit-base-patch32")
@@ -1317,7 +1417,13 @@ def parse_args():
         default=5,
         help="最大关键词数：不超过则全保留；超过则删除与其它词 CLIP 相似度最高的 (n-max_keywords) 个",
     )
-    p.add_argument("--keyword_prompt_version", type=int, choices=[0, 1], default=0, help="关键词抽取prompt版本：0=旧版，1=CLIP帧检索导向新版")
+    p.add_argument(
+        "--keyword_prompt_version",
+        type=int,
+        choices=[0, 1, 2, 3],
+        default=0,
+        help="关键词抽取 prompt 版本：0=旧版，1=CLIP 帧检索导向，2=题干+每选项一词，3=极简视觉元素提取",
+    )
     p.add_argument(
         "--keyword_extractor_model",
         type=str,
@@ -1438,6 +1544,13 @@ def main():
             f"max_new_tokens={effective_max_new_tokens}, lmms_model={lmms_model_name}",
             flush=True,
         )
+    elif is_official_lvb_dataset(args.dataset):
+        effective_max_new_tokens = resolve_lvb_max_new_tokens()
+        print(
+            "[vqa_eval_ours] LongVideoBench validation 使用官方 lmms-eval prompt / 打分；"
+            f"max_new_tokens={effective_max_new_tokens}, lmms_model={lmms_model_name}",
+            flush=True,
+        )
 
     budget = max(1, int(args.num_frames))
     if args.use_keyword_cache:
@@ -1529,6 +1642,12 @@ def main():
         print(
             f"官方 Video-MME Overall: {results['official_videomme_overall']:.1f}% "
             f"(n={len(results['official_videomme_scores'])})",
+            flush=True,
+        )
+    if "official_lvb_overall" in results:
+        print(
+            f"官方 LongVideoBench Overall: {results['official_lvb_overall']:.1f}% "
+            f"(n={len(results['official_lvb_scores'])})",
             flush=True,
         )
 

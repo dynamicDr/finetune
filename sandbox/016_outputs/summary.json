@@ -1,0 +1,22 @@
+{
+  "seed": 42,
+  "dataset": "videomme",
+  "num_samples": 10,
+  "num_frames_grid": [
+    16,
+    32
+  ],
+  "methods": [
+    "uniform",
+    "aks-blip",
+    "aks-clip",
+    "bolt-clip",
+    "bolt-siglip2",
+    "clip-new",
+    "blip-new",
+    "siglip2-new"
+  ],
+  "use_preprocessed_clip_frames": true,
+  "preprocessed_clip_dir": "/userhome/cs3/duanty/dataset_preposcess/videomme/clip_1",
+  "num_heatmaps": 20
+}

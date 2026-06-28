@@ -109,11 +109,14 @@ def calculate_mra(pred: float, gt: float) -> float:
 
 def compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[float, float]:
     avg_accuracy = 0.0
-    if task_filter in {"mcq", "short", "medium", "long"} and results["total"] > 0:
+    tf = str(task_filter).strip()
+    if tf in {"mcq", "short", "medium", "long"} and results["total"] > 0:
         avg_accuracy = results["correct"] / results["total"] * 100
-    elif task_filter == "numeric" and results["mra_count"] > 0:
+    elif tf not in {"all", "numeric", "generation"} and results["total"] > 0:
+        avg_accuracy = results["correct"] / results["total"] * 100
+    elif tf == "numeric" and results["mra_count"] > 0:
         avg_accuracy = results["mra_sum"] / results["mra_count"] * 100
-    elif task_filter == "all":
+    elif tf == "all":
         total_score = results["correct"] + results["mra_sum"]
         total_count = results["total"] + results["mra_count"]
         if total_count > 0:
@@ -123,9 +126,12 @@ def compute_accuracy_from_results(results: dict, task_filter: str) -> tuple[floa
 
 
 def compute_score_counts_for_csv(results: dict, task_filter: str) -> tuple[int, float]:
-    if task_filter in {"mcq", "short", "medium", "long"}:
+    tf = str(task_filter).strip()
+    if tf in {"mcq", "short", "medium", "long"}:
         return int(results["total"]), float(results["correct"])
-    if task_filter == "numeric":
+    if tf not in {"all", "numeric", "generation"} and results["total"] > 0:
+        return int(results["total"]), float(results["correct"])
+    if tf == "numeric":
         return int(results["mra_count"]), float(results["mra_sum"])
     return int(results["total"] + results["mra_count"]), float(results["correct"] + results["mra_sum"])
 
@@ -144,6 +150,8 @@ def load_srt_segments(subtitle_path: str) -> list[tuple[float, float, str]]:
     p = Path(subtitle_path)
     if not p.is_file():
         return []
+    if p.suffix.lower() == ".json":
+        return load_lvb_json_segments(subtitle_path)
     text = p.read_text(encoding="utf-8", errors="ignore")
     blocks = re.split(r"\n\s*\n", text.strip())
     segs: list[tuple[float, float, str]] = []
@@ -170,7 +178,84 @@ def load_srt_segments(subtitle_path: str) -> list[tuple[float, float, str]]:
     return segs
 
 
+def _lvb_timestamp_to_seconds(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    if ":" in text:
+        return parse_subtitle_time(text)
+    return float(text)
+
+
+def load_lvb_json_segments(
+    subtitle_path: str,
+    *,
+    starting_timestamp: float = 0.0,
+) -> list[tuple[float, float, str]]:
+    p = Path(subtitle_path)
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+
+    segs: list[tuple[float, float, str]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text", item.get("line", ""))).strip()
+        if not text:
+            continue
+        if "timestamp" in item:
+            ts = item["timestamp"]
+            if not isinstance(ts, (list, tuple)) or len(ts) < 2:
+                continue
+            start = _lvb_timestamp_to_seconds(ts[0]) - starting_timestamp
+            end = _lvb_timestamp_to_seconds(ts[1]) - starting_timestamp
+        else:
+            start = _lvb_timestamp_to_seconds(item.get("start", 0.0)) - starting_timestamp
+            end = _lvb_timestamp_to_seconds(item.get("end", start)) - starting_timestamp
+        if end < start:
+            end = start
+        segs.append((max(0.0, start), max(0.0, end), text))
+    segs.sort(key=lambda x: x[0])
+    return segs
+
+
 def resolve_subtitle_path(sample: Any, subtitles_dir: str | None) -> str | None:
+    if isinstance(getattr(sample, "metadata", None), dict):
+        meta_path = str(sample.metadata.get("subtitle_path", "")).strip()
+        if meta_path and Path(meta_path).is_file():
+            return meta_path
+        rel_path = str(sample.metadata.get("subtitle_path_rel", "")).strip()
+        if rel_path:
+            explicit_dir = os.path.expanduser(subtitles_dir) if subtitles_dir else ""
+            rel_candidates: list[Path] = []
+            if explicit_dir:
+                rel_candidates.extend(
+                    [
+                        Path(explicit_dir) / rel_path,
+                        Path(explicit_dir) / Path(rel_path).name,
+                    ]
+                )
+            video_path = Path(sample.video_path).expanduser().resolve()
+            for root in [video_path.parent, video_path.parent.parent, video_path.parent.parent.parent]:
+                rel_candidates.extend(
+                    [
+                        root / rel_path,
+                        root / "subtitles" / rel_path,
+                        root / "subtitles" / Path(rel_path).name,
+                    ]
+                )
+            for candidate in rel_candidates:
+                if candidate.is_file():
+                    return str(candidate)
+
     explicit_dir = os.path.expanduser(subtitles_dir) if subtitles_dir else ""
     video_path = Path(sample.video_path).expanduser().resolve()
     video_stem = video_path.stem
@@ -208,6 +293,12 @@ def collect_unique_subtitles_for_sample(
     subtitle_path = resolve_subtitle_path(sample, subtitles_dir=subtitles_dir)
     if not subtitle_path:
         return []
+    starting_timestamp = 0.0
+    if isinstance(getattr(sample, "metadata", None), dict):
+        try:
+            starting_timestamp = float(sample.metadata.get("starting_timestamp_for_subtitles", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            starting_timestamp = 0.0
     cap = cv2.VideoCapture(sample.video_path)
     if not cap.isOpened():
         return []
@@ -224,7 +315,10 @@ def collect_unique_subtitles_for_sample(
         frame_indices = sorted(rng.sample(range(total_frames), k))
     else:
         frame_indices = [int(i * total_frames / k) for i in range(k)]
-    segments = load_srt_segments(subtitle_path)
+    if Path(subtitle_path).suffix.lower() == ".json":
+        segments = load_lvb_json_segments(subtitle_path, starting_timestamp=starting_timestamp)
+    else:
+        segments = load_srt_segments(subtitle_path)
     if not segments:
         return []
     out: list[str] = []
@@ -248,6 +342,12 @@ def collect_subtitles_for_frame_ids(
     subtitle_path = resolve_subtitle_path(sample, subtitles_dir=subtitles_dir)
     if not subtitle_path or not sampled_frame_ids:
         return [], ["" for _ in sampled_frame_ids]
+    starting_timestamp = 0.0
+    if isinstance(getattr(sample, "metadata", None), dict):
+        try:
+            starting_timestamp = float(sample.metadata.get("starting_timestamp_for_subtitles", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            starting_timestamp = 0.0
     cap = cv2.VideoCapture(sample.video_path)
     if not cap.isOpened():
         return [], ["" for _ in sampled_frame_ids]
@@ -255,7 +355,10 @@ def collect_subtitles_for_frame_ids(
     cap.release()
     if fps <= 1e-6:
         return [], ["" for _ in sampled_frame_ids]
-    segments = load_srt_segments(subtitle_path)
+    if Path(subtitle_path).suffix.lower() == ".json":
+        segments = load_lvb_json_segments(subtitle_path, starting_timestamp=starting_timestamp)
+    else:
+        segments = load_srt_segments(subtitle_path)
     if not segments:
         return [], ["" for _ in sampled_frame_ids]
     out: list[str] = []

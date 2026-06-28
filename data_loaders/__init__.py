@@ -5,6 +5,7 @@ from typing import Any
 
 from .base import BaseDataLoader, VQASample
 from .egoschema import EgoSchemaLoader
+from .longvideobench import LongVideoBenchLoader
 from .mlvu import MLVULoader
 from .nextqa import NextQALoader
 from .shared_paths import SHARED_DATASET_ROOT
@@ -14,6 +15,8 @@ from .vsibench import VSIBenchLoader
 
 LOADER_REGISTRY: dict[str, type[BaseDataLoader]] = {
     "egoschema": EgoSchemaLoader,
+    "lvb": LongVideoBenchLoader,
+    "longvideobench": LongVideoBenchLoader,
     "mlvu": MLVULoader,
     "nextqa": NextQALoader,
     "videomme": VideoMMELoader,
@@ -23,6 +26,8 @@ LOADER_REGISTRY: dict[str, type[BaseDataLoader]] = {
 # 各数据集默认根目录（共享 duanty 数据，可用 FINETUNE_SHARED_DATASET_ROOT 覆盖）
 DEFAULT_DATASET_ROOTS: dict[str, str] = {
     "egoschema": str(SHARED_DATASET_ROOT / "egoschema"),
+    "lvb": str(SHARED_DATASET_ROOT / "LongVideoBench"),
+    "longvideobench": str(SHARED_DATASET_ROOT / "LongVideoBench"),
     "mlvu": str(SHARED_DATASET_ROOT / "mlvu_test"),
     "nextqa": str(SHARED_DATASET_ROOT / "nextqa"),
     "videomme": str(SHARED_DATASET_ROOT / "Video-MME"),

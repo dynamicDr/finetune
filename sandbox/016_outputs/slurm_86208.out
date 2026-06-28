@@ -1,0 +1,6 @@
+OpenCLIP not installed
+[aks_sampler] extract_feature_model=blip, query=According to what is shown in the video, why does the cameraman drive a car?
+[aks_sampler] loaded preprocessed candidate frames: sample_id=874-1, count=2005
+[aks_sampler] 从本地缓存加载: Salesforce/blip-itm-base-coco
+[aks_sampler] 从本地缓存加载: Salesforce/blip-itm-base-coco
+[aks_sampler] loaded BLIP model(Salesforce/blip-itm-base-coco) on device=None

@@ -1,0 +1,45 @@
+---
+description: 后台实验优先使用 gpu-4090-a02 节点
+alwaysApply: true
+---
+
+# 后台实验 GPU 调度
+
+在本项目中通过 Slurm 提交后台实验时，**优先申请 `gpu-4090-a02` 节点**（该节点有 10 张空闲 RTX 4090，避免混用节点导致 GPU 被占）。
+
+## 推荐方式
+
+使用项目已有的 Hydra Slurm 配置，在 `python run.py` 命令中加：
+
+```
+slurm=default_4090
+```
+
+该配置见 `config/slurm/default_4090.yaml`，已通过 `additional_parameters.nodelist: gpu-4090-a02` 固定节点。
+
+示例：
+
+```bash
+python run.py --multirun \
+    hydra/launcher=submitit_slurm \
+  ... \
+    slurm=default_4090
+```
+
+## 直接 sbatch 时
+
+若不用 Hydra，在 sbatch 参数中指定：
+
+```
+--partition=debug --nodelist=gpu-4090-a02
+```
+
+## 提交前检查
+
+- 查看节点空闲：`sinfo`
+- 查看自己的任务：`squeue -u $USER`
+
+## 注意
+
+- 仅当实验适合 RTX 4090（debug 分区、6 小时时限）时使用；需要 H100/H800 或更长时限时改用 `slurm=hgpu_batch` 等配置。
+- 不要擅自修改 `config/slurm/default_4090.yaml` 中的 `nodelist`，除非用户明确要求换节点。

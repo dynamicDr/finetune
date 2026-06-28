@@ -1,0 +1,25 @@
+/userhome/cs3/duanty/miniconda3/lib/python3.13/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.1) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+/userhome/cs3/duanty/miniconda3/envs/finetune/lib/python3.10/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+samples:   0%|          | 0/10 [00:00<?, ?it/s]
+874-1@16f:   0%|          | 0/8 [00:00<?, ?it/s][A
+874-1@16f:  12%|█▎        | 1/8 [00:10<01:14, 10.61s/it][A
+
+Loading weights:   0%|          | 0/472 [00:00<?, ?it/s][A[ALoading weights: 100%|██████████| 472/472 [00:00<00:00, 46600.09it/s]
+
+                                                        [Asamples:   0%|          | 0/10 [00:21<?, ?it/s]
+Traceback (most recent call last):
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 491, in <module>
+    main()
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 445, in main
+    frame_ids = select_frame_ids_for_method(
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 330, in select_frame_ids_for_method
+    return _aks_frame_ids(extract_feature_model="blip", **common, **qa)
+  File "/userhome/cs3/duanty/finetune/sandbox/016_baseline_frame_selection_heatmap.py", line 283, in _aks_frame_ids
+    scores, frame_num = _extract_scores(
+  File "/userhome/cs3/duanty/finetune/frame_samplers/aks.py", line 391, in _extract_scores
+    ).to(device)
+  File "/userhome/cs3/duanty/miniconda3/envs/finetune/lib/python3.10/site-packages/transformers/feature_extraction_utils.py", line 246, in to
+    raise ValueError(f"Attempting to cast a BatchFeature to type {str(arg)}. This is not supported.")
+ValueError: Attempting to cast a BatchFeature to type None. This is not supported.

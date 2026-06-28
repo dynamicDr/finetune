@@ -15,6 +15,7 @@ from data_loaders import (
     should_apply_vl_pixel_limits,
     get_data_loader,
     list_supported_datasets,
+    resolve_dataset_root,
 )
 from data_loaders.base import VQASample, sample_matches_task_filter
 from frame_samplers import sample_video_frames
@@ -30,10 +31,15 @@ from utils import (
 )
 from lmms_eval_bridge import generate_response, load_model_and_processor, release_cuda_memory, resolve_lmms_model_name
 from lmms_eval_official import (
+    aggregate_lvb,
     aggregate_videomme,
+    build_lvb_prompt,
     build_videomme_prompt,
+    is_official_lvb_dataset,
     is_official_videomme_dataset,
+    resolve_lvb_max_new_tokens,
     resolve_videomme_max_new_tokens,
+    score_lvb,
     score_videomme,
 )
 
@@ -155,8 +161,10 @@ def evaluate_vqa(
     subtitles_dir: str | None = None,
     dataset: str = "",
     lmms_model_name: str = "",
+    video_dir: str = "",
 ) -> dict[str, Any]:
     use_official_videomme = is_official_videomme_dataset(dataset)
+    use_official_lvb = is_official_lvb_dataset(dataset)
     results = {
         "correct": 0,
         "total": 0,
@@ -167,6 +175,7 @@ def evaluate_vqa(
         "over_max_tokens_count": 0,
         "missing_think_end_count": 0,
         "official_videomme_scores": [],
+        "official_lvb_scores": [],
     }
 
     pbar = tqdm(samples, desc="评估进度")
@@ -224,7 +233,7 @@ def evaluate_vqa(
                 random_seed=random_seed,
                 subtitles_dir=subtitles_dir,
             )
-            if use_subtitles and not use_official_videomme
+            if use_subtitles and not use_official_videomme and not use_official_lvb
             else []
         )
         raw_doc = sample.metadata.get("raw_doc")
@@ -234,6 +243,16 @@ def evaluate_vqa(
                 lmms_model_name,
                 use_subtitles=use_subtitles,
                 num_frames=num_frames,
+            )
+        elif use_official_lvb and isinstance(raw_doc, dict):
+            prompt = build_lvb_prompt(
+                raw_doc,
+                lmms_model_name,
+                use_subtitles=use_subtitles,
+                num_frames=num_frames,
+                video_dir=video_dir,
+                subtitles_dir=subtitles_dir,
+                subtitle_path=str(sample.metadata.get("subtitle_path", "") or "") or None,
             )
         elif use_subtitles:
             prompt = build_user_text_with_subtitles(sample.question, sample.options, subtitles_for_prompt)
@@ -274,6 +293,13 @@ def evaluate_vqa(
             ans_text = str(pred_answer)
             is_correct = float(score_dict.get("score", 0.0)) == 1.0
             answer_usable = True
+        elif use_official_lvb and isinstance(raw_doc, dict):
+            score_dict = score_lvb(raw_doc, response)
+            results["official_lvb_scores"].append(score_dict)
+            pred_answer = score_dict.get("parsed_pred", "")
+            ans_text = str(pred_answer)
+            is_correct = str(score_dict.get("answer", "")).strip().upper() == str(pred_answer).strip().upper()
+            answer_usable = True
         else:
             answer_usable = has_think_end or (not require_think_end_for_scoring)
             if not answer_usable:
@@ -293,7 +319,7 @@ def evaluate_vqa(
         results["inference_times"].append(inference_time)
 
         if sample.options is not None:
-            if not use_official_videomme:
+            if not use_official_videomme and not use_official_lvb:
                 is_correct = answer_usable and (
                     str(sample.answer).strip().upper() == str(pred_answer).strip().upper()
                 )
@@ -318,6 +344,8 @@ def evaluate_vqa(
 
     if use_official_videomme and results["official_videomme_scores"]:
         results["official_videomme_overall"] = aggregate_videomme(results["official_videomme_scores"])
+    if use_official_lvb and results["official_lvb_scores"]:
+        results["official_lvb_overall"] = aggregate_lvb(results["official_lvb_scores"])
 
     return results
 
@@ -366,7 +394,7 @@ def parse_args():
         "--task_filter",
         type=str,
         default="all",
-        help="all/mcq/numeric/generation，或数据集特定桶（如 videomme: short/medium/long；mlvu: plotQA/anomaly_reco/...）",
+        help="all/mcq/numeric/generation，或数据集特定桶（如 videomme: short/medium/long；lvb: 15/60/600/3600 或 TOS/T2A/...；mlvu: plotQA/anomaly_reco/...）",
     )
     p.add_argument("--max_new_tokens", type=int, default=2048)
     p.add_argument(
@@ -479,6 +507,13 @@ def main():
             f"max_new_tokens={effective_max_new_tokens}, lmms_model={lmms_model_name}",
             flush=True,
         )
+    elif is_official_lvb_dataset(args.dataset):
+        effective_max_new_tokens = resolve_lvb_max_new_tokens()
+        print(
+            "[vqa_eval] LongVideoBench validation 使用官方 lmms-eval prompt / 打分；"
+            f"max_new_tokens={effective_max_new_tokens}, lmms_model={lmms_model_name}",
+            flush=True,
+        )
     else:
         print(
             f"[vqa_eval] max_new_tokens 已按模式固定: mode={model_mode}, "
@@ -523,6 +558,7 @@ def main():
         subtitles_dir=(args.subtitles_dir.strip() if args.subtitles_dir.strip() else None),
         dataset=args.dataset,
         lmms_model_name=lmms_model_name,
+        video_dir=resolve_dataset_root(args.dataset),
     )
     avg_accuracy, avg_inference_time = _compute_accuracy_from_results(results, args.task_filter)
     evaluated_samples, correct_count = _compute_score_counts_for_csv(results, args.task_filter)
@@ -560,6 +596,12 @@ def main():
         print(
             f"官方 Video-MME Overall: {results['official_videomme_overall']:.1f}% "
             f"(n={len(results['official_videomme_scores'])})",
+            flush=True,
+        )
+    if "official_lvb_overall" in results:
+        print(
+            f"官方 LongVideoBench Overall: {results['official_lvb_overall']:.1f}% "
+            f"(n={len(results['official_lvb_scores'])})",
             flush=True,
         )
 

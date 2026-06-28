@@ -1,0 +1,62 @@
+[
+  {
+    "sample_id": "874-1",
+    "task_type": "long",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/h1cv8Fsn4eU.mp4",
+    "question": "According to what is shown in the video, why does the cameraman drive a car?"
+  },
+  {
+    "sample_id": "153-1",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/_KU4X06VNiE.mp4",
+    "question": "Referring to ths video, which company sponsored the competition?"
+  },
+  {
+    "sample_id": "035-1",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/Gh_GtYtQoVI.mp4",
+    "question": "What is the function of the stopwatch in the upper right corner of the video?"
+  },
+  {
+    "sample_id": "376-2",
+    "task_type": "medium",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/VBygMK8jRoI.mp4",
+    "question": "What is the final piece of equipment that the woman adds to her body?"
+  },
+  {
+    "sample_id": "335-2",
+    "task_type": "medium",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/GPOv72Awo68.mp4",
+    "question": "As depicted in the video, how did investors respond to the availability of mortgage-backed securities and CDOs in the early 2000s?"
+  },
+  {
+    "sample_id": "305-3",
+    "task_type": "medium",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/tuZcS2Flabw.mp4",
+    "question": "Which of the following events are in correct order?"
+  },
+  {
+    "sample_id": "191-2",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/vQTQJ1Mlzqo.mp4",
+    "question": "What finger is wrapped with the third rubber band trick in this video?"
+  },
+  {
+    "sample_id": "140-3",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/Kv1JXuOkAfk.mp4",
+    "question": "According to the video, what happens to the car when it is running?"
+  },
+  {
+    "sample_id": "745-2",
+    "task_type": "long",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/mRgstQ4X5d4.mp4",
+    "question": "What story does this documentary tell?"
+  },
+  {
+    "sample_id": "119-3",
+    "task_type": "short",
+    "video_path": "/userhome/cs3/duanty/dataset/Video-MME/videos/data/-ApL8d6tX5U.mp4",
+    "question": "According to the video, what problem does the world's shortest woman have?"
+  }
+]
