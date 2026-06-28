@@ -979,7 +979,7 @@ def collect_video_frames_at_fps(
 
 # ==================== 关键词磁盘缓存 ====================
 KEYWORD_CACHE_DURATION_SUFFIXES = frozenset({"short", "medium", "long"})
-DEFAULT_KEYWORD_CACHE_DIR = Path.home() / "vqa_keyword_cache"
+DEFAULT_KEYWORD_CACHE_DIR = Path("/userhome/cs3/duanty/vqa_keyword_cache")
 
 
 def keyword_cache_dataset_key(dataset: str, task_type: str | None = None) -> str:

@@ -48,6 +48,7 @@ from utils import (
     ours_eval_csv_row,
     pool_positions_at_fps,
     resolve_keyword_cache_root,
+    DEFAULT_KEYWORD_CACHE_DIR,
     resolve_preprocessed_clip_dir,
     sanitize_cache_component,
     save_keyword_cache_entry,
@@ -676,6 +677,7 @@ def _extract_keywords_with_optional_cache(
     use_cache: bool,
     cache_dir: str | None,
     cache_number: int = 0,
+    cache_write_on_miss: bool = False,
 ) -> tuple[list[str], list[str]]:
     cache_dataset_key = keyword_cache_dataset_key(dataset, task_type)
     cache_root = resolve_keyword_cache_root(cache_dir)
@@ -696,6 +698,13 @@ def _extract_keywords_with_optional_cache(
             kws_raw, kws = cached
             _log(f"sample={sample_id} 关键词缓存命中 ({cache_path})")
             return kws_raw, kws
+        if not cache_write_on_miss:
+            raise RuntimeError(
+                f"sample={sample_id} 关键词缓存未命中 ({cache_path})；"
+                "已启用 --use_keyword_cache 且未开启 --write_keyword_cache，仅读缓存、不调用关键词 API。"
+                "请检查 keyword_cache_dir、keyword_extractor_model、keyword_prompt_version、"
+                "max_keywords、keyword_cache_number 是否与生成缓存时一致。"
+            )
 
     kws_raw, kws = _extract_keywords_with_llm_text(
         model=model,
@@ -709,7 +718,7 @@ def _extract_keywords_with_optional_cache(
         api_base_url=api_base_url,
         api_key_env=api_key_env,
     )
-    if use_cache and kws:
+    if use_cache and cache_write_on_miss and kws:
         save_keyword_cache_entry(
             cache_path,
             sample_id=sample_id,
@@ -1083,6 +1092,7 @@ def _eval_one_sample(
         use_cache=bool(args.use_keyword_cache),
         cache_dir=str(args.keyword_cache_dir or ""),
         cache_number=int(args.keyword_cache_number),
+        cache_write_on_miss=bool(args.write_keyword_cache),
     )
     if not kws:
         raise RuntimeError(f"LLM 关键词提取失败: sample={sample.sample_id}")
@@ -1455,14 +1465,20 @@ def parse_args():
     p.add_argument(
         "--use_keyword_cache",
         action="store_true",
-        help="使用关键词磁盘缓存：同一 dataset(+short/medium/long)+keyword_extractor_model+prompt+cache_number "
-        "下已跑过的样本直接读缓存，未命中则 LLM 抽取后写入（默认目录 ~/vqa_keyword_cache）",
+        help="仅使用关键词磁盘缓存（不调用关键词 API）：同一 dataset(+short/medium/long)+keyword_extractor_model"
+        "+prompt+cache_number 下已跑过的样本直接读缓存；未命中则报错（默认目录 /userhome/cs3/duanty/vqa_keyword_cache）",
+    )
+    p.add_argument(
+        "--write_keyword_cache",
+        action="store_true",
+        help="与 --use_keyword_cache 联用：缓存未命中时调用关键词 API 并写入缓存（需 API key）；"
+        "未开启时仅读已有缓存，未命中则报错",
     )
     p.add_argument(
         "--keyword_cache_dir",
         type=str,
-        default="",
-        help="关键词缓存根目录；为空时使用 ~/vqa_keyword_cache",
+        default=str(DEFAULT_KEYWORD_CACHE_DIR),
+        help="关键词缓存根目录（默认 /userhome/cs3/duanty/vqa_keyword_cache）",
     )
     p.add_argument(
         "--keyword_cache_number",
